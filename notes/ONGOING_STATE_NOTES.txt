@@ -1,0 +1,8 @@
+
+NOTES - ORDERED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLETED AND THE SUGGESTED IMMEDIATE NEXT WORK/THING TO SOLVE
+
+    - 20220219
+
+        A) completed download of N years, dumped to file on a year basis
+        B) working on loading data from local database folder
+        C) executed intial commit
