@@ -1,0 +1,91 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jan  5 16:18:32 2022
+
+@author: fiora
+"""
+
+"""
+Description:
+  
+    
+"""
+
+from typing import NamedTuple
+import pandas_datareader as pdr
+
+import histadatalib as hd
+
+import lmdb
+
+class DEFAULT_PATHS:
+    
+    FOREX_LOCAL_HIST_DATA_PATH     = "C:/Database/Forex/Historical"
+    FOREX_LOCAL_REALTIME_DATA_PATH = "C:/Database/Forex/RealTime"
+    
+class db_parameters(NamedTuple):
+    """
+        pair : exchange currency pair
+    """
+    
+    pair                : str  = None
+    timescale           : list = None 
+    years               : list = None
+    months              : list = None
+    hist_data_path      : str  = DEFAULT_PATHS.FOREX_LOCAL_HIST_DATA_PATH
+    rt_data_path        : str  = DEFAULT_PATHS.FOREX_LOCAL_REALTIME_DATA_PATH
+    data_source         : list = None
+    nrows_per_file      : int  = 100000
+    add_real_time       : bool = False
+    search_local_folder : bool = False
+    
+    
+class db_manager:
+    
+    def __init__(self, parameters=None):
+                 
+        assert isinstance( parameters, db_parameters), \
+                'Parameters must be a data_manager_parameters instance'
+        
+        
+        self.parameters = parameters
+        # historical data manager
+        
+        self.historical_db = hd.HistDataManager(parameters.pair, 
+                                                parameters.hist_data_path,
+                                                parameters.years,
+                                                timeframe = parameters.timescale,
+                                                perform_download = False,
+                                                nrows_per_file = parameters.nrows_per_file ) 
+                
+        # realtime data manager
+        
+        
+        
+    def download_histdata(self, years=None):
+        
+        if not years:
+            years = self.historical_db.years
+            
+        self.historical_db.download(years)
+        
+
+    def get_realtime_quote(self):
+        
+        pass
+    
+    def get_last_candle(self, retain_data=False):
+        
+        pass
+    
+    def data_to_file(self, file_type='csv', filepath=None):
+        
+        if self.historical_db:
+            self.historical_db.data_to_file()
+        
+    
+    def search_local_folder(self):
+        
+        pass
+
+
