@@ -6,3 +6,31 @@ NOTES - ORDERED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLET
         A) completed download of N years, dumped to file on a year basis
         B) working on loading data from local database folder
         C) executed intial commit
+
+        TODOs
+
+        1) test .resample method in histdatalib._reframe_data
+        2) complete function that searches on local folder if specified data is available
+            . YES: read load data to object
+            . NO : exit with no action taken ----> data needs to be downloaded
+
+        3) Start real-time data management: get, update local database, plotting
+
+    - 20220220
+
+        Added dotty_dict package:
+            a dotty() instance for local data (= _local_db) will have all the details related to available data 
+            on current local database folder
+
+    - 20220301
+
+        Need to empower data management with dotty dictionaries
+
+    - 20220309
+
+        data to local files are dumped by years
+        key format for the dotty dict of managed data:
+            . organize by year or unify alla available data for the pair? 
+                --> download chain of functions call to improve: efficiency and capability of
+                    organization by year
+        
