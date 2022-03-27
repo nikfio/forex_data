@@ -14,7 +14,7 @@ Description:
 from typing import NamedTuple
 import pandas_datareader as pdr
 
-import histadatalib as hd
+import histdatalib as hd
 
 import lmdb
 

@@ -26,10 +26,10 @@ from data_manager import db_manager, db_parameters
 
 def main(argv):
     
-    param = db_parameters(pair='EURUSD',
-                          timescale = '1H',
-                          years = [2000],
-                          data_source = 'HISTDATA',
+    param = db_parameters(pair           = 'EURUSD',
+                          timescale      = '1H',
+                          years          = [2000],
+                          data_source    = 'HISTDATA',
                           nrows_per_file = 50000
                           )
     
