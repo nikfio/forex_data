@@ -12,30 +12,34 @@ Description:
         1) download historical data and save to file in minimal timeframe
            available (TICK) to avoid further downloads at each run
            
-        2) resample TICK data to to have any larger timeframe desired
+        2) resample TICK data to to have any larger timeframe specified
+            2.1) manage read/write of lmdb files 
     
         3) add real time data download 
     
-        4) add download of any indicator or generic data specified by the 
-           user
+        4) add download of any indicator or generic data other than 
+           pair exchange data
     
 """
 
 from absl import app
 from data_manager import db_manager, db_parameters
 
+#TODO: add logging options via input FLAGS
+
 def main(argv):
     
-    param = db_parameters(pair           = 'EURUSD',
-                          timescale      = '1H',
-                          years          = [2000],
-                          data_source    = 'HISTDATA',
-                          nrows_per_file = 50000
-                          )
+    #TODO: get logging handler
     
-    db_test = db_manager(param)
+    init_param = db_parameters(pair           = 'EURUSD',
+                               timescale      = '4H',
+                               years          = [2000,2001],
+                               data_source    = 'HISTDATA'
+                               )
     
-    db_test.download_histdata()
+    db_test = db_manager(init_param)
+    
+    db_test.download_histdata([2003,2004,2005])
     
     
     
