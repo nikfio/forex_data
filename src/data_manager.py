@@ -50,38 +50,35 @@ class db_manager:
         
         self.parameters = parameters
         # historical data manager
-        
-        self.historical_db = hd.HistDataManager(parameters.pair, 
-                                                parameters.hist_data_path,
-                                                parameters.years,
-                                                timeframe = parameters.timescale,
-                                                perform_download = False,
-                                                nrows_per_file = parameters.nrows_per_file ) 
+        self._historical_mngr = hd.HistDataManager(parameters.pair, 
+                                                   parameters.hist_data_path,
+                                                   parameters.years,
+                                                   timeframe = parameters.timescale)
                 
         # realtime data manager
         
         
         
-    def download_histdata(self, years=None):
+    def download_histdata(self, years):
+             
         
-        if not years:
-            years = self.historical_db.years
-            
-        self.historical_db.download(years)
+        self._historical_mngr.download(years)
         
 
     def get_realtime_quote(self):
         
         pass
     
+    
     def get_last_candle(self, retain_data=False):
         
         pass
     
+    
     def data_to_file(self, file_type='csv', filepath=None):
         
-        if self.historical_db:
-            self.historical_db.data_to_file()
+        if self._historical_mngr:
+            self._historical_mngr.data_to_file()
         
     
     def search_local_folder(self):

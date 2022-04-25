@@ -21,30 +21,24 @@ import histdata.api
 
 # from matplotlib.dates import MONDAY, DateFormatter, DayLocator, WeekdayLocator
 
-URL_TEMPLATE = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
-               'ascii/tick-data-quotes/{pair}/{year}/{month_num}'
-DOWNLOAD_URL = "http://www.histdata.com/get.php"
-DOWNLOAD_METHOD = 'POST'
-DEFAULT_timeframe_TEMPLATE = '{}s'
-MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December']
-YEARS = list(range(2000, 2022, 1))
+URL_TEMPLATE                = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
+                              'ascii/tick-data-quotes/{pair}/{year}/{month_num}'
+DOWNLOAD_URL                = "http://www.histdata.com/get.php"
+DOWNLOAD_METHOD             = 'POST'
+DEFAULT_timeframe_TEMPLATE  = '{}s'
+MONTHS                      = ['January', 'February', 'March', 'April', 'May', 'June',
+                               'July', 'August', 'September', 'October', 'November', 'December']
+YEARS                       = list(range(2000, 2022, 1))
 
-# parse string and return datetime as template defined 
-def infer_date(s): return dt.strptime(s + '000', "%Y%m%d %H%M%S%f")
+RAW_DATE_FORMAT             = '%Y%m%d %H%M%S%f' 
+DATE_FORMAT                 = '%Y-%m-%d %H:%M:%S' 
 
-# parse timeframe as string and validate if it is valid
-# following pandas DateOffset freqstr rules and 'TICK' (=lowest timeframe available)
-def check_timeframe_str(tf):
-    
-    try:
-        to_offset(tf) or tf == 'TICK'
-    except ValueError:
-        raise ValueError("Invalid timeframe: %s" % (tf))
-    else: 
-        return tf
-    
-### auxiliary def
+FILENAME_STR                = '{pair}_Y{year}_{tf}.csv'
+
+
+### auxiliary CONSTANT DEFINITIONS
+
+# TIMEFRAME macro
 class TIMEFRAME_MACRO:
     
     MIN_TICK_TF      = 'TICK'
@@ -54,33 +48,91 @@ class TIMEFRAME_MACRO:
     ONE_WEEK_TF      = '1W'
     ONE_MONTH_TF     = '1M'
     
-# filename template : <PAIR>_<year>_<timeframe>.<filetype>
+# filename template : <PAIR>_Y<year>_<timeframe>.<filetype>
 class FILENAME_TEMPLATE:
     
-    PAIR_INDEX       = 0
-    YEAR_INDEX       = 1
-    TF_INDEX         = 2
-    FILETYPE_INDEX   = 3
+    PAIR_INDEX              = 0
+    YEAR_INDEX              = 1
+    YEAR_NUMERICAL_CHAR     = 1
+    TF_INDEX                = 2
+    FILETYPE_INDEX          = 3
     
+# column names for dataframes TICK and timeframe filtered
+class DATA_COLUMN_NAMES:
+    
+    TICK_DATA               = ['timestamp','ask','bid','vol','p']
+    TF_DATA                 = ['timestamp','open','close','high','low']
+    TICK_DATA_TIME_INDEX    = ['ask','bid','vol','p']
+    TF_DATA_TIME_INDEX      = ['open','close','high','low']
+        
+class DTYPE_DICT:
+    
+    TICK_DTYPE = {'ask': 'float32', 'bid': 'float32',
+                  'vol': 'float16', 'p': 'float32'}
+    TF_DTYPE   = {'open': 'float32', 'close': 'float32',
+                  'high': 'float32', 'low': 'float32'}
 
-### class using hddl repo
+
+
+### auxiliary fast functions
+
+# parse date obj and return datetime as template defined 
+def infer_date_dt(s): return pd.to_datetime(s, 
+                                            format   = DATE_FORMAT,
+                                            exact    = True,
+                                            utc      = True)
+
+# parse RAW FILE date obj and return datetime as template defined 
+def infer_raw_date_dt(s): return pd.to_datetime(s, 
+                                                format   = RAW_DATE_FORMAT,
+                                                exact    = True,
+                                                utc      = True)
+
+# parse timeframe as string and validate if it is valid
+# following pandas DateOffset freqstr rules and 'TICK' (=lowest timeframe available)
+def check_timeframe_str(tf):
+    
+    if tf == 'TICK':
+        return tf
+    else:
+    
+        try:
+            to_offset(tf) 
+        except ValueError:
+            raise ValueError("Invalid timeframe: %s" % (tf))
+        else: 
+            return tf
+        
+        
+        
+### class implementation
+
 class HistDataManager(TestCase):
 
-    def __init__(self, pair, data_path, years=None, months=None, timeframe='1H',
-                 perform_download=False, nrows_per_file=None):
+    def __init__(self, pair, data_path, years=None, months=None, 
+                 timeframe='1H'):
         """
-        The Hist Data Manager is capable of downloading tick data of one Month
-        and to convert it to the desired timeframe.
-        :param pair (str):  the currency pair to download eg. EURUSD, USDNZD, ...
-        :param data_path (str):  the folder path to search for data or save data files downloaded
-        :param years (list of int):    the years of interest
-        :param month (list of str):   the months of interest (1-12)
-        :param timeframe (freq param):  timeframe of candledata,
-                                        compliant to pandas Grouper freq param
-        :param perform_download (bool): load data based constructor info params
+        
 
-        :method download:   starts the download and returns a pandas.DataFrame
-                            with columns (open, close, high, low) indexed by date.
+        Parameters
+        ----------
+        pair : TYPE
+            DESCRIPTION.
+        data_path : TYPE
+            DESCRIPTION.
+        years : TYPE, optional
+            DESCRIPTION. The default is None.
+        months : TYPE, optional
+            DESCRIPTION. The default is None.
+        timeframe : TYPE, optional
+            DESCRIPTION. The default is '1H'.
+        perform_download : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
+
         """
         
         # assert timeframe is a valid freq string value 
@@ -89,7 +141,8 @@ class HistDataManager(TestCase):
         
         # internal
         # list of years currently managed by object instance  
-        self._years = list()                      
+        # data type: int
+        self._years_int = list()                      
         
         # Fundamentals parameters initialization
         self._pair = pair.upper()
@@ -98,7 +151,6 @@ class HistDataManager(TestCase):
 
         # files details variable initialization
         self._data_path        = Path(data_path)
-        self._nrows_per_file   = nrows_per_file
         
         # db currently loaded on object instance
         self._db_dotdict       = dotty()
@@ -106,14 +158,14 @@ class HistDataManager(TestCase):
         self._local_db_dotdict = dotty()
 
         # perform data download at object instantiate
-        if perform_download:
+        if not years:
+            years          = YEARS
+        else:
+            self.assertTrue(set(years).issubset(YEARS))
             
-            if not years:
-                years          = YEARS
-            else:
-                self.assertTrue(set(years).issubset(YEARS))
-                
-            self.download(years, timeframe=self._tf)
+        # initial download at objct instatiation
+        self.download(years, timeframe=self._tf,
+                      search_local=True)
 
     def db_key(self, pair, year, timeframe, data_type):
         """
@@ -139,9 +191,10 @@ class HistDataManager(TestCase):
             
         tf = check_timeframe_str(timeframe)
         
-        return '.'.join([str(pair), str(year), str(tf), str(data_type)])
+        return '.'.join([str(pair), 'Y'+str(year),
+                         str(tf), str(data_type)])
     
-    def _db_all_key(pair, timeframe, data_type):
+    def db_all_key(self, pair, timeframe, data_type):
         
         # all key template = pair.ALL.timeframe.data_type
         
@@ -186,12 +239,12 @@ class HistDataManager(TestCase):
         
         headers = {'Referer': self.url}
         data = {'tk': self.tk, 'date': year, 'datemonth': "%d%02d" % (year, month_num), 'platform': 'ASCII',
-                'timeframe': 'T', 'fxpair': self.pair}
+                'timeframe': 'T', 'fxpair': self._pair}
         r = self.session.request(DOWNLOAD_METHOD, DOWNLOAD_URL, data=data, headers=headers, stream=True)
         bio = BytesIO()
         size = 0
         if logging.level_info():
-            logging.info("Starting to download: %s - %d - %s\n" % (self.pair, year, MONTHS[month_num-1]))
+            logging.info("Starting to download: %s - %d - %s" % (self._pair, year, MONTHS[month_num-1]))
         for chunk in r.iter_content(chunk_size=2 ** 19):
             bio.write(chunk)
             size += len(chunk)
@@ -203,8 +256,10 @@ class HistDataManager(TestCase):
             zf = zipfile.ZipFile(bio)
         except zipfile.BadZipFile:
             
-            print('%s - %d - %s not found or invalid download' % (self.pair, year, MONTHS[month_num-1]))
-            
+            # here will be a warning log
+            print('%s - %d - %s not found or invalid download' % (self._pair, year, MONTHS[month_num-1]))
+            return None
+        
         else:
             
             # return raw zip files 
@@ -232,28 +287,36 @@ class HistDataManager(TestCase):
         # assert timeframe input value
         tf = check_timeframe_str(tf)
 
-        assert bool(tick_data), 'tick_data input must not be empty'
+        assert not tick_data.empty, 'tick_data input must not be empty'
         assert isinstance(tick_data, pd.DataFrame), 'tick_data input must be pandas DataFrame type'
-        assert tick_data.names() == ['ask','bid','vol'], 'tick data input must be raw downloaded tick data'
-
-        grp = tick_data['p'].groupby(pd.Grouper(freq=tf))
-        # TEST: .resample method to ease data reframe given a timeframe as input
-        grp_resample = tick_data.resample(tf)
-        first = grp.first()
-        data = pd.DataFrame(columns='open close high low'.split(), index=first.index)
-        # data.open=grp.first() # better to use last close price
-        data.close = grp.last()
-        data.open = data.close.shift(1)
-        data.high = grp.max()
-        data.low = grp.min()
-        data = data.fillna(method='pad')
-        data.high = data.max(axis=1)
-        data.low = data.min(axis=1)
-        data.index = data.index.tz_localize('CET').tz_convert(None)
+        assert all(tick_data.columns == DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX), \
+                'tick data input must be raw downloaded tick data'
+                
+        assert pd.api.types.is_datetime64_any_dtype(tick_data.index), \
+               'index column must be datetime dtype'
+        
+        # resample along 'p' column
+        df_resampler = tick_data.p.resample(tf)
+        first        = df_resampler.first()
+        data = pd.DataFrame(columns=DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX, 
+                            index=first.index)
+        
+        # set timeframed data
+        data.close   = df_resampler.last()
+        data.open    = data.close.shift(1)
+        data.high    = df_resampler.max()
+        data.low     = df_resampler.min()
+        data         = data.fillna(method='pad')
+        data.high    = data.max(axis=1)
+        data.low     = data.min(axis=1)
+        data.index   = data.index
+        data.fillna(method='bfill', 
+                    axis='columns', 
+                    inplace=True)
 
         return data
 
-    def _parse_raw_download_files(self,raw_files_list=None):
+    def _raw_file_to_df(self, raw_file):
         """
         
 
@@ -268,50 +331,125 @@ class HistDataManager(TestCase):
 
         """
         
-        assert raw_files_list, 'raw files list must not be empty'
+        assert raw_file, 'raw files list must not be empty'
        
         # funtions is specific for format of files downloaded
-        # parse all available files and concatenate data
-        df = pd.concat(pd.read_csv(file, header=None, names='ask bid vol'.split(),
-                                        parse_dates=True, date_parser=infer_date)
-                            for file in raw_files_list)
+        # parse file passed as input
+        df = pd.read_csv(raw_file, 
+                         sep         = ',', 
+                         names       = DATA_COLUMN_NAMES.TICK_DATA,
+                         dtype       = DTYPE_DICT.TICK_DTYPE,
+                         index_col   = 'timestamp',
+                         parse_dates = ['timestamp'],
+                         date_parser = infer_raw_date_dt)
+                           
 
-        
-        df['p'] = (self.df.ask + self.df.bid) / 2
+        # calculate 'p'
+        df['p'] = (df.ask + df.bid) / 2
 
         return df
     
     
-    def _get_years_str_list(self):
+    def _get_years_list(self, pair, vartype):
         
-        # get year keys
-        years_filter_key = '{pair}.:'
-        years_keys = self._db_dotdict[years_filter_key]
-        years_keys.sort(key=int)
+        # work on copy as pop operation is 'inplace'
+        # so the original db is not modified
+        db_copy = self._db_dotdict.copy()
         
-        # return list of int elements as manipulation is easier
-        return [int(year) for year in years_keys]
+        # get keys at year level
+        years_filter_keys = '{pair}'.format(pair=self._pair)
+        
+        # pop at year level in data copy 
+        year_db = db_copy.pop(years_filter_keys)
+        
+        if year_db:
+        
+            try: 
+                years_keys = year_db.keys()
+            except KeyError:
+                # no active year found --> return empty list
+                return []
+            else:
+                
+                # if present do not include 'ALL' key element 
+                # remove first identifier character 'Y' to have canonical 
+                # year values
+                years_list = [key[FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:] 
+                              for key in years_keys 
+                              if key != 'ALL']
+                
+        else:
             
+            # empty db --> return empty list
+            return []
             
+        # sort to have oldest year first
+        years_list.sort(key=int)
+        
+        # return list of elements as manipulation is easier
+        # return type based on input specification
+        if vartype == 'str':
+            
+            return [str(year) for year in years_list]
+        
+        elif vartype == 'int':
+            
+            return [int(year) for year in years_list]
+        
+        else:
+            
+            return [int(year) for year in years_list]
+            
+    def _get_year_timeframe_list(self, pair, year):
+        
+        # work on copy as pop operation is 'inplace'
+        # so the original db is not modified
+        db_copy = self._db_dotdict.get(self._pair).copy()
+        
+        # get key at timeframe level
+        tf_key = 'Y{year}'.format(year=year)
+        
+        # pop at timeframe level in data copy 
+        tf_db = db_copy.pop(tf_key)
+        
+        if tf_db:
+        
+            try: 
+                tf_keys = tf_db.keys()
+            except KeyError:
+                # no active timeframe found --> return empty list
+                return []
+            else:
+                
+                return [key for key in tf_keys]
+                
+        else:
+            
+            # empty db --> return empty list
+            return []
+        
     def _update_all_block_data(self, timeframe=None):
         
         # get year keys
-        years_keys_str = self._get_years_list()
+        years_list_str = self._get_years_list(self._pair, 'str')
         
         all_df = pd.DataFrame()
         
         # loop through years in order from oldest to most recent
-        for year in years_keys_str:
+        for year in years_list_str:
         
             # get df from year key
-            year_tick_key = self.db_key(self.pair.upper(), year, 'TICK', 'df')
-            assert isinstance(self._db_dotdict[year_tick_key], pd.DataFrame)
+            year_tick_key = self.db_key(self._pair, year, 'TICK', 'df')
+            assert isinstance(self._db_dotdict.get(year_tick_key), pd.DataFrame), \
+                   'key %s is no valid DataFrame' % (year_tick_key)
             
             # append to all_df 
-            pd.concat(all_df, self._db_dotdict[year_tick_key])
+            all_df = pd.concat([all_df, self._db_dotdict.get(year_tick_key)],
+                               ignore_index = False,
+                               copy         = True)
             
         # assign 'ALL' tick key
-        all_tick_key = self._db_all_key('TICK', 'df')
+        all_tick_key = self.db_all_key(self._pair, 'TICK', 'df')
         self._db_dotdict[all_tick_key] = all_df
         
         # assign 'ALL' key with specified timeframe if set
@@ -319,7 +457,7 @@ class HistDataManager(TestCase):
             all_timeframe_df = self._reframe_data(tick_data=all_df,
                                                   tf=timeframe)
             
-            all_tf_key = self._db_all_key(timeframe, 'df')
+            all_tf_key = self.db_all_key(self._pair, timeframe, 'df')
             self._db_dotdict[all_tf_key] = all_timeframe_df
         
             
@@ -345,14 +483,14 @@ class HistDataManager(TestCase):
         """
         
         # parse date input to have specific format date type
-        start_dt = dt.strptime(start, "%Y-%m-%d %H:%M:%S")
-        end_dt = dt.strptime(end, "%Y-%m-%d %H:%M:%S") 
+        start_dt = dt.strptime(start, DATE_FORMAT)
+        end_dt   = dt.strptime(end, DATE_FORMAT) 
         
         # slice data from the 'all' block, key reference
-        all_tick_key = self._db_all_key('TICK', 'df')
-        all_df = self._db_dotdict[all_tick_key]
+        all_tick_key = self.db_all_key(self._pair, 'TICK', 'df')
+        all_df = self._db_dotdict.get(all_tick_key)
         
-        # create a index mask
+        # create an index mask along timestamp axis
         slice_index = (all_df.index >= start_dt) & (all_df.index <= end_dt)
         
         if tf:
@@ -364,7 +502,7 @@ class HistDataManager(TestCase):
             
             return all_df.loc[slice_index]
 
-    def year_data_to_file(self, year, tf=None):
+    def _year_data_to_file(self, year, tf=None):
         """
         
 
@@ -381,7 +519,7 @@ class HistDataManager(TestCase):
 
         """
         
-        pair_path = self.data_path / self.pair.upper()
+        pair_path = self._data_path / self._pair
         if not pair_path.is_dir() or not pair_path.exists():
             pair_path.mkdir(parents=True, exist_ok=False)
 
@@ -390,20 +528,84 @@ class HistDataManager(TestCase):
             year_path.mkdir(parents=True, exist_ok=False)
             
         # alternative: get year by referenced key
-        year_key = self.db_key(self._pair, year, tf, 'df')
-        year_data = self._db_dotdict[year_key]
+        year_tf_key = self.db_key(self._pair, year, tf, 'df')
+        assert isinstance(self._db_dotdict.get(year_tf_key), pd.DataFrame), \
+               'key %s is no valid DataFrame' % (year_tf_key)
+        year_data = self._db_dotdict.get(year_tf_key)
 
-        filename = "{pair}_{year}_{tf}.csv".format(pair=self._pair, year=year, tf=tf)
-        filepath = year_path / filename
+        filepath = year_path / self._get_filename(self._pair, year, tf)
         
         if filepath.exists() and filepath.is_file():
             logging.info("File {} already exists".format(filepath))
             return
         
-        year_data.to_csv(filepath.absolute(), index=True, 
-                         header=True,
-                         date_format="%Y-%m-%d %H:%M:%S")
-
+        # IMPORTANT
+        # avoid date_format parameter since it is reported that 
+        # it makes to_csv to be excessively long with column data 
+        # being datetime data type
+        # see: https://github.com/pandas-dev/pandas/issues/37484
+        #      https://stackoverflow.com/questions/65903287/pandas-1-2-1-to-csv-performance-with-datetime-as-the-index-and-setting-date-form
+        year_data.to_csv(filepath.absolute(), 
+                         index       = True, 
+                         header      = True)
+        
+        
+    def _get_file_details(self, filename):
+        
+        assert isinstance(filename, str), 'filename type must be str'
+        
+        # get years available in offline data (local disk)
+        filename_details = filename.replace('_','.').split(sep='.')
+     
+        # store each file details in local variables 
+        file_pair = filename_details[FILENAME_TEMPLATE.PAIR_INDEX]
+        file_year = int(filename_details[FILENAME_TEMPLATE.YEAR_INDEX][FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:])
+        file_tf   = filename_details[FILENAME_TEMPLATE.TF_INDEX]
+        
+        # return each file details 
+        return file_pair, file_year, file_tf
+    
+    
+    def _get_filename(self, pair, year, tf):
+        
+        # based on standard filename template
+        return FILENAME_STR.format(pair = self._pair,
+                                   year = year,
+                                   tf   = tf)
+        
+    
+    def _update_local_data_folder(self, local_folderpath):
+        
+        # get active years loaded on db manager
+        years_active = self._get_years_list(self._pair, 'int')
+        
+        # get file names in local folder
+        _, local_files_name = self._list_local_data(local_folderpath)
+        
+        # loop through years loaded
+        for year in years_active:
+            
+            year_tf_list = self._get_year_timeframe_list(self._pair, year)
+            
+            # loop through timeframes loaded
+            for tf in year_tf_list:
+                
+                
+                tf_filename = self._get_filename(self._pair,
+                                                 year,
+                                                 tf)
+                
+                key = self.db_key(self._pair, year, tf, 'df')
+                
+                # check if file is present in local data folder
+                # and if valid dataframe is currently loaded in database
+                if tf_filename not in local_files_name \
+                   and isinstance(self._db_dotdict.get(key), \
+                                  pd.DataFrame):
+                                       
+                    self._year_data_to_file(year, tf=tf)
+                    
+                    
     def download(self, years, timeframe=None, search_local=False):
         """
         Execute download of all years and months specified
@@ -413,8 +615,9 @@ class HistDataManager(TestCase):
                     by date
         """
         
-        # check timeframe str ok even if here is redundant
+        assert isinstance(years, list), 'years input must be a list'
         
+        # check timeframe str ok even if here is redundant
         if not timeframe:
             timeframe = self._tf 
         else:
@@ -427,55 +630,79 @@ class HistDataManager(TestCase):
         self.assertTrue(set(years).issubset(YEARS), 'years input must be included in available YEARS list')
 
         # CHECK IF YEARS TO DOWNLOAD IS NOT ALREADY IN SELF INTERNAL MEMORY
-        self._years = self._get_years_str_list()
-        new_years = set(years).difference(self._years)
+        self._years_int = self._get_years_list(self._pair, 'int')
+        new_years = set(years).difference(self._years_int)
 
         # search if years data are already available offline
         if search_local:
-            years_offline = self.load_data_folder(self.data_path, new_years, timeframe)
+            years_offline = self.load_data(self._data_path, list(new_years), timeframe)
         else:
             years_offline = list()
             
         # years not found on disk must be downloaded
         new_years_to_download = set(new_years).difference(years_offline)
 
-        # download data not available offline (on disk) and save to file on disk
-        months_file_list  = list()
-        year_tick_df      = pd.DataFrame()
-        year_timeframe_df = pd.DataFrame()
+        # update internal list of years loaded before new files download
+        self._years_int = self._get_years_list(self._pair, 'int')
         
         if new_years_to_download:
             
             for year in new_years_to_download:
-                # Loop through selected months
-                for month in MONTHS:
-                    month_num = MONTHS.index(month) + 1
-                    self.url = URL_TEMPLATE.format(pair=self.pair, year=year, month_num=month_num)
-                    self._prepare()
-                    months_file_list.append(self._download_raw(year, month_num))
-
-                # parse year data and save it to file on disk
-                year_tick_df = self._parse_raw_download_files(raw_files_list=months_file_list)
                 
+                # download data not available offline (on disk) and save to file on disk
+                year_tick_df      = pd.DataFrame()
+                year_timeframe_df = pd.DataFrame()
+                
+                # loop through selected months
+                for month in MONTHS:
+                    
+                    month_num = MONTHS.index(month) + 1
+                    self.url = URL_TEMPLATE.format(pair      = self._pair, 
+                                                   year      = year, 
+                                                   month_num = month_num)
+                    self._prepare()
+                    file = self._download_raw(year, month_num)
+                    if file:
+                        month_data = self._raw_file_to_df(file)
+                        year_tick_df = pd.concat([year_tick_df, month_data], 
+                                                 ignore_index = False,
+                                                 copy         = True)
+
                 # get key for dotty dict: TICK
-                year_tick_key = self.db_key(self.pair.upper(), year, 'TICK', 'df')
+                year_tick_key = self.db_key(self._pair, year, 'TICK', 'df')
                 self._db_dotdict[year_tick_key] = year_tick_df
                 
+                # reframe tick data to have timeframed data
                 year_timeframe_df = self._reframe_data(tick_data=year_tick_df, tf=timeframe)
                 # get key for dotty dict: timeframe
-                year_tf_key = self.db_key(self.pair.upper(), year, timeframe, 'df')
+                year_tf_key = self.db_key(self._pair, year, timeframe, 'df')
                 self._db_dotdict[year_tf_key] = year_timeframe_df
                 
-                # dump new year data just downloaded to local folder data
-                self.year_data_to_file(year)
-                
-                months_file_list.clear()
                 
         # data collecting done --> update 'ALL' key block data
         self._update_all_block_data(timeframe=timeframe)
+        
+        # dump new downloaded data not already present in local data folder
+        self._update_local_data_folder(self._data_path)
 
 
-    def load_data_folder(self, folderpath, years_to_load, timeframe=None):
+    def _list_local_data(self, folderpath):
+        
+        # prepare predefined path and check if exists
+        folderpath = Path(folderpath) / self._pair
+        if not folderpath.exists():
+            raise FileNotFoundError("Directory {0} Not Found".format(folderpath.name))
+        elif not folderpath.is_dir():
+            raise NotADirectoryError("{0} is Not a Directory".format(folderpath.name))
+
+        # list all specifed pair data files in folder path and subdirs 
+        local_files = list(folderpath.glob('**/{pair}_*.csv'.format(pair=self._pair)))
+        local_files_name = [file.name for file in local_files]
+
+        return local_files, local_files_name        
+        
+
+    def load_data(self, folderpath, years_to_load, timeframe=None):
         """
         
 
@@ -506,71 +733,67 @@ class HistDataManager(TestCase):
         if not years_to_load:
             logging.error("Called load_data function but no years to load specified")
             return None
+         
+            
 
-        # prepare predefined path and check if exists
-        folderpath = Path(folderpath) / self.pair.upper()
-        if not folderpath.exists():
-            raise FileNotFoundError("Directory {0} Not Found".format(folderpath.name))
-        elif not folderpath.is_dir():
-            raise NotADirectoryError("{0} is Not a Directory".format(folderpath.name))
-
-        # list all specifed pair data files in folder path and subdirs 
-        local_files = list(folderpath.glob('**/{pair}_*.csv'.format(pair=self._pair)))
-        local_files_name = [file.name for file in local_files]
-        
         # intiate list: set false if file with specified timeframe is not found --> call reframe
-        years_found = [False] * len(years_to_load)
-        years_tf_found = [False] * len(years_to_load)
+        years_found = list()
         local_tick_df  = pd.DataFrame()
+        
+        # list data available in local folder
+        local_files, local_files_name = self._list_local_data(folderpath)
         
         # parse files and fill details list
         for file in local_files:
             
             # get years available in offline data (local disk)
             local_filepath_key = file.name.replace('_','.')
-            local_file_details = local_filepath_key.split(sep='.')
-            
-            file_pair = local_file_details[FILENAME_TEMPLATE.PAIR_INDEX]
-            file_year = int(local_file_details[FILENAME_TEMPLATE.YEAR_INDEX])
-            file_tf   = local_file_details[FILENAME_TEMPLATE.TF_INDEX]
+        
+            # get file details
+            file_pair, file_year, file_tf = self._get_file_details(file.name)
             
             # check at timeframe index file has a valid timeframe
             if check_timeframe_str(file_tf) == file_tf:
                     
                 # assign filepath key in local db
-                self._local_db[local_filepath_key] = file.resolve()
+                self._local_db_dotdict[local_filepath_key] = file.resolve()
+                
+                # create key for dataframe type
+                year_tick_key = self.db_key(file_pair,
+                                            file_year,
+                                            'TICK',
+                                            'df')
+                
+                # create key for dataframe type
+                year_tf_key = self.db_key(file_pair,
+                                          file_year,
+                                          timeframe,
+                                          'df')
                 
                 # search if years to load is present in local db
                 if file_pair == self._pair \
                    and (int(file_year) in years_to_load):
                            
                     
-                    if file_tf == TIMEFRAME_MACRO.MIN_TICK_TF:
+                    if file_tf == TIMEFRAME_MACRO.MIN_TICK_TF \
+                       and self._db_dotdict.get(year_tick_key) is None:
                         
-                        # create key for dataframe type
-                        year_tick_key = self.db_key(file_pair,
-                                                    file_year,
-                                                    'TICK',
-                                                    'df')
-                            
-                        local_tick_df = pd.read_csv(file, sep=',', header=0,
-                                                    parse_dates=True,
-                                                    date_parser=infer_date)
+                        local_tick_df = pd.read_csv(file, 
+                                                    sep         = ',', 
+                                                    header      = 0,
+                                                    dtype       = DTYPE_DICT.TICK_DTYPE,
+                                                    index_col   = 'timestamp',
+                                                    parse_dates = ['timestamp'],
+                                                    date_parser = infer_date_dt)
                         
                         self._db_dotdict[year_tick_key] = local_tick_df
                         
-                        year_tf_key = self.db_key(file_pair,
-                                                  file_year,
-                                                  timeframe,
-                                                  'df')
-                        
                         if self._db_dotdict.get(year_tf_key) is None:
                                 
-                            year_tf_filename = '{pair}_{year}_{tf}.csv'.format(pair=self._pair,
-                                                                               year=file_year,
-                                                                               tf=timeframe)
                             
-                            year_tf_key = year_tf_filename.replace('_','.')[-1] 
+                            year_tf_filename = self._get_filename(self._pair, 
+                                                                  file_year,
+                                                                  timeframe)
                         
                             # search for timeframe data in local files
                             if year_tf_filename in local_files_name:
@@ -579,33 +802,39 @@ class HistDataManager(TestCase):
                                 tf_file = local_files[local_files_name.index(year_tf_filename)]
                                 
                                 # read file and load data to db
-                                self._db_dotdict[year_tick_key] = pd.read_csv(tf_file, sep=',', header=0,
-                                                                              parse_dates=True,
-                                                                              date_parser=infer_date)
+                                self._db_dotdict[year_tf_key] = pd.read_csv(tf_file, 
+                                                                            sep         = ',', 
+                                                                            header      = 0,
+                                                                            dtype       = DTYPE_DICT.TF_DTYPE,
+                                                                            index_col   = 'timestamp',
+                                                                            parse_dates = ['timestamp'],
+                                                                            date_parser = infer_date_dt)
                                 
                             else:
                                 
                                 # timeframe file not found --> call reframe function
-                                self._db_dotdict[year_tick_key] = self._reframe_data(tick_data=local_tick_df,
+                                self._db_dotdict[year_tf_key] = self._reframe_data(tick_data=local_tick_df,
                                                                                      tf=timeframe)
                         
                     
-                    elif file_tf == timeframe:
+                    elif file_tf == timeframe \
+                         and self._db_dotdict.get(year_tf_key) is None:
                         
-                        # create key for dataframe type
-                        year_tf_key = local_filepath_key
-                        year_tf_key[-1] = 'df'
-                            
-                        self._db_dotdict[year_tf_key] = pd.read_csv(file, sep=',', header=0,
-                                                                    parse_dates=True,
-                                                                    date_parser=infer_date)
+                         self._db_dotdict[year_tf_key] = pd.read_csv(file, 
+                                                                     sep         = ',', 
+                                                                     header      = 0,
+                                                                     dtype       = DTYPE_DICT.TF_DTYPE,
+                                                                     index_col   = 'timestamp',
+                                                                     parse_dates = ['timestamp'],
+                                                                     date_parser = infer_date_dt)
                         
-                
-                    years_tf_found[years_to_load.index(file_year)] = True
+                    # append year in list of data found in local folder
+                    years_found.append(file_year)
+                    
+                local_tick_df  = pd.DataFrame()
                             
-                            
-        # return years data loaded from offline database folder (disk)
-        return years_to_load[years_found]
+        # return years data loaded from local database folder 
+        return years_found
 
 
     def plot_data(self, date_bounds=None, timeframe=None):
@@ -622,8 +851,8 @@ class HistDataManager(TestCase):
             raise TypeError("date_bounds items type must be string")
 
         # parse date input to have specific format date type
-        start_date = dt.strptime(date_bounds[0], "%Y-%m-%d %H:%M:%S")
-        end_date = dt.strptime(date_bounds[1], "%Y-%m-%d %H:%M:%S")
+        start_date = dt.strptime(date_bounds[0], DATE_FORMAT)
+        end_date   = dt.strptime(date_bounds[1], DATE_FORMAT)
 
         # consider also pandas date_range() function
 
