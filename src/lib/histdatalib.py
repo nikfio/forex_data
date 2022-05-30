@@ -1,116 +1,34 @@
+
+# python base imports
 import sys
 import pandas as pd
-from pandas.tseries.frequencies import to_offset
 import zipfile
 import re
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from pathlib import Path
 from requests import Session
-from datetime import datetime as dt
 from io import BytesIO
 from mpl_finance import candlestick_ohlc
 from unittest import TestCase
+
+# external 
 from absl import logging
 from dotty_dict import dotty
-from typing import NamedTuple
 
-# external lib to download data from histdata site
-import histdata.api
+# alternative source 
+import histdata.api  #analysis:ignore
 
-
-# from matplotlib.dates import MONDAY, DateFormatter, DayLocator, WeekdayLocator
-
-URL_TEMPLATE                = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
-                              'ascii/tick-data-quotes/{pair}/{year}/{month_num}'
-DOWNLOAD_URL                = "http://www.histdata.com/get.php"
-DOWNLOAD_METHOD             = 'POST'
-DEFAULT_timeframe_TEMPLATE  = '{}s'
-MONTHS                      = ['January', 'February', 'March', 'April', 'May', 'June',
-                               'July', 'August', 'September', 'October', 'November', 'December']
-YEARS                       = list(range(2000, 2022, 1))
-
-RAW_DATE_FORMAT             = '%Y%m%d %H%M%S%f' 
-DATE_FORMAT                 = '%Y-%m-%d %H:%M:%S' 
-
-FILENAME_STR                = '{pair}_Y{year}_{tf}.csv'
-
-
-### auxiliary CONSTANT DEFINITIONS
-
-# TIMEFRAME macro
-class TIMEFRAME_MACRO:
-    
-    MIN_TICK_TF      = 'TICK'
-    ONE_HOUR_TF      = '1H'
-    FOUR_HOUR_TF     = '4H'
-    ONE_DAY_TF       = '1D'
-    ONE_WEEK_TF      = '1W'
-    ONE_MONTH_TF     = '1M'
-    
-# filename template : <PAIR>_Y<year>_<timeframe>.<filetype>
-class FILENAME_TEMPLATE:
-    
-    PAIR_INDEX              = 0
-    YEAR_INDEX              = 1
-    YEAR_NUMERICAL_CHAR     = 1
-    TF_INDEX                = 2
-    FILETYPE_INDEX          = 3
-    
-# column names for dataframes TICK and timeframe filtered
-class DATA_COLUMN_NAMES:
-    
-    TICK_DATA               = ['timestamp','ask','bid','vol','p']
-    TF_DATA                 = ['timestamp','open','close','high','low']
-    TICK_DATA_TIME_INDEX    = ['ask','bid','vol','p']
-    TF_DATA_TIME_INDEX      = ['open','close','high','low']
+# internally defined 
+import data_common_def as dc_def
         
-class DTYPE_DICT:
-    
-    TICK_DTYPE = {'ask': 'float32', 'bid': 'float32',
-                  'vol': 'float16', 'p': 'float32'}
-    TF_DTYPE   = {'open': 'float32', 'close': 'float32',
-                  'high': 'float32', 'low': 'float32'}
 
+# TODO: replace 'pair' with 'symbol' so it's semantically correct for any market item 
 
-
-### auxiliary fast functions
-
-# parse date obj and return datetime as template defined 
-def infer_date_dt(s): return pd.to_datetime(s, 
-                                            format   = DATE_FORMAT,
-                                            exact    = True,
-                                            utc      = True)
-
-# parse RAW FILE date obj and return datetime as template defined 
-def infer_raw_date_dt(s): return pd.to_datetime(s, 
-                                                format   = RAW_DATE_FORMAT,
-                                                exact    = True,
-                                                utc      = True)
-
-# parse timeframe as string and validate if it is valid
-# following pandas DateOffset freqstr rules and 'TICK' (=lowest timeframe available)
-def check_timeframe_str(tf):
-    
-    if tf == 'TICK':
-        return tf
-    else:
-    
-        try:
-            to_offset(tf) 
-        except ValueError:
-            raise ValueError("Invalid timeframe: %s" % (tf))
-        else: 
-            return tf
-        
-        
-        
 ### class implementation
-
 class HistDataManager(TestCase):
 
-    def __init__(self, pair, data_path, years=None, months=None, 
-                 timeframe='1H'):
+    def __init__(self, pair, data_path, years=None, timeframe='1H'):
         """
         
 
@@ -137,7 +55,7 @@ class HistDataManager(TestCase):
         
         # assert timeframe is a valid freq string value 
         # following pandas DateOffset freqstr rules
-        self._tf = check_timeframe_str(timeframe)
+        self._tf = check_timeframe_str(timeframe) # analysis:ignore
         
         # internal
         # list of years currently managed by object instance  
@@ -153,17 +71,17 @@ class HistDataManager(TestCase):
         self._data_path        = Path(data_path)
         
         # db currently loaded on object instance
-        self._db_dotdict       = dotty()
+        self._db_dotdict       = dc_def.dotty()
         # local data db
         self._local_db_dotdict = dotty()
 
         # perform data download at object instantiate
         if not years:
-            years          = YEARS
+            years          = dc_def.YEARS
         else:
-            self.assertTrue(set(years).issubset(YEARS))
+            self.assertTrue(set(years).issubset(dc_def.YEARS))
             
-        # initial download at objct instatiation
+        # initial download at object instantiation
         self.download(years, timeframe=self._tf,
                       search_local=True)
 
@@ -189,7 +107,7 @@ class HistDataManager(TestCase):
 
         """
             
-        tf = check_timeframe_str(timeframe)
+        tf = dc_def.check_timeframe_str(timeframe)
         
         return '.'.join([str(pair), 'Y'+str(year),
                          str(tf), str(data_type)])
@@ -198,7 +116,7 @@ class HistDataManager(TestCase):
         
         # all key template = pair.ALL.timeframe.data_type
         
-        tf = check_timeframe_str(timeframe)
+        tf = dc_def.check_timeframe_str(timeframe)
         
         return '.'.join([str(pair), 'ALL', str(tf), str(data_type)])
         
@@ -240,11 +158,17 @@ class HistDataManager(TestCase):
         headers = {'Referer': self.url}
         data = {'tk': self.tk, 'date': year, 'datemonth': "%d%02d" % (year, month_num), 'platform': 'ASCII',
                 'timeframe': 'T', 'fxpair': self._pair}
-        r = self.session.request(DOWNLOAD_METHOD, DOWNLOAD_URL, data=data, headers=headers, stream=True)
+        r = self.session.request(dc_def.DOWNLOAD_METHOD, 
+                                 dc_def.DOWNLOAD_URL, 
+                                 data=data, 
+                                 headers=headers, 
+                                 stream=True)
         bio = BytesIO()
         size = 0
         if logging.level_info():
-            logging.info("Starting to download: %s - %d - %s" % (self._pair, year, MONTHS[month_num-1]))
+            logging.info("Starting to download: %s - %d - %s" % (self._pair, 
+                                                                 year, 
+                                                                 dc_def.MONTHS[month_num-1]))
         for chunk in r.iter_content(chunk_size=2 ** 19):
             bio.write(chunk)
             size += len(chunk)
@@ -257,7 +181,9 @@ class HistDataManager(TestCase):
         except zipfile.BadZipFile:
             
             # here will be a warning log
-            print('%s - %d - %s not found or invalid download' % (self._pair, year, MONTHS[month_num-1]))
+            print('%s - %d - %s not found or invalid download' % (self._pair, 
+                                                                  year, 
+                                                                  dc_def.MONTHS[month_num-1]))
             return None
         
         else:
@@ -285,11 +211,11 @@ class HistDataManager(TestCase):
         """
         
         # assert timeframe input value
-        tf = check_timeframe_str(tf)
+        tf = dc_def.check_timeframe_str(tf)
 
         assert not tick_data.empty, 'tick_data input must not be empty'
         assert isinstance(tick_data, pd.DataFrame), 'tick_data input must be pandas DataFrame type'
-        assert all(tick_data.columns == DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX), \
+        assert all(tick_data.columns == dc_def.DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX), \
                 'tick data input must be raw downloaded tick data'
                 
         assert pd.api.types.is_datetime64_any_dtype(tick_data.index), \
@@ -298,7 +224,7 @@ class HistDataManager(TestCase):
         # resample along 'p' column
         df_resampler = tick_data.p.resample(tf)
         first        = df_resampler.first()
-        data = pd.DataFrame(columns=DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX, 
+        data = pd.DataFrame(columns=dc_def.DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX, 
                             index=first.index)
         
         # set timeframed data
@@ -337,11 +263,11 @@ class HistDataManager(TestCase):
         # parse file passed as input
         df = pd.read_csv(raw_file, 
                          sep         = ',', 
-                         names       = DATA_COLUMN_NAMES.TICK_DATA,
-                         dtype       = DTYPE_DICT.TICK_DTYPE,
+                         names       = dc_def.DATA_COLUMN_NAMES.TICK_DATA,
+                         dtype       = dc_def.DTYPE_DICT.TICK_DTYPE,
                          index_col   = 'timestamp',
                          parse_dates = ['timestamp'],
-                         date_parser = infer_raw_date_dt)
+                         date_parser = dc_def.infer_raw_date_dt)
                            
 
         # calculate 'p'
@@ -374,7 +300,7 @@ class HistDataManager(TestCase):
                 # if present do not include 'ALL' key element 
                 # remove first identifier character 'Y' to have canonical 
                 # year values
-                years_list = [key[FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:] 
+                years_list = [key[dc_def.FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:] 
                               for key in years_keys 
                               if key != 'ALL']
                 
@@ -443,7 +369,7 @@ class HistDataManager(TestCase):
             assert isinstance(self._db_dotdict.get(year_tick_key), pd.DataFrame), \
                    'key %s is no valid DataFrame' % (year_tick_key)
             
-            # append to all_df 
+            # concat to all_df 
             all_df = pd.concat([all_df, self._db_dotdict.get(year_tick_key)],
                                ignore_index = False,
                                copy         = True)
@@ -459,9 +385,17 @@ class HistDataManager(TestCase):
             
             all_tf_key = self.db_all_key(self._pair, timeframe, 'df')
             self._db_dotdict[all_tf_key] = all_timeframe_df
+            
+    def add_timeframe(self, timeframe):
+        
+        
+        # loop trough keys and add timeframe
+        # review if self._tf still have meaning
+        
+        pass
         
             
-    def _slice_data(self, start=None, end=None, tf=None):
+    def time_slice_data(self, start=None, end=None, tf=None):
         """
         
 
@@ -482,25 +416,49 @@ class HistDataManager(TestCase):
 
         """
         
-        # parse date input to have specific format date type
-        start_dt = dt.strptime(start, DATE_FORMAT)
-        end_dt   = dt.strptime(end, DATE_FORMAT) 
-        
-        # slice data from the 'all' block, key reference
-        all_tick_key = self.db_all_key(self._pair, 'TICK', 'df')
-        all_df = self._db_dotdict.get(all_tick_key)
-        
-        # create an index mask along timestamp axis
-        slice_index = (all_df.index >= start_dt) & (all_df.index <= end_dt)
-        
-        if tf:
+        # try to convert to datetime data type if not already is
+        if not pd.api.types.is_datetime64_any_dtype(start):
             
-            return self._reframe_data(timeframe=tf, 
-                                      data=all_df.loc[slice_index])
-        
-        else: 
+            start_dt = dc_def.infer_date_dt(start)
+            
+        if not pd.api.types.is_datetime64_any_dtype(end):
+            
+            end_dt   = dc_def.infer_date_dt(end)
+            
+        # check timeframe validation
+        dc_def.check_timeframe_str(tf)
+            
+        if tf == self._tf:
+            
+            all_tf_key = self.db_all_key(self._pair, tf, 'df')
+            all_df = self._db_dotdict.get(all_tf_key)
+            
+            # create an index mask along timestamp axis
+            slice_index = (all_df.index >= start_dt) & (all_df.index <= end_dt)
             
             return all_df.loc[slice_index]
+            
+        else:
+            
+            # slice data from the 'all' block, key reference
+            all_tick_key = self.db_all_key(self._pair, 'TICK', 'df')
+            all_df = self._db_dotdict.get(all_tick_key)
+            
+            # create an index mask along timestamp axis
+            slice_index = (all_df.index >= start_dt) & (all_df.index <= end_dt)
+            
+            if tf != dc_def.TIMEFRAME_MACRO.MIN_TICK_TF:
+                
+                # timeframe different from currently managed, further reframe
+                # needed
+                return self._reframe_data(timeframe=tf, 
+                                          data=all_df.loc[slice_index])
+            
+            else: 
+                
+                # TICK timeframe specified, no further reframe opeartion needed
+                return all_df.loc[slice_index]
+
 
     def _year_data_to_file(self, year, tf=None):
         """
@@ -558,9 +516,9 @@ class HistDataManager(TestCase):
         filename_details = filename.replace('_','.').split(sep='.')
      
         # store each file details in local variables 
-        file_pair = filename_details[FILENAME_TEMPLATE.PAIR_INDEX]
-        file_year = int(filename_details[FILENAME_TEMPLATE.YEAR_INDEX][FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:])
-        file_tf   = filename_details[FILENAME_TEMPLATE.TF_INDEX]
+        file_pair = filename_details[dc_def.FILENAME_TEMPLATE.PAIR_INDEX]
+        file_year = int(filename_details[dc_def.FILENAME_TEMPLATE.YEAR_INDEX][dc_def.FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:])
+        file_tf   = filename_details[dc_def.FILENAME_TEMPLATE.TF_INDEX]
         
         # return each file details 
         return file_pair, file_year, file_tf
@@ -569,9 +527,9 @@ class HistDataManager(TestCase):
     def _get_filename(self, pair, year, tf):
         
         # based on standard filename template
-        return FILENAME_STR.format(pair = self._pair,
-                                   year = year,
-                                   tf   = tf)
+        return dc_def.FILENAME_STR.format(pair = self._pair,
+                                          year = year,
+                                          tf   = tf)
         
     
     def _update_local_data_folder(self, local_folderpath):
@@ -621,13 +579,13 @@ class HistDataManager(TestCase):
         if not timeframe:
             timeframe = self._tf 
         else:
-            timeframe = check_timeframe_str(timeframe)
+            timeframe = dc_def.check_timeframe_str(timeframe)
         
         # convert to list of int
         if not all(isinstance(year, int) for year in years):
             years = [int(year) for year in years]
 
-        self.assertTrue(set(years).issubset(YEARS), 'years input must be included in available YEARS list')
+        self.assertTrue(set(years).issubset(dc_def.YEARS), 'years input must be included in available YEARS list')
 
         # CHECK IF YEARS TO DOWNLOAD IS NOT ALREADY IN SELF INTERNAL MEMORY
         self._years_int = self._get_years_list(self._pair, 'int')
@@ -654,12 +612,12 @@ class HistDataManager(TestCase):
                 year_timeframe_df = pd.DataFrame()
                 
                 # loop through selected months
-                for month in MONTHS:
+                for month in dc_def.MONTHS:
                     
-                    month_num = MONTHS.index(month) + 1
-                    self.url = URL_TEMPLATE.format(pair      = self._pair, 
-                                                   year      = year, 
-                                                   month_num = month_num)
+                    month_num = dc_def.MONTHS.index(month) + 1
+                    self.url = dc_def.URL_TEMPLATE.format(pair      = self._pair, 
+                                                          year      = year, 
+                                                          month_num = month_num)
                     self._prepare()
                     file = self._download_raw(year, month_num)
                     if file:
@@ -753,7 +711,7 @@ class HistDataManager(TestCase):
             file_pair, file_year, file_tf = self._get_file_details(file.name)
             
             # check at timeframe index file has a valid timeframe
-            if check_timeframe_str(file_tf) == file_tf:
+            if dc_def.check_timeframe_str(file_tf) == file_tf:
                     
                 # assign filepath key in local db
                 self._local_db_dotdict[local_filepath_key] = file.resolve()
@@ -775,16 +733,16 @@ class HistDataManager(TestCase):
                    and (int(file_year) in years_to_load):
                            
                     
-                    if file_tf == TIMEFRAME_MACRO.MIN_TICK_TF \
+                    if file_tf == dc_def.TIMEFRAME_MACRO.MIN_TICK_TF \
                        and self._db_dotdict.get(year_tick_key) is None:
                         
                         local_tick_df = pd.read_csv(file, 
                                                     sep         = ',', 
                                                     header      = 0,
-                                                    dtype       = DTYPE_DICT.TICK_DTYPE,
+                                                    dtype       = dc_def.DTYPE_DICT.TICK_DTYPE,
                                                     index_col   = 'timestamp',
                                                     parse_dates = ['timestamp'],
-                                                    date_parser = infer_date_dt)
+                                                    date_parser = dc_def.infer_date_dt)
                         
                         self._db_dotdict[year_tick_key] = local_tick_df
                         
@@ -805,10 +763,10 @@ class HistDataManager(TestCase):
                                 self._db_dotdict[year_tf_key] = pd.read_csv(tf_file, 
                                                                             sep         = ',', 
                                                                             header      = 0,
-                                                                            dtype       = DTYPE_DICT.TF_DTYPE,
+                                                                            dtype       = dc_def.DTYPE_DICT.TF_DTYPE,
                                                                             index_col   = 'timestamp',
                                                                             parse_dates = ['timestamp'],
-                                                                            date_parser = infer_date_dt)
+                                                                            date_parser = dc_def.infer_date_dt)
                                 
                             else:
                                 
@@ -823,10 +781,10 @@ class HistDataManager(TestCase):
                          self._db_dotdict[year_tf_key] = pd.read_csv(file, 
                                                                      sep         = ',', 
                                                                      header      = 0,
-                                                                     dtype       = DTYPE_DICT.TF_DTYPE,
+                                                                     dtype       = dc_def.DTYPE_DICT.TF_DTYPE,
                                                                      index_col   = 'timestamp',
                                                                      parse_dates = ['timestamp'],
-                                                                     date_parser = infer_date_dt)
+                                                                     date_parser = dc_def.infer_date_dt)
                         
                     # append year in list of data found in local folder
                     years_found.append(file_year)
@@ -837,7 +795,7 @@ class HistDataManager(TestCase):
         return years_found
 
 
-    def plot_data(self, date_bounds=None, timeframe=None):
+    def plot_data(self, tf, start_date, end_date):
         """
         Plot data in selected time frame and start and end date bound
         :param date_bounds: start and end of plot
@@ -845,39 +803,20 @@ class HistDataManager(TestCase):
         :return: void
         """
 
-        self.assertIsNotNone(date_bounds, msg='date_bounds param is required')
-        self.assertTrue((len(date_bounds) == 2), msg='date_bounds must be two items')
-        if not all(isinstance(date, str) for date in date_bounds):
-            raise TypeError("date_bounds items type must be string")
-
-        # parse date input to have specific format date type
-        start_date = dt.strptime(date_bounds[0], DATE_FORMAT)
-        end_date   = dt.strptime(date_bounds[1], DATE_FORMAT)
-
-        # consider also pandas date_range() function
-
         # make sure a timeframe specific is active
-        chart_tf = timeframe or self._tf
-        logging.info("Chart request: from {start} to {end} with {tf} time interval".format(start=str(start_date),
-                                                                                           end=str(date_bounds[1]),
-                                                                                           tf=str(chart_tf)))
+        chart_tf = tf or self._tf
+        
+        logging.info("Chart request: from {start} to {end} with {tf} time interval".format(start= str(start_date),
+                                                                                           end  = str(end_date),
+                                                                                           tf   = str(chart_tf)))
 
-        # different methods to frame data to plot using chart request info
-        # create a index mask
-        chart_index_mask = (self.df.index >= start_date) & (self.df.index <= end_date)
-        chart_data = self.df.loc[chart_index_mask]
-        # use directly a start and end index
-        chart_data = self.df.loc[start_date:end_date]
-        chart_data = self._reframe_data(timeframe=chart_tf, data=chart_data)
-
+        chart_data = self.time_slice_data(tf    = tf,
+                                          start = start_date,
+                                          end   = end_date)
+        
         # create fgure
         fig, ax = plt.subplots()
         fig.subplots_adjust(bottom=0.2)
-
-        chart_d = (mdates.date2num(chart_data.index),
-                                 chart_data.open, chart_data.high,
-                                 chart_data.low, chart_data.close,
-                                 chart_data),
 
         # candlestick chart type
         candlestick_ohlc(ax, zip(mdates.date2num(chart_data.index),
@@ -886,6 +825,8 @@ class HistDataManager(TestCase):
                                  chart_data),
                          width=0.6)
 
+        # add details on axis and title
+        
         ax.xaxis_date()
         ax.autoscale_view()
         plt.show()
@@ -893,4 +834,12 @@ class HistDataManager(TestCase):
         
         
         
-### class using histdata.api repo     
+### class using histdata.api repo    
+
+
+
+### lmdb 
+
+# adopt lmdb to reduce memory occupied by data in local folder
+# and to speed read/write operations when using data 
+

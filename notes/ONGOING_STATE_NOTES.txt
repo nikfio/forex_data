@@ -33,4 +33,19 @@ NOTES - ORDERED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLET
             . organize by year or unify alla available data for the pair? 
                 --> download chain of functions call to improve: efficiency and capability of
                     organization by year
+
+
+    - 20220530
+
+        historical data maanagement into consolidation:
+
+                . only plot functionality remains to be tested
+                . to be evaluated it is useful to manage multiple timeframes and related data by the same manager instance 
+
+
+        realtime data management:
+
+                . tried get_quote functions
+                . to try function to read window data (daily, weekly, start-end, etc) with ohlc values
+                . align data format as used in historical manager to have common data organization 
         
