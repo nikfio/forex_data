@@ -32,15 +32,25 @@ def main(argv):
     #TODO: get logging handler
     
     init_param = db_parameters(pair           = 'EURUSD',
-                               timescale      = '4H',
-                               years          = [2000,2001],
-                               data_source    = 'HISTDATA'
-                               )
+                               timeframe      = '4H',
+                               years          = [2000,2001,2002],
+                               data_source    = 'HISTDATA')
     
+    # db instantiation                            
     db_test = db_manager(init_param)
     
+    # further data loading 
+    # managed internally if it is necessary to download from the net
+    # or if data is available in local folder
     db_test.download_histdata([2003,2004,2005])
     
+    # plot data with
+    # timestamp start and end bounds
+    # timeframe specified
+    db_test.plot(source_type = 'Historical_data',
+                 tf          = '1D',
+                 start_date  = '2001-10-02 18:00:00',
+                 end_date    = '2002-06-23 23:00:00')
     
     
 if __name__ == '__main__':
