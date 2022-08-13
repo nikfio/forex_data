@@ -25,6 +25,8 @@ Description:
 from absl import app
 from data_manager import db_manager, db_parameters
 
+from src import *
+
 #TODO: add logging options via input FLAGS
 
 def main(argv):
