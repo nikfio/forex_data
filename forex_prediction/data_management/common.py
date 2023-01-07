@@ -7,8 +7,10 @@ Created on Sat Apr 30 09:23:19 2022
 
 # python base
 from re import fullmatch, findall
+import pandas as pd
 from pandas.tseries.frequencies import to_offset
 from pandas import to_datetime, Timedelta
+from dateutil.rrule import rrule, DAILY, MO, TU, WE, TH, FR
 
 
 # common functions, constants and templates
@@ -27,14 +29,16 @@ YEARS                           = list(range(2000, 2022, 1))
 
 RAW_DATE_FORMAT                 = '%Y%m%d %H%M%S%f' 
 DATE_FORMAT                     = '%Y-%m-%d %H:%M:%S' 
+DATE_NO_HOUR_FORMAT             = '%Y-%m-%d'
 
 FILENAME_STR                    = '{pair}_Y{year}_{tf}.csv'
 
 PAIR_FORMAT_ALPHAVANTAGE_STR    = '{TO}/{FROM}'
 PAIR_MATCH_ALPHAVANTAGE_STR     = '^[A-Z]{3}/[A-Z]{3}$'
+POLY_FX_SYMBOL_FORMAT           = 'C:{TO}{FROM}'
 SINGLE_CURRENCY_PATTERN_STR     = '[A-Z]{3}'
-TIME_WINDOW_PATTERN_STR         = '^\d[A-Za-z]{1,}$'
-TIME_WINDOW_VAL_PATTERN_STR     = '^\d'
+TIME_WINDOW_PATTERN_STR         = '^[-+]?[0-9]+[A-Za-z]{1,}$'
+TIME_WINDOW_COMPONENTS_PATTERN_STR         = '^[-+]?[0-9]+|[A-Za-z]{1,}$'
 TIME_WINDOW_UNIT_PATTERN_STR    = '[A-Za-z]{1,}$'
 
 ALPHA_VANTAGE_KEY_ENV           = 'ALPHA_VANTAGE_KEY'
@@ -42,6 +46,7 @@ POLY_IO_KEY_ENV                 = 'POLYGON_IO_KEY'
 
 AV_LIST_URL                     = 'https://www.alphavantage.co/query?function=LISTING_STATUS&apikey={api_key}'
 
+DEFAULT_TIMEZONE                = 'utc'
 
 # actual environment variable name containing key
 
@@ -81,21 +86,23 @@ class DATA_COLUMN_NAMES:
     TF_DATA                 = ['timestamp','open','high','low', 'close']
     TICK_DATA_TIME_INDEX    = ['ask','bid','vol','p']
     TF_DATA_TIME_INDEX      = ['open','high','low', 'close']             ## SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE          
- 
+    POLYGON_IO_AGGS         = ['open','high','low', 'close', 'volume', 'vwap', \
+                               'timestamp', 'transactions' ]
+    
 BASE_DATA = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
 BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
        
 class DTYPE_DICT:
     
-    TICK_DTYPE = {'ask': 'float32', 'bid': 'float32',
-                  'vol': 'float16', 'p': 'float32'}
+    HISTORICAL_TICK_DTYPE = {'ask': 'float32', 'bid': 'float32',
+                             'vol': 'float16', 'p': 'float32'}
     TF_DTYPE   = {'open': 'float32', 'high': 'float32', 
                   'low': 'float32', 'close': 'float32'}
     TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ns]',
                        'open': 'float32', 'high': 'float32', 
                        'low': 'float32', 'close': 'float32'}
 
-class REALTIME_DATA_SOURCE:
+class REALTIME_DATA_PROVIDER:
     
     ALPHA_VANTAGE           = 'ALPHA_VANTAGE'
     POLYGON_IO              = 'POLYGON-IO'
@@ -142,13 +149,23 @@ def infer_raw_date_dt(s): return to_datetime(s,
                                              exact    = True,
                                              utc      = True)
 
+# parse argument to get datetime object with date format as input
+def infer_date_from_format_dt(s, date_format): 
+    
+    return to_datetime(s, 
+                       format   = date_format,
+                       exact    = True,
+                       utc      = True)
+
 
 # parse timeframe as string and validate if it is valid
 # following pandas DateOffset freqstr rules and 'TICK' (=lowest timeframe available)
 def check_timeframe_str(tf):
     
     if tf == 'TICK':
+        
         return tf
+    
     else:
     
         try:
@@ -170,20 +187,26 @@ def check_AV_FX_symbol(symbol):
         return False
     
     
-def get_fxpair_components(symbol):
+def get_fxpair_symbols(ticker):
     
-    if check_AV_FX_symbol(symbol):
+    if check_AV_FX_symbol(ticker):
         
-        components  = findall(SINGLE_CURRENCY_PATTERN_STR, symbol)
+        components  = findall(SINGLE_CURRENCY_PATTERN_STR, ticker)
         
-        from_symbol = components[0]
-        to_symbol   = components[1]
+        to_symbol     = components[0]
+        from_symbol   = components[1]
         
-        return from_symbol, to_symbol
+        return to_symbol, from_symbol
     
     else:
         
         return None
+    
+def get_poly_fx_symbol_format(ticker):
+    
+    to_symbol, from_symbol = get_fxpair_symbols(ticker) 
+    
+    return POLY_FX_SYMBOL_FORMAT.format(TO=to_symbol, FROM=from_symbol)
     
     
 def timewindow_str_to_timedelta(time_window_str):
@@ -195,15 +218,110 @@ def timewindow_str_to_timedelta(time_window_str):
     
     else:
         
-        raise ValueError('time window pattern not match: "<value><unit>" str')
+        raise ValueError('time window pattern not match: "<integer_multiplier><unit>" str')
         
-def any_date_to_datetime64(any_date):
+        
+def any_date_to_datetime64(any_date, 
+                           date_format=DATE_FORMAT):
     
-    pass
+    any_date_dt64 = any_date
     
+    # set datetime64 type
+    if not pd.api.types.is_datetime64_any_dtype(any_date_dt64):
+        any_date_dt64 = infer_date_from_format_dt(any_date_dt64, 
+                                                  date_format)
+        
+    if isinstance(any_date_dt64, pd.Timestamp):
+        any_date_dt64 = any_date_dt64.to_datetime64()
+            
+    return any_date_dt64
 
-def get_date_interval(days)
+
+def get_date_interval(start=None,
+                      end=None,
+                      interval_start_mode=None,
+                      interval_end_mode='now',
+                      interval_timespan=None,
+                      freq=None,
+                      normalize=False,
+                      bdays=False):
+
+    # create start and end date as timestamp instances
+    start_date = pd.Timestamp(start)
+    end_date = pd.Timestamp(end)
+                
+    if interval_timespan:
+    
+        # a variety of interval mode could be implemented
+        
+        # 'now' - end of date interval is timestamp now
+        if interval_end_mode == 'now':
+            
+            end_date = pd.Timestamp.utcnow()
+            start_date = end_date - timewindow_str_to_timedelta(interval_timespan)
+            
+        
+        if bdays:
+            
+            components  = findall(TIME_WINDOW_COMPONENTS_PATTERN_STR,
+                                  interval_timespan)    
+            
+            # fixed days redundancy check available only with 'd' type requested timespan
+            if components[1] == 'd':
+                
+                days_list = list(
+                                    rrule(freq=DAILY, 
+                                    dtstart=start_date,
+                                    until  =end_date,
+                                    byweekday=(MO,TU,WE,TH,FR))
+                                )
+                
+                while len(days_list) < int(components[0]):
+                    
+                    start_date = start_date - Timedelta(days=1)
+                    
+                    days_list = list(
+                                        rrule(freq=DAILY, 
+                                        dtstart=start_date,
+                                        until  =end_date,
+                                        byweekday=(MO,TU,WE,TH,FR))
+                                    )
+                
+    assert isinstance(start_date, pd.Timestamp) \
+           and isinstance(end_date, pd.Timestamp), \
+           'start or end is not a valid Timestamp instance'
+    
+    if normalize:
+        
+        if not pd.isnull(start_date):
+            start_date = pd.Timestamp.normalize(start_date)
+            
+        if not pd.isnull(end_date):
+            end_date   = pd.Timestamp.normalize(end_date)
+            
+    start_date = any_date_to_datetime64(start_date)
+    end_date   = any_date_to_datetime64(end_date)
+            
+    # generate DateTimeIndex if freq is set
+    # otherwise return just start and end of interval
+    if freq:
+        
+        bdate_dtindex = pd.bdate_range(start = start_date,
+                                       end   = end_date,
+                                       freq  = freq,
+                                       tz    = 'UTC',
+                                       normalize = normalize,
+                                       name  = 'timestamp')
+        
+        return start_date, end_date, bdate_dtindex
+        
+    else:
+        
+        return start_date, end_date
+    
+    
+def reframe_tf_data(data, tf):
     
     pass
-        
+                                               
         
