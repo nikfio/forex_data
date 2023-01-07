@@ -90,12 +90,80 @@ NOTES - SORTED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLETE
                   although max start year is 2002/2003
                 . data files are distributed also with 1-minute bar (ohlc aggregates) data, 
                   tick data files are still available
+                  tick data means interval  < 1min, but it is generic meaning a fixed frequence value
+                  is not granted
                   
     - 20220813
     
         tested functions to get daily data with interval options
-        now interval options parsing must be genralized in common functions to be used 
+        now interval options parsing must be generalized in common functions to be used 
         generically across data manager
+        
+    - 20220828
+    
+        realtime manager: testing with generic get_date_interval function
+        historical manager: progress on supporting a list of timeframes rather than a single one
+        
+    - 20221013
+    
+        realtime manager: working on parsing data _parse_time_window_data()
+                          received from polygon-io get_aggs()
+                          and alpha-vantage get_currency_exchange_intraday()
+                          called in get_time_window_data()
+                          need to comply with project data templates
+                          
+        historical manager: no substantial progress
+        
+        package: introduce poetry for package management
+        
+        upon finishing testing get_time_window_data()
+        next step is dynamic support for multiple timeframes in both
+        historicaldata_manager and realtimedata_manager
+        ---> composing the database_manager
+           
+           
+    - 20230107
+    
+        CONVENTION LOCAL DATA FOLDER PATH SPECIFICATION:
+        
+            <BASE_PATH>\<MARKET>\<DATABASE_CLASS>\<SYMBOL>\<YEAR>\<filename.csv>
             
-
+            MARKET:         
+                    "Forex"
+                    "Stocks"
+                    "Option"
+                    "Crypto"
+                    
+            DATABASE_CLASS: 
+                            "Historical"
+                            "Realtime"
+                            
+            SYMBOL: 
+            
+            YEAR:   from "2000" going forward, "2001", "2002" ...
+            
+        CONVENTION FOR LOCAL DATA CSV FILENAME:
+        
+            <symbol>_Y<year>_<timeframe>.csv
+            
+        CONVENTION FOR LOCAL CSV DATA FIELD:
+        
+            TICK timeframe (HISTDATA source):
+            
+                'timestamp','ask','bid','vol','p' 
+            
+            other timeframe:  
+            
+                'timestamp','open','high','low','close'
+            
+        progress: started implementaion configuration file .yaml read/write
+        
+                  beginning testing of historical data with multiple 
+                  supported
+                  
+                  after validation complete focus back on
+                  realtime manager data downloading and elaboration
+                  
+        
+        
             

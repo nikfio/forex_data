@@ -23,9 +23,15 @@ Description:
 """
 
 from absl import app
-from data_manager import db_manager, db_parameters
 
-from src import *
+from forex_prediction import (
+                                read_config_file,
+                                db_parameters,
+                                db_manager
+                             )
+
+from forex_prediction.config import DATA_PROVIDER_KEY
+
 
 #TODO: add logging options via input FLAGS
 
@@ -33,8 +39,13 @@ def main(argv):
     
     #TODO: get logging handler
     
+    # load settings 
+    config_set = read_config_file(r'C:\Database\settings\data_manager_base_set.yaml')
+    
+    
+    # create parameters structure
     init_param = db_parameters(pair           = 'EURUSD',
-                               timeframe      = '4H',
+                               timeframe      = ['4H'],
                                years          = [2000,2001,2002],
                                data_source    = 'HISTDATA')
     

@@ -8,7 +8,6 @@ Created on Mon Apr 25 18:07:21 2022
 # python base 
 from time import sleep 
 from requests import Session
-import pandas as pd
 from dotty_dict import dotty
 from io import StringIO
 from typing import Union, Optional
@@ -23,7 +22,7 @@ from polygon import RESTClient
 # alpha-vantage source
 from alpha_vantage.foreignexchange import ForeignExchange as av_FX_reader
  
-from common import * 
+from .common import * 
 
 # constants
 READ_RETRY_COUNT = 2 
@@ -48,11 +47,11 @@ class RealTime_data_manager():
         
         self._pair          = pair.upper()
         
-        self._from_symbol, self._to_symbol = get_fxpair_components(pair)
+        self._to_symbol, self._from_symbol = get_fxpair_symbols(pair)
+        
+        self._pair_poly_format = get_poly_fx_symbol_format(pair)
         
         self._tf            = check_timeframe_str(timeframe)
-        
-        self._db_dotdict    = dotty()
         
         self._session       = Session()
         
@@ -122,60 +121,21 @@ class RealTime_data_manager():
             # call function for forex asset_class
             listing_downloaded = self._poly_reader.get_exchanges(asset_class = poly_asset_class)
                                                                  
-            
-            
-                    
             tickers_list = [item.acronym for item in listing_downloaded]
             
         return tickers_list
      
-        
-    def pause(time):
-        
-        # pause execution
-        sleep(time)
-        
-        
-    def get_timestamp_window_bounds(freq, ):
-        
-        pass
-        
-        
-    def _parse_time_series_data(raw_window_data):
-        
-        # parse raw data and format data as common defined 
-        
-        # timestamp column to datetime type and common format
-        # infer_raw_date_dt()
-        
-        # set timestamp column as df index
-        # df.set_index()
-        
-        # set columns names as 
-        # DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
-        
-        # RETURN
-        
-        pass
-    
-    
-    def _reframe_data(source_data, timeframe):
-        
-        # resample following timeframe input spec
-        
-        pass
-    
-        
-    def get_day_close(self,
-                      last_close=False,
-                      recent_days_window=None, 
-                      day_start=None, 
-                      day_end=None):
+                 
+    def get_daily_close(self,
+                        last_close=False,
+                        recent_days_window=None, 
+                        day_start=None, 
+                        day_end=None):
         
         if last_close:
         
-            av_daily_data_resp = self._av_reader.get_currency_exchange_daily(self._from_symbol,
-                                                                             self._to_symbol,
+            av_daily_data_resp = self._av_reader.get_currency_exchange_daily(self._to_symbol,
+                                                                             self._from_symbol,
                                                                              outputsize='compact')
             
             # parse response and return
@@ -186,6 +146,9 @@ class RealTime_data_manager():
                                              day_end=day_end)  
             
         else:
+            
+            if not day_start or not day_end:
+                assert isinstance(recent_days_window, int), 'recent_days_window must be integer'
             
             av_daily_data_resp = self._av_reader.get_currency_exchange_daily(self._from_symbol,
                                                                              self._to_symbol,
@@ -202,7 +165,7 @@ class RealTime_data_manager():
     def _parse_av_daily_data(self, 
                              daily_data,
                              last_close=False,
-                             recent_days_window=10, 
+                             recent_days_window=None, 
                              day_start=None, 
                              day_end=None):
     
@@ -229,45 +192,63 @@ class RealTime_data_manager():
         
         else:
             
-            # start and end input have higher priority
-            if not day_start or not day_end:
-                
-                assert isinstance(recent_days_window, int) \
-                       and recent_days_window > 1, 'recent days input param must be integer type > 1'
-                     
-                # create window start and end bounds
-                day_end   = pd.Timestamp.now(tz='UTC')
-                day_start = day_end - pd.Timedelta(recent_days_window + 1, 'd')
-                
+            if isinstance(recent_days_window, int):
+                # set window as DateOffset str with num and days
+                days_window = '{days_num}d'.format(days_num=recent_days_window)
             else:
+                days_window = None
                 
-                day_start = infer_date_dt(day_start)
-                day_end = infer_date_dt(day_end)
-                
-            day_start = day_start.normalize()    
-                
-            # set datetime64 type
-            if not pd.api.types.is_datetime64_any_dtype(day_start):
-                day_start.to_pydatetime()
-                
-            if isinstance(day_start, pd.Timestamp):
-                day_start = day_start.to_datetime64()
-                    
-            # set datetime64 type
-            if not pd.api.types.is_datetime64_dtype(day_end):
-                day_end = infer_date_dt(day_end)
-                
-            if isinstance(day_end, pd.Timestamp):
-                day_end = day_end.to_datetime64()
+            day_start, day_end = get_date_interval(start=day_start,
+                                                   end=day_end,
+                                                   interval_end_mode='now',
+                                                   interval_timespan=days_window,
+                                                   normalize=True,
+                                                   bdays=True)
         
             # return data based on filter output
             window_data = daily_df[(daily_df.index >= day_start) \
                                    & (daily_df.index <= day_end)]
+                
+            window_data.as_type(DTYPE_DICT.TF_DTYPE)
             
             return window_data
 
+
+    def _parse_time_window_data(raw_window_data,
+                                data_provider):
         
-    def get_time_window_data(self, recent_time_window=None, start=None, end=None, timeframe=None):
+        # parse raw data and format data as common defined 
+        
+        data_df = raw_window_data.copy()
+        
+        if data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
+            
+            # keep base data columns
+            extra_columns = DATA_COLUMN_NAMES.TF_DATA - data_df.columns
+            data_df.drop(extra_columns, inplace=True)
+            
+            # set index as timestamp datetime64
+            data_df.set_index(BASE_DATA_FEATURE_NAME.TIMESTAMP, \
+                              inplace = True)
+            
+            data_df.index = any_date_to_datetime64(data_df.index)
+            
+            # conventional dtype
+            data_df.astype(DTYPE_DICT.TF_DTYPE)
+            
+        elif data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+            
+            pass
+        
+        
+        return data_df
+    
+    
+    def get_time_window_data(self, 
+                             time_window=None, 
+                             start=None, 
+                             end=None, 
+                             timeframe=None):
         """
          
         
@@ -295,65 +276,59 @@ class RealTime_data_manager():
            
         """
          
-        now_date = pd.Timestamp.now(tz='UTC')
-        
-        # start and end input have higher priority
-        if start and end:
-        
-            start_date = start
-            end_date   = end
-        
-        else:
-        
-            # get time window as a pandas timedelta object
-            timedelta_window = timewindow_str_to_timedelta(recent_time_window)
-            
-            # create window start and end bounds
-            end_date   = now_date
-            start_date = end_date - timedelta_window
-            
-            # time series reader : to get complete ohlc data 
-            
-            # check if start date is older than last midnight
-            curr_midnight_date = pd.Timestamp.normalize(now_date)
+        start_date, end_date = get_date_interval(start=start,
+                                                 end=end,
+                                                 interval_end_mode='now',
+                                                 interval_timespan=time_window,
+                                                 bdays=True,
+                                                 normalize=False)
             
         data_df = pd.DataFrame()
+        data_provider = ''
         
         # try to get data with alpha_vantage if available
-        if start_date > curr_midnight_date:
+        # alpha vantage provides intraday data with high resolution
+        if pd.Timestamp(start_date).tz_localize('UTC')  \
+            > pd.Timestamp.utcnow().normalize():
         
             # using alpha vantage wrapper
             # use alpha vantage intraday option if start date is later than last midnight
-            data, meta_data = self._av_reader.get_currency_exchange_intraday(self._from_symbol,
-                                                                             self._to_symbol,
+            data, meta_data = self._av_reader.get_currency_exchange_intraday(self._to_symbol,
+                                                                             self._from_symbol,
                                                                              interval='1min',
                                                                              outputsize='full')
             
-        # parse response
-        
-        data_df = pd.DataFrame(data)
+            # parse response
+            data_df = pd.DataFrame(data)
+            data_provider = REALTIME_DATA_PROVIDER.ALPHA_VANTAGE
         
         # if alpha vantage fails or it is not available 
         # --> polygon-ai is the backup provider
         if data_df.empty:
         
+            # get dates as datetime dtype
+            start_ts = pd.Timestamp(start_date).to_pydatetime()
+            end_ts = pd.Timestamp(end_date).to_pydatetime()
+                                          
             # using Polygon-io client
-            poly_resp = self._poly_reader.get_aggs(ticker      = self._pair, 
+            poly_resp = self._poly_reader.get_aggs(ticker      = self._pair_poly_format, 
                                                    multiplier  = 1, 
-                                                   timespan    = '1min', 
-                                                   from_       = start_date,
-                                                   to          = end_date)
+                                                   timespan    = 'minute', 
+                                                   from_       = start_ts,
+                                                   to          = end_ts,
+                                                   adjusted    = True,
+                                                   sort        = 'asc' )
         
-        # parse response
+            # parse response
+            data_df = pd.DataFrame(poly_resp)
+            data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO
         
-        data_df = pd.DataFrame(poly_resp.results)
-        
-        
-        window_data = self._parse_time_series_data(data)
+        window_data = self._parse_time_window_data(data_df,
+                                                   data_provider)
         
         if check_timeframe_str(timeframe):
         
-            window_data_reframed = self._reframe_data(window_data, self._timeframe)
+            window_data_reframed = reframe_data(window_data, self._timeframe)
             
             return window_data_reframed
         

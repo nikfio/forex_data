@@ -11,15 +11,19 @@ Description:
     
 """
 
+__all__ = ['db_parameters', 
+           'db_manager']
+
 from typing import NamedTuple
 
 # custom lib
-from historicaldata import HistDataManager
-from realtimedata import RealTime_data_manager
+from .historicaldata import HistDataManager
+from .realtimedata import RealTime_data_manager
 
 # custom definitions
-from common import * 
+from .common import * 
     
+
 class db_parameters(NamedTuple):
     """
     
@@ -37,13 +41,12 @@ class db_parameters(NamedTuple):
     data_source         : list = None
     nrows_per_file      : int  = 100000
     add_real_time       : bool = False
-    rt_data_source      : REALTIME_DATA_SOURCE = REALTIME_DATA_SOURCE.ALPHA_VANTAGE
     av_api_key          : str  = ''
     poly_api_key        : str  = ''
     
     
     
-    
+
 class db_manager:
     
     def __init__(self, parameters):
@@ -51,7 +54,7 @@ class db_manager:
         assert isinstance( parameters, db_parameters), \
                 'Parameters must be a data_manager_parameters instance'
         
-        # internal intialization
+        # internal initialization
         self._parameters = parameters
         self._historical_data_enabled = False
         self._realtime_data_enabled   = False
@@ -79,7 +82,7 @@ class db_manager:
             self._realtime_data_enabled = True
         
         
-    def download_histdata(self, years):
+    def add_histdata(self, years):
              
         self._historical_mngr.download(years)
         
@@ -91,7 +94,7 @@ class db_manager:
     
     def get_realtime_quote(self):
         
-        return self._realtime_mngr.get_day_close(last_close=True)
+        return self._realtime_mngr.get_daily_close(last_close=True)
     
     
     def get_realtime_daily_close(self,
@@ -99,24 +102,29 @@ class db_manager:
                                  day_start=None, 
                                  day_end=None):
         
-        return self._realtime_mngr.get_day_close(last_close=False,
-                                                 recent_days_window=recent_days_window,
-                                                 day_start=day_start,
-                                                 day_end=day_end)
+        return self._realtime_mngr.get_daily_close(last_close=False,
+                                                   recent_days_window=recent_days_window,
+                                                   day_start=day_start,
+                                                   day_end=day_end)
     
 
-    def get_realtime_window_data(self, recent_time_window=None, start=None, end=None, reframe=False, timeframe=None):
+    def get_realtime_window_data(self,
+                                 time_window=None,
+                                 start=None,
+                                 end=None,
+                                 reframe=False,
+                                 timeframe=None):
         
         if reframe:
             
-            self._realtime_mngr.get_time_window_data(recent_time_window = recent_time_window,
+            self._realtime_mngr.get_time_window_data(time_window        = time_window,
                                                      start              = start,
                                                      end                = end,
                                                      timeframe          = timeframe)
                                  
         else:
             
-            self._realtime_mngr.get_time_window_data(recent_time_window = recent_time_window,
+            self._realtime_mngr.get_time_window_data(time_window        = time_window,
                                                      start              = start,
                                                      end                = end)
         
