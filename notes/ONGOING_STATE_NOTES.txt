@@ -164,6 +164,11 @@ NOTES - SORTED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLETE
                   after validation complete focus back on
                   realtime manager data downloading and elaboration
                   
+    - 20230408
+    
+        hundred percent focus on simultaneous support of multiple timeframes
+        in historical data manager and realtime data manager
+                  
         
         
             

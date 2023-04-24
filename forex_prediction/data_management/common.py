@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+## -*- coding: utf-8 -*-
 """
 Created on Sat Apr 30 09:23:19 2022
 
@@ -6,9 +6,10 @@ Created on Sat Apr 30 09:23:19 2022
 """
 
 # python base
-from re import fullmatch, findall
+from re import fullmatch, findall, search
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
+from pandas.tseries.offsets import DateOffset
 from pandas import to_datetime, Timedelta
 from dateutil.rrule import rrule, DAILY, MO, TU, WE, TH, FR
 
@@ -94,8 +95,8 @@ BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
        
 class DTYPE_DICT:
     
-    HISTORICAL_TICK_DTYPE = {'ask': 'float32', 'bid': 'float32',
-                             'vol': 'float16', 'p': 'float32'}
+    HISTORICAL_TICK_DTYPE = {'ask': 'float16', 'bid': 'float16',
+                             'vol': 'float16', 'p': 'float16'}
     TF_DTYPE   = {'open': 'float32', 'high': 'float32', 
                   'low': 'float32', 'close': 'float32'}
     TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ns]',
@@ -160,6 +161,7 @@ def infer_date_from_format_dt(s, date_format):
 
 # parse timeframe as string and validate if it is valid
 # following pandas DateOffset freqstr rules and 'TICK' (=lowest timeframe available)
+# link to official panas doc https://pandas.pydata.org/docs/user_guide/timeseries.html#dateoffset-objects
 def check_timeframe_str(tf):
     
     if tf == 'TICK':
@@ -323,5 +325,107 @@ def get_date_interval(start=None,
 def reframe_tf_data(data, tf):
     
     pass
+
+### RELATED TO DOTTY DICTIONARY
+
+
+def get_dotty_keys(dotty_dict,
+                   root=False,
+                   level=None,
+                   parent_key=None):
+    
+    dotty_copy = dotty_dict.copy()
+    
+    if root:
+        
+        return dotty_copy.keys()
+    
+    elif level:
+        
+        assert isinstance(level, int) \
+               and level >= 0, 'level must be zero or positive integer'
+               
+        # default start at root key
+        level_counter = 0
+        
+        pass
+        
+    elif parent_key:
+        
+        assert isinstance(parent_key, str), 'parent key must be str'
+        
+        parent_dict = dotty_copy.pop(parent_key)
+        
+        if parent_dict:
+            
+            try:
+                keys = parent_dict.keys()
+            except KeyError as err:
+                
+                # TODO: error to be logged, now print
+                print( '{error} : keys not found under {parent}'.format(error=str(err),
+                                                                        parent=parent_key) )
+                return []
+                
+            else:
+                
+               return [str(k) for k in keys]
+                
+        
+        else:
+            
+            raise KeyError( '{parent} key not exist'.format(parent=parent_key) )
+                
+                
+def get_dotty_leaf(dotty_dict):
+    
+    leaf_keys = list()
+    
+    def get_leaf(dotty_dict, parent_key):
+        
+        try: 
+            
+            if dotty_dict.keys():
+                
+                for key in dotty_dict.keys():
+                    
+                    key_w_parent = '{parent}.{key}'.format(parent=parent_key,
+                                                           key=key)
+                    
+                    get_leaf(dotty_dict.get(key), key_w_parent)
+            
+        except AttributeError:
+            
+            leaf_keys.append( parent_key )
+            
+        except ValueError:
+            
+            leaf_keys.append( parent_key )
+        
+    # root field is temporary to have common start in any case in all leafs
+    get_leaf(dotty_dict, 'root')
+    
+    # pull out root field from all paths to leafs
+    leaf_keys = [ search('(?<=root.)\S+', leaf).group(0) for leaf in leaf_keys]
+    
+    return leaf_keys
+        
+
+def get_dotty_key_parent(key):
+    
+    assert isinstance(key, str), 'dotty key must be str type'
+    
+    # prune last field and rejoin with '.' separator
+    # to recreate a dotty key
+    parent_key = '.'.join( key.split('.')[:-2] )
+    
+    return parent_key
+
+
+def check_time_offset_str(timeoffset_str):
+
+    return isinstance(to_offset(timeoffset_str), DateOffset)
+# TODO: function that returns all leafs at a given
+        # given level
                                                
         

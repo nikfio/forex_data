@@ -30,24 +30,20 @@ from forex_prediction import (
                                 db_manager
                              )
 
-from forex_prediction.config import DATA_PROVIDER_KEY
-
-
-#TODO: add logging options via input FLAGS
+# TODO: add logging options via input FLAGS
 
 def main(argv):
     
-    #TODO: get logging handler
+    # TODO: get logging handler
     
     # load settings 
-    config_set = read_config_file(r'C:\Database\settings\data_manager_base_set.yaml')
+    config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
     
     
     # create parameters structure
-    init_param = db_parameters(pair           = 'EURUSD',
-                               timeframe      = ['4H'],
-                               years          = [2000,2001,2002],
-                               data_source    = 'HISTDATA')
+    init_param = db_parameters(pair           = config_set['PAIR'],
+                               timeframe      = config_set['TIMEFRAME'],
+                               years          = config_set['YEARS'])
     
     # db instantiation                            
     db_test = db_manager(init_param)
@@ -55,7 +51,7 @@ def main(argv):
     # further data loading 
     # managed internally if it is necessary to download from the net
     # or if data is available in local folder
-    db_test.download_histdata([2003,2004,2005])
+    db_test.add_histdata([2003,2004,2005])
     
     # plot data with
     # timestamp start and end bounds
