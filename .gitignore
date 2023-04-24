@@ -4,3 +4,4 @@ src/__pycache__/data_manager.cpython-39.pyc
 saved_workspaces/
 *.pyc
 issues/
+.vscode/
