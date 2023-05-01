@@ -82,7 +82,7 @@ class db_manager:
             self._realtime_data_enabled = True
         
         
-    def add_histdata(self, years):
+    def add_historical_data(self, years):
              
         self._historical_mngr.download(years)
         

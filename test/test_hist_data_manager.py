@@ -51,7 +51,11 @@ def main(argv):
     # further data loading 
     # managed internally if it is necessary to download from the net
     # or if data is available in local folder
-    db_test.add_histdata([2003,2004,2005])
+    db_test.add_historical_data([2003,2004,2005])
+    
+    # add new timeframe
+    db_test.add_timeframe(['1M', '1W'],
+                          update_all=True)
     
     # plot data with
     # timestamp start and end bounds
