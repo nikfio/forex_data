@@ -161,7 +161,8 @@ def infer_date_from_format_dt(s, date_format):
 
 # parse timeframe as string and validate if it is valid
 # following pandas DateOffset freqstr rules and 'TICK' (=lowest timeframe available)
-# link to official panas doc https://pandas.pydata.org/docs/user_guide/timeseries.html#dateoffset-objects
+# link to official pandas doc
+# https://pandas.pydata.org/docs/user_guide/timeseries.html#dateoffset-objects
 def check_timeframe_str(tf):
     
     if tf == 'TICK':
@@ -326,8 +327,8 @@ def reframe_tf_data(data, tf):
     
     pass
 
-### RELATED TO DOTTY DICTIONARY
 
+### RELATED TO DOTTY DICTIONARY
 
 def get_dotty_keys(dotty_dict,
                    root=False,
@@ -377,7 +378,7 @@ def get_dotty_keys(dotty_dict,
             raise KeyError( '{parent} key not exist'.format(parent=parent_key) )
                 
                 
-def get_dotty_leaf(dotty_dict):
+def get_dotty_leafs(dotty_dict):
     
     leaf_keys = list()
     
@@ -425,6 +426,8 @@ def get_dotty_key_parent(key):
 def check_time_offset_str(timeoffset_str):
 
     return isinstance(to_offset(timeoffset_str), DateOffset)
+
+
 # TODO: function that returns all leafs at a given
         # given level
                                                

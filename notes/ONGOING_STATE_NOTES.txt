@@ -168,6 +168,15 @@ NOTES - SORTED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLETE
     
         hundred percent focus on simultaneous support of multiple timeframes
         in historical data manager and realtime data manager
+        
+    - 20230425 
+    
+        improving and proceeding with multiple dataframes
+        pandas.read_csv of TICK files is significatively long
+        switched to dask dataframe 
+        is it worthy to have all database in db manager of dask dataframe type?
+        
+        
                   
         
         
