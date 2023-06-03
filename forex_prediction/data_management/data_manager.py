@@ -39,7 +39,6 @@ class db_parameters(NamedTuple):
     hist_data_path      : str  = DEFAULT_PATHS.FOREX_LOCAL_HIST_DATA_PATH
     rt_data_path        : str  = DEFAULT_PATHS.FOREX_LOCAL_REALTIME_DATA_PATH
     data_source         : list = None
-    nrows_per_file      : int  = 100000
     add_real_time       : bool = False
     av_api_key          : str  = ''
     poly_api_key        : str  = ''
@@ -74,8 +73,8 @@ class db_manager:
            or parameters.mode == DB_MODE.REALTIME_MODE:
                
             # realtime data manager
-            self._realtime_mngr = RealTime_data_manager(pair        = parameters.pair,
-                                                        timeframe   = parameters.timeframe,
+            self._realtime_mngr = RealTime_data_manager(pair           = parameters.pair,
+                                                        timeframe      = parameters.timeframe,
                                                         av_api_key     = parameters.av_api_key,
                                                         poly_api_key   = parameters.poly_api_key)
         
@@ -86,7 +85,14 @@ class db_manager:
              
         self._historical_mngr.download(years)
         
-    
+    def add_timeframe(self, timeframe):
+        
+        if self._historical_data_enabled \
+            and hasattr(self, '_historical_mngr'):
+                
+            self._historical_mngr.add_timeframe(timeframe)
+            
+        
     def get_realtime_tickers_list(self, source, asset_class=None):
         
         return self._realtime_mngr.tickers_list(source, asset_class = asset_class)

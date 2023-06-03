@@ -41,6 +41,8 @@ SINGLE_CURRENCY_PATTERN_STR     = '[A-Z]{3}'
 TIME_WINDOW_PATTERN_STR         = '^[-+]?[0-9]+[A-Za-z]{1,}$'
 TIME_WINDOW_COMPONENTS_PATTERN_STR         = '^[-+]?[0-9]+|[A-Za-z]{1,}$'
 TIME_WINDOW_UNIT_PATTERN_STR    = '[A-Za-z]{1,}$'
+GET_YEAR_FROM_TICK_KEY_PATTERN_STR = '^[A-Za-z].Y[0-9].TICK'
+YEAR_FIELD_PATTERN_STR          = '^Y([0-9]{4,})$'              
 
 ALPHA_VANTAGE_KEY_ENV           = 'ALPHA_VANTAGE_KEY'
 POLY_IO_KEY_ENV                 = 'POLYGON_IO_KEY'
@@ -49,20 +51,20 @@ AV_LIST_URL                     = 'https://www.alphavantage.co/query?function=LI
 
 DEFAULT_TIMEZONE                = 'utc'
 
+TICK_TIMEFRAME                  = 'TICK'
+
 # actual environment variable name containing key
 
 ### auxiliary CONSTANT DEFINITIONS
+     
+# dotty key template: <PAIR>.Y<year>.<timeframe>.<data-type>
+class DATA_KEY:
+    
+    PAIR_INDEX              = 0
+    YEAR_INDEX              = 1 
+    TF_INDEX                = 2 
+    DATATYPE_INDEX          = 3 
 
-# TIMEFRAME macro
-class TIMEFRAME_MACRO:
-    
-    MIN_TICK_TF      = 'TICK'
-    ONE_HOUR_TF      = '1H'
-    FOUR_HOUR_TF     = '4H'
-    ONE_DAY_TF       = '1D'
-    ONE_WEEK_TF      = '1W'
-    ONE_MONTH_TF     = '1M'
-    
 # filename template : <PAIR>_Y<year>_<timeframe>.<filetype>
 class FILENAME_TEMPLATE:
     
@@ -72,6 +74,7 @@ class FILENAME_TEMPLATE:
     TF_INDEX                = 2
     FILETYPE_INDEX          = 3
 
+# default path to store data in local disk
 class DEFAULT_PATHS:
     
     FOREX_LOCAL_HIST_DATA_PATH     = "C:/Database/Forex/Historical"
@@ -95,7 +98,7 @@ BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
        
 class DTYPE_DICT:
     
-    HISTORICAL_TICK_DTYPE = {'ask': 'float16', 'bid': 'float16',
+    TICK_DTYPE = {'ask': 'float16', 'bid': 'float16',
                              'vol': 'float16', 'p': 'float16'}
     TF_DTYPE   = {'open': 'float32', 'high': 'float32', 
                   'low': 'float32', 'close': 'float32'}
@@ -329,6 +332,23 @@ def reframe_tf_data(data, tf):
 
 
 ### RELATED TO DOTTY DICTIONARY
+
+def get_dotty_key_field(key, index):
+    
+    assert isinstance(key, str), \
+            f'dotty key {key} invalid type, str required'
+    
+    try:
+    
+        field = key.split('.')[index]
+        
+    except IndexError:
+        
+        raise IndexError(f'index {index} invalid for key {key}')
+        
+    
+    return field
+
 
 def get_dotty_keys(dotty_dict,
                    root=False,

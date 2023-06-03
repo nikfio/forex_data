@@ -3,8 +3,17 @@
 Created on Fri Apr 29 22:13:04 2022
 
 @author: fiora
+
+test data_manager object realtime feature:
+    
+    1) test real time data providers
+    
+    2) test timeframe flexibility as in historical data manager
+    
+    3) download indicators values
+
 """
-# python base
+
 import pyaml
 
 from absl import app
