@@ -7,7 +7,7 @@ Created on Thu Jan  6 22:03:27 2022
 
 """
 Description: 
-    test data_manager object:
+    test data_manager object historical data feature:
         
         1) download historical data and save to file in minimal timeframe
            available (TICK) to avoid further downloads at each run
@@ -15,9 +15,7 @@ Description:
         2) resample TICK data to to have any larger timeframe specified
             2.1) manage read/write of lmdb files 
     
-        3) add real time data download 
-    
-        4) add download of any indicator or generic data other than 
+        3) add download of any indicator or generic data other than 
            pair exchange data
     
 """
@@ -38,7 +36,6 @@ def main(argv):
     
     # load settings 
     config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
-    
     
     # create parameters structure
     init_param = db_parameters(pair           = config_set['PAIR'],
