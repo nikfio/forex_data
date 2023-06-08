@@ -277,9 +277,9 @@ def get_date_interval(start=None,
                 
                 days_list = list(
                                     rrule(freq=DAILY, 
-                                    dtstart=start_date,
-                                    until  =end_date,
-                                    byweekday=(MO,TU,WE,TH,FR))
+                                          dtstart=start_date,
+                                          until  =end_date,
+                                          byweekday=(MO,TU,WE,TH,FR))
                                 )
                 
                 while len(days_list) < int(components[0]):
