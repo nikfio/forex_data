@@ -6,6 +6,7 @@ Created on Sat Jul 16 01:31:35 2022
 """
 
 __all__ = ['common', 
+           'DB_MODE',
            'data_manager',
            'db_parameters',
            'db_manager']

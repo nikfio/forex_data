@@ -31,11 +31,10 @@ class db_parameters(NamedTuple):
     
     """
     
-    mode                : DB_MODE = DB_MODE.FULL_MODE
+    mode                : DB_MODE = None
     pair                : str  = None
     timeframe           : list = None 
     years               : list = None
-    months              : list = None
     hist_data_path      : str  = DEFAULT_PATHS.FOREX_LOCAL_HIST_DATA_PATH
     rt_data_path        : str  = DEFAULT_PATHS.FOREX_LOCAL_REALTIME_DATA_PATH
     data_source         : list = None
@@ -68,7 +67,7 @@ class db_manager:
                                                     timeframe = parameters.timeframe)
                 
             self._historical_data_enabled = True
-            
+           
         if parameters.mode == DB_MODE.FULL_MODE \
            or parameters.mode == DB_MODE.REALTIME_MODE:
                
@@ -82,15 +81,17 @@ class db_manager:
         
         
     def add_historical_data(self, years):
-             
-        self._historical_mngr.download(years)
         
-    def add_timeframe(self, timeframe):
+        self._historical_mngr.download(years = years, 
+                                       search_local = True)
+        
+    def add_timeframe(self, timeframe, update_data=True):
         
         if self._historical_data_enabled \
             and hasattr(self, '_historical_mngr'):
                 
-            self._historical_mngr.add_timeframe(timeframe)
+            self._historical_mngr.add_timeframe(timeframe,
+                                                update_data=update_data)
             
         
     def get_realtime_tickers_list(self, source, asset_class=None):
@@ -135,17 +136,21 @@ class db_manager:
                                                      end                = end)
         
         
-    def plot(self, data_source, timeframe=None, 
-                   chart_mode=None, start_date=None, end_date=None):
+    def plot(self, 
+             data_source,
+             timeframe  = None,
+             start_date = None,
+             end_date   = None):
         
-        if data_source == 'Historical_data':
+        
+        if data_source == DB_MODE.HISTORICAL_MODE:
             
-            self._historical_mngr.plot_data(tf         = timeframe,
+            self._historical_mngr.plot_data(timeframe  = timeframe,
                                             start_date = start_date,
                                             end_date   = end_date)
 
 
-        elif data_source == 'Realtime_data':
+        elif data_source == DB_MODE.REALTIME_MODE:
             
             pass
 
