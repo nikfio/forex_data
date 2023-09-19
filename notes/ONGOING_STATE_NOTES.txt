@@ -176,6 +176,12 @@ NOTES - SORTED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLETE
         switched to dask dataframe 
         is it worthy to have all database in db manager of dask dataframe type?
         
+    - 20200809
+    
+        in histarical data manager, implementing call to download data if 
+        plot interval request is not currently included in data manager
+        db instance
+        
         
                   
         

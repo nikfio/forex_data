@@ -39,7 +39,7 @@ def main(argv):
     config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
     
     # create parameters structure
-    init_param = db_parameters(mode           = config_set['MODE'],
+    init_param = db_parameters(mode           = DB_MODE.HISTORICAL_MODE,
                                pair           = config_set['PAIR'],
                                timeframe      = config_set['TIMEFRAME'],
                                years          = config_set['YEARS'])
@@ -47,26 +47,27 @@ def main(argv):
     # db instantiation                            
     db_test = db_manager(init_param)
     
+    """
     # further data loading 
     # managed internally if it is necessary to download from the net
     # or if data is available in local folder
-    '''
+    
     db_test.add_historical_data([2005])
-    '''
+    
     
     # add new timeframe
     '''
     db_test.add_timeframe('1W',
                           update_data=True)
     '''
-    
+    """
     # plot data with
     # timestamp start and end bounds
     # timeframe specified
     db_test.plot(data_source = DB_MODE.HISTORICAL_MODE,
                  timeframe   = '1D',
-                 start_date  = '2007-10-02 18:00:00',
-                 end_date    = '2008-06-23 23:00:00')
+                 start_date  = '2002-10-02 18:00:00',
+                 end_date    = '2003-06-23 23:00:00')
     
     
 if __name__ == '__main__':

@@ -47,7 +47,7 @@ class RealTime_data_manager():
         
         self._pair          = pair.upper()
         
-        self._to_symbol, self._from_symbol = get_fxpair_symbols(pair)
+        self._to_symbol, self._from_symbol = get_fxpair_symbols(self.pair)
         
         self._pair_poly_format = get_poly_fx_symbol_format(pair)
         
@@ -132,6 +132,7 @@ class RealTime_data_manager():
                         day_start=None, 
                         day_end=None):
         
+        
         if last_close:
         
             av_daily_data_resp = self._av_reader.get_currency_exchange_daily(self._to_symbol,
@@ -182,6 +183,7 @@ class RealTime_data_manager():
         
         daily_df.index.name = BASE_DATA_FEATURE_NAME.TIMESTAMP
         
+        
         if last_close:
             
             # timestamp as column to include it in return data
@@ -191,6 +193,8 @@ class RealTime_data_manager():
             return daily_df.iloc[CANONICAL_INDEX.LATEST_DATA_INDEX].to_dict()
         
         else:
+            
+            
             
             if isinstance(recent_days_window, int):
                 # set window as DateOffset str with num and days
