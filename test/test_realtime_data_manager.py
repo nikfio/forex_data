@@ -23,18 +23,22 @@ from absl import app
 from forex_prediction import (
                               DB_MODE,
                               db_parameters,
-                              db_manager
+                              db_manager,
+                              read_config_file
                               )
 
 
 def main(argv):
     
+    # load settings parameters
+    config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
+    
     # realtime manager instantiation
     rt_param = db_parameters(mode            = DB_MODE.REALTIME_MODE,
-                             pair            = 'EUR/USD',
-                             timeframe       = '30min',
-                             av_api_key      = av_key, 
-                             poly_api_key    = poly_key )
+                             pair            = config_set['PAIR'],
+                             timeframe       = config_set['TIMEFRAME'],
+                             av_api_key      = config_set['DATA_PROVIDER_KEY']['ALPHA_VANTAGE_KEY'], 
+                             poly_api_key    = config_set['DATA_PROVIDER_KEY']['POLYGON_IO_KEY'])
     
     test_rt_data_manager = db_manager(rt_param)
     

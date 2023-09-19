@@ -1,5 +1,4 @@
 
-# python base imports
 import sys
 import zipfile
 import re
@@ -216,7 +215,7 @@ class HistDataManager:
             return []
 
 
-    def _get_tf_complete_years(self, years):
+    def _get_tf_complete_years(self):
 
         # check input years list if each year is complete
         # across tick and timeframes requested
@@ -353,8 +352,41 @@ class HistDataManager:
         # resample along 'p' column
         df_resampler = tick_data.p.resample(tf)
         
-        
+        # use native method for pandas dataframe
         return df_resampler.ohlc().interpolate(method='nearest')
+    
+    def _add_tf_data_key(self, year, tf):
+        
+        year_tf_key = self.db_key(self._pair,
+                                  year,
+                                  tf,
+                                  'df')
+
+        if self._db_dotdict.get(year_tf_key) is None \
+            or not isinstance(self._db_dotdict.get(year_tf_key),
+                              pd.DataFrame):
+
+            # get tick key
+            year_tick_key = self.db_key(self._pair,
+                                        year,
+                                        'TICK',
+                                        'df')
+
+            try:
+
+                aux_base_df = self._db_dotdict[year_tick_key]
+
+            except KeyError:
+
+                # to logging
+                print('year {}: tick data not found'.format(year))
+
+            else:
+
+                # produce reframed data at the timeframe requested
+                self._db_dotdict[year_tf_key] \
+                    = self._reframe_from_tick_data(aux_base_df,
+                                                   tf)
         
 
     def _complete_years_timeframe(self):
@@ -363,7 +395,7 @@ class HistDataManager:
         years_list = self._get_years_list(self._pair, 'int')
 
         # get years that has not all timeframes
-        years_complete = self._get_tf_complete_years(years_list)
+        years_complete = self._get_tf_complete_years()
 
         # get years not having all timeframes data
         years_incomplete = set(years_list).difference(years_complete)
@@ -392,38 +424,11 @@ class HistDataManager:
 
             for tf in self._tf_list:
 
-                year_tf_key = self.db_key(self._pair,
-                                          year,
-                                          tf,
-                                          'df')
-
-                if self._db_dotdict.get(year_tf_key) is None:
-
-                    # get tick key
-                    year_tick_key = self.db_key(self._pair,
-                                                year,
-                                                'TICK',
-                                                'df')
-
-                    try:
-
-                        aux_base_df = self._db_dotdict[year_tick_key]
-
-                    except KeyError:
-
-                        # to logging
-                        print('year {}: tick data not found'.format(year))
-
-                    else:
-
-                        # produce reframed data at the timeframe requested
-                        self._db_dotdict[year_tf_key] \
-                            = self._reframe_from_tick_data(aux_base_df,
-                                                           tf)
+                self._add_tf_data_key(year, tf)
 
         # assert no incomplete years found after operation
         assert self._get_years_list(self._pair, 'int') \
-            == self._get_tf_complete_years(years_list), \
+            == self._get_tf_complete_years(), \
             'timeframe completing operation NOT OK'
 
 
@@ -553,8 +558,12 @@ class HistDataManager:
     def interval_aggr_data_keys(self,
                                 timeframe,
                                 start,
-                                end):
+                                end,
+                                add_timeframe = False):
 
+        assert check_time_offset_str(timeframe), \
+            f'timeframe request {timeframe} invalid'
+            
         # try to convert to datetime data type if not already is
         if not pd.api.types.is_datetime64_any_dtype(start):
 
@@ -564,28 +573,82 @@ class HistDataManager:
 
             end = infer_date_dt(end)
 
-        # assert end > start
+        assert end > start, \
+            'date interval not coherent, start must be older than end'
 
-        if timeframe in self._tf_list:
+        if not timeframe in self._tf_list \
+            and add_timeframe:
 
-            interval_tf = timeframe
+            # timeframe list
+            self.add_timeframe([timeframe])
 
-        else:
-
-            interval_tf = TICK_TIMEFRAME
-
-        keys = [key for key in get_dotty_leafs(self._db_dotdict)
-                if get_dotty_key_field(key, DATA_KEY.TF_INDEX)
-                == interval_tf]
-
+        
+        # get years including interval requested
+        years_interval_req = list(range(start.year, end.year+1, 1))
+        
+        # get data keys referred to interval years 
+        # at the given timeframe
+        interval_keys = [key for key in get_dotty_leafs(self._db_dotdict)
+                          if get_key_year(key) in years_interval_req \
+                              and get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
+                                  == timeframe]
+        
+        # get years covered by interval keys
+        interval_keys_years = [get_key_year(key) for key in interval_keys]
+        
+        # aggregate data to current instance if necessary
+        if years_interval_req != interval_keys_years:
+            
+            year_tf_missing = list(set(years_interval_req).difference(interval_keys_years))
+            
+            year_tick_keys = [get_key_year(key) for key in get_dotty_leafs(self._db_dotdict)
+                                  if get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
+                                      == TICK_TIMEFRAME \
+                                     and get_key_year(key) != 'ALL']
+            
+            year_tick_missing = list(set(years_interval_req).difference(year_tick_keys))
+            
+            # if tick is missing --> download missing years
+            if year_tick_missing:
+                
+                self.download(year_tick_missing, 
+                              search_local=True)
+                
+            # if timeframe req is in tf_list 
+            # data requested should at this point be available
+            # call add data for specific timeframe requested 
+            if not timeframe in self._tf_list:
+                
+                for year in year_tf_missing:
+                    
+                    # call add single tf data
+                    self._add_tf_data_key(year, timeframe)
+                    
+                    
+            # get years covered by interval keys
+            interval_keys_years = [get_key_year(key) for key in get_dotty_leafs(self._db_dotdict)
+                                      if get_key_year(key) in years_interval_req and \
+                                          get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
+                                          == timeframe]
+            
+            assert years_interval_req == interval_keys_years, \
+                    f'processing year data completion for {years_interval_req} ' \
+                    'not ok'
+                    
+        # at this point data keys necessary are completed
+        
+        # get data keys referred to interval years 
+        # at the given timeframe
+        interval_keys = [key for key in get_dotty_leafs(self._db_dotdict)
+                          if get_key_year(key) in years_interval_req \
+                              and get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
+                                  == timeframe]
+            
         data_df = pd.DataFrame()
+        
+        if len(interval_keys) == 1: 
 
-        if start.year == end.year:
-
-            data_key = [key for key in keys
-                        if get_key_year(key) == start.year][0]
-
-            data_df = self._db_dotdict.get(data_key)
+            data_df = self._db_dotdict.get(interval_keys[0])
 
             # return data slice
             data_df = data_df[(data_df.index >= start)
@@ -593,27 +656,16 @@ class HistDataManager:
 
         else:
 
-            # get years including interval requested
-            years_interval = range(start.year, end.year+1, 1)
-
-            # get data keys referred to interval years
-            years_keys = [key for key in keys
-                          if get_key_year(key) in years_interval]
-
             # order keys by ascending year value
-            years_keys.sort(key=lambda x: get_key_year(x))
+            interval_keys.sort(key=lambda x: get_key_year(x))
 
             # get data interval
             data_df = pd.concat([self._db_dotdict.get(key)[
                                  (self._db_dotdict.get(key).index >= start)
                                  & (self._db_dotdict.get(key).index <= end)].copy()
-                                for key in years_keys])
-
-        if interval_tf == TICK_TIMEFRAME:
-
-            data_df = self._reframe_from_tick_data(data_df,
-                                                   timeframe)
-
+                                 for key in interval_keys])
+            
+    
         return data_df
 
 
@@ -844,6 +896,7 @@ class HistDataManager:
 
         # update manager database
         self.update_db()
+        
 
     def _list_local_data(self, folderpath):
 
@@ -978,6 +1031,7 @@ class HistDataManager:
         # dump new downloaded data not already present in local data folder
         self._update_local_data_folder(self._data_path)
 
+
     def plot_data(self, timeframe, start_date, end_date):
         """
         Plot data in selected time frame and start and end date bound
@@ -993,7 +1047,8 @@ class HistDataManager:
 
         chart_data = self.interval_aggr_data_keys(timeframe=timeframe,
                                                   start=start_date,
-                                                  end=end_date)
+                                                  end=end_date,
+                                                  add_timeframe=True)
 
         # candlestick chart type
         # use mplfinance
@@ -1007,7 +1062,9 @@ class HistDataManager:
         mpf.show()
 
 
-# class using histdata.api
+
+
+######## CLASS using histdata.api
 
 # external library (more tested and structure (?))
 # to manage histdata provided data

@@ -208,13 +208,19 @@ def get_fxpair_symbols(ticker):
         
         return None
     
+    
 def get_poly_fx_symbol_format(ticker):
     
     to_symbol, from_symbol = get_fxpair_symbols(ticker) 
     
     return POLY_FX_SYMBOL_FORMAT.format(TO=to_symbol, FROM=from_symbol)
     
-    
+
+def check_time_offset_str(timeoffset_str):
+
+    return isinstance(to_offset(timeoffset_str), DateOffset)
+
+
 def timewindow_str_to_timedelta(time_window_str):
     
     
@@ -331,7 +337,7 @@ def reframe_tf_data(data, tf):
     pass
 
 
-### RELATED TO DOTTY DICTIONARY
+### UTILS FOR DOTTY DICTIONARY
 
 def get_dotty_key_field(key, index):
     
@@ -443,9 +449,13 @@ def get_dotty_key_parent(key):
     return parent_key
 
 
-def check_time_offset_str(timeoffset_str):
+#def get_list_key_values(index):
+    
+    # generic function to return keys index value
+    # as a list
 
-    return isinstance(to_offset(timeoffset_str), DateOffset)
+
+
 
 
 # TODO: function that returns all leafs at a given
