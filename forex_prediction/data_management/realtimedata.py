@@ -36,23 +36,26 @@ MINIMAL_RECENT_TIME_WINDOW_DAYS = 3
 
 class RealTime_data_manager():
     
-    def __init__(self, pair:str,   
-                 av_api_key:str=None, poly_api_key:str=None, timeframe=None):
+    def __init__(self, 
+                 pair:str,   
+                 av_api_key:str=None, 
+                 poly_api_key:str=None, 
+                 timeframe=None):
         
-        assert check_AV_FX_symbol(pair), 'invalid pair symbol format'
+        self._to_symbol, self._from_symbol = get_pair_symbols(self.pair)
         
-        # check if pair is in market 'Forex' tickers available by polygon provider
-        # and alpha vantage provider
-        # if not return failure for invalid ticker requested
+        # pair
+        self._pair         = pair.upper()
         
-        self._pair          = pair.upper()
+        self._pair_polygon = to_source_symbol(self._pair, 
+                                                  REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
         
-        self._to_symbol, self._from_symbol = get_fxpair_symbols(self.pair)
-        
-        self._pair_poly_format = get_poly_fx_symbol_format(pair)
+        self._pair_alphavantage = to_source_symbol(self._pair, 
+                                                  REALTIME_DATA_PROVIDER.POLYGON_IO)
         
         self._tf            = check_timeframe_str(timeframe)
         
+        # http session instance
         self._session       = Session()
         
         # keys for data providers
@@ -60,9 +63,9 @@ class RealTime_data_manager():
         self._poly_api_key     = poly_api_key
         
         # alpha vantage client
-        self._av_reader = av_FX_reader(key   = self._av_api_key,
-                                               output_format= 'pandas',
-                                               indexing_type= 'date')
+        self._av_reader = av_FX_reader( key   = self._av_api_key,
+                                        output_format= 'pandas',
+                                        indexing_type= 'date')
         
         # Polygon-io client 
         self._poly_reader = RESTClient(api_key=self._poly_api_key)          
