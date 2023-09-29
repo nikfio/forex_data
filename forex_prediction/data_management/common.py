@@ -33,27 +33,33 @@ DATE_FORMAT                     = '%Y-%m-%d %H:%M:%S'
 DATE_NO_HOUR_FORMAT             = '%Y-%m-%d'
 
 FILENAME_STR                    = '{pair}_Y{year}_{tf}.csv'
+DEFAULT_TIMEZONE                = 'utc'
+TICK_TIMEFRAME                  = 'TICK'
 
-PAIR_FORMAT_ALPHAVANTAGE_STR    = '{TO}/{FROM}'
-PAIR_MATCH_ALPHAVANTAGE_STR     = '^[A-Z]{3}/[A-Z]{3}$'
-POLY_FX_SYMBOL_FORMAT           = 'C:{TO}{FROM}'
+## PAIR ticker
+PAIR_GENERIC_FORMAT             = '{TO}/{FROM}'
 SINGLE_CURRENCY_PATTERN_STR     = '[A-Z]{3}'
+
+## PAIR ALPHAVANTAGE
+PAIR_ALPHAVANTAGE_FORMAT        = '{TO}/{FROM}'
+PAIR_ALPHAVANTAGE_PATTERN       = '^' + SINGLE_CURRENCY_PATTERN_STR + '/' \
+                                      + SINGLE_CURRENCY_PATTERN_STR + '$'
+ALPHA_VANTAGE_KEY_ENV           = 'ALPHA_VANTAGE_KEY'
+AV_LIST_URL                     = 'https://www.alphavantage.co/query?function=LISTING_STATUS&apikey={api_key}'
+
+## PAIR POLYGON IO
+PAIR_POLYGON_FORMAT             = 'C:{TO}{FROM}'
+PAIR_POLYGON_PATTERN            = '^C:' + SINGLE_CURRENCY_PATTERN_STR + \
+                                        + SINGLE_CURRENCY_PATTERN_STR + '$'
+POLY_IO_KEY_ENV                 = 'POLYGON_IO_KEY'
+
+## TIME PATTERN
 TIME_WINDOW_PATTERN_STR         = '^[-+]?[0-9]+[A-Za-z]{1,}$'
 TIME_WINDOW_COMPONENTS_PATTERN_STR         = '^[-+]?[0-9]+|[A-Za-z]{1,}$'
 TIME_WINDOW_UNIT_PATTERN_STR    = '[A-Za-z]{1,}$'
 GET_YEAR_FROM_TICK_KEY_PATTERN_STR = '^[A-Za-z].Y[0-9].TICK'
 YEAR_FIELD_PATTERN_STR          = '^Y([0-9]{4,})$'              
 
-ALPHA_VANTAGE_KEY_ENV           = 'ALPHA_VANTAGE_KEY'
-POLY_IO_KEY_ENV                 = 'POLYGON_IO_KEY'
-
-AV_LIST_URL                     = 'https://www.alphavantage.co/query?function=LISTING_STATUS&apikey={api_key}'
-
-DEFAULT_TIMEZONE                = 'utc'
-
-TICK_TIMEFRAME                  = 'TICK'
-
-# actual environment variable name containing key
 
 ### auxiliary CONSTANT DEFINITIONS
      
@@ -180,40 +186,73 @@ def check_timeframe_str(tf):
             raise ValueError("Invalid timeframe: %s" % (tf))
         else: 
             return tf
+
+
+## PAIR functions        
+def get_pair_symbols(ticker):
         
-        
-def check_AV_FX_symbol(symbol):
+    components  = findall(SINGLE_CURRENCY_PATTERN_STR, ticker)
     
-    if fullmatch(PAIR_MATCH_ALPHAVANTAGE_STR, symbol):
-        
-        return True
-    
-    else:
-        
-        return False
-    
-    
-def get_fxpair_symbols(ticker):
-    
-    if check_AV_FX_symbol(ticker):
-        
-        components  = findall(SINGLE_CURRENCY_PATTERN_STR, ticker)
-        
-        to_symbol     = components[0]
-        from_symbol   = components[1]
-        
-        return to_symbol, from_symbol
+    if len(components) == 2:
+         
+        return components[0], components[1]
     
     else:
         
         return None
     
+
+def check_symbol(symbol, source):
     
-def get_poly_fx_symbol_format(ticker):
+    if source == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+         
+        if fullmatch(PAIR_ALPHAVANTAGE_PATTERN, symbol):
+            
+            return True
+        
+        else:
+            
+            return False
     
-    to_symbol, from_symbol = get_fxpair_symbols(ticker) 
+    elif source == REALTIME_DATA_PROVIDER.POLYGON_IO:
+        
+        if fullmatch(PAIR_POLYGON_FORMAT, symbol):
+            
+            return True
+        
+        else:
+            
+            return False
+        
+    else:
+        
+        if fullmatch(PAIR_POLYGON_FORMAT, symbol):
+            
+            return True
+        
+        else:
+            
+            return False
     
-    return POLY_FX_SYMBOL_FORMAT.format(TO=to_symbol, FROM=from_symbol)
+       
+def to_source_symbol(ticker, source):
+    
+    to_symbol, from_symbol = get_pair_symbols(ticker) 
+    
+    if source == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+    
+        return PAIR_ALPHAVANTAGE_FORMAT.format(TO=to_symbol,
+                                               FROM=from_symbol)
+        
+    elif source == REALTIME_DATA_PROVIDER.POLYGON_IO:
+    
+        return PAIR_POLYGON_FORMAT.format(TO=to_symbol,
+                                          FROM=from_symbol)
+    
+    else:
+        
+        return PAIR_GENERIC_FORMAT.format(TO=to_symbol,
+                                          FROM=from_symbol)
     
 
 def check_time_offset_str(timeoffset_str):

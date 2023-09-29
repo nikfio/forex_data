@@ -15,7 +15,9 @@ Description:
         2) resample TICK data to to have any larger timeframe specified
             2.1) manage read/write of lmdb files 
     
-        3) add download of any indicator or generic data other than 
+        3) plot ticker between date interval specified
+    
+        4) add download of any indicator or generic data other than 
            pair exchange data
     
 """
@@ -66,8 +68,8 @@ def main(argv):
     # timeframe specified
     db_test.plot(data_source = DB_MODE.HISTORICAL_MODE,
                  timeframe   = '1D',
-                 start_date  = '2002-10-02 18:00:00',
-                 end_date    = '2003-06-23 23:00:00')
+                 start_date  = '2012-10-02 18:00:00',
+                 end_date    = '2013-06-23 23:00:00')
     
     
 if __name__ == '__main__':
