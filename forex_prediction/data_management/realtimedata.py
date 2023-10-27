@@ -40,9 +40,9 @@ class RealTime_data_manager():
                  pair:str,   
                  av_api_key:str=None, 
                  poly_api_key:str=None, 
-                 timeframe=None):
+                 timeframe:list=None):
         
-        self._to_symbol, self._from_symbol = get_pair_symbols(self.pair)
+        self._to_symbol, self._from_symbol = get_pair_symbols(pair)
         
         # pair
         self._pair         = pair.upper()
@@ -53,7 +53,12 @@ class RealTime_data_manager():
         self._pair_alphavantage = to_source_symbol(self._pair, 
                                                   REALTIME_DATA_PROVIDER.POLYGON_IO)
         
-        self._tf            = check_timeframe_str(timeframe)
+        assert isinstance(timeframe, list)   \
+                and all([check_timeframe_str(tf) 
+                         for tf in timeframe]), \
+                f'requested non compliant timeframe {timeframe}'
+        
+        self._tf_list  = timeframe
         
         # http session instance
         self._session       = Session()
@@ -197,17 +202,13 @@ class RealTime_data_manager():
         
         else:
             
-            
-            
             if isinstance(recent_days_window, int):
                 # set window as DateOffset str with num and days
                 days_window = '{days_num}d'.format(days_num=recent_days_window)
             else:
                 days_window = None
                 
-            day_start, day_end = get_date_interval(start=day_start,
-                                                   end=day_end,
-                                                   interval_end_mode='now',
+            day_start, day_end = get_date_interval(interval_end_mode='now',
                                                    interval_timespan=days_window,
                                                    normalize=True,
                                                    bdays=True)

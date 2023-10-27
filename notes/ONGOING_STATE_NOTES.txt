@@ -176,11 +176,21 @@ NOTES - SORTED BY GENERATION DATE - EXPLAINING HOW IT IS GOING, WHAT IS COMPLETE
         switched to dask dataframe 
         is it worthy to have all database in db manager of dask dataframe type?
         
-    - 20200809
+    - 20230809
     
-        in histarical data manager, implementing call to download data if 
+        in historical data manager, implementing call to download data if 
         plot interval request is not currently included in data manager
         db instance
+        
+    - 20231013
+    
+        DONE issue above
+        
+        could be better to have a core data manager for reframe and 
+        efficient data storing in a dotty dict
+        or in an internal database working with dynamic memory
+        at runtime or local disk data caching
+        
         
         
                   
