@@ -50,7 +50,7 @@ AV_LIST_URL                     = 'https://www.alphavantage.co/query?function=LI
 ## PAIR POLYGON IO
 PAIR_POLYGON_FORMAT             = 'C:{TO}{FROM}'
 PAIR_POLYGON_PATTERN            = '^C:' + SINGLE_CURRENCY_PATTERN_STR + \
-                                        + SINGLE_CURRENCY_PATTERN_STR + '$'
+                                        SINGLE_CURRENCY_PATTERN_STR + '$'
 POLY_IO_KEY_ENV                 = 'POLYGON_IO_KEY'
 
 ## TIME PATTERN
@@ -371,9 +371,32 @@ def get_date_interval(start=None,
         return start_date, end_date
     
     
-def reframe_tf_data(data, tf):
+def reframe_data(data, tf, from_p_col=True):
     
-    pass
+    # assert timeframe input value
+    # TODO: to be different from 'TICK'
+    tf = check_timeframe_str(tf)
+
+    assert isinstance(
+        data, pd.DataFrame), 'data input must be pandas DataFrame type'
+    assert not data.empty, 'data input must not be empty'
+    assert all(data.columns == DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX), \
+        'data input must be raw downloaded tick data'
+
+    assert pd.api.types.is_datetime64_any_dtype(data.index), \
+        'data index column must be datetime dtype'
+
+    if from_p_col:
+        
+        # resample along 'p' column
+        df_resampler = data.p.resample(tf)
+        
+    else:
+        
+        df_resampler = data.resample(tf)
+    
+    # use native method for pandas dataframe
+    return df_resampler.ohlc().interpolate(method='nearest')
 
 
 ### UTILS FOR DOTTY DICTIONARY

@@ -374,7 +374,7 @@ class HistDataManager:
 
             try:
 
-                aux_base_df = self._db_dotdict[year_tick_key]
+                aux_base_df = self._db_dotdict.get(year_tick_key)
 
             except KeyError:
 
@@ -403,8 +403,7 @@ class HistDataManager:
         # all current data keys
         data_paths = [key for key in get_dotty_leafs(self._db_dotdict)
                       if get_dotty_key_field(key, DATA_KEY.YEAR_INDEX)
-                      != 'ALL'
-                      ]
+                      != 'ALL' ]
 
         # get years missing timeframes data but with tick data available
         # in current data instance (no further search offline)
