@@ -49,33 +49,40 @@ def main(argv):
     test_timeframe   = '1H'
     test_n_days      = 10
     
-    # test list tickers - listing function no expected results
+    ## test list tickers - listing function no expected results
     #av_tickers_list    = test_rt_data_manager.get_realtime_tickers_list(source='ALPHA_VANTAGE')
     #poly_tickers_list  = test_rt_data_manager.get_realtime_tickers_list(source='POLYGON-IO')
     
     # test current quote value function
-    current_quote = test_rt_data_manager.get_realtime_quote() 
+    # required subscription
+    # current_quote = test_rt_data_manager.get_realtime_quote() 
     
-    print(f'Real time daily quote {current_quote}')
+    # print(f'Realtime current quote: {current_quote}')
     
-    # test time window data function with daily resolution
-    window_daily_ohlc = \
-        test_rt_data_manager.get_realtime_daily_close(recent_days_window=test_n_days)
+    # dayclose_quote = \
+    #     test_rt_data_manager.get_realtime_daily_close(last_close=True)
     
-    print(f'Last {test_n_days} window data: {window_daily_ohlc}')
+    # print(f'Real time daily close quote {dayclose_quote}')
+    
+    # # test time window data function with daily resolution
+    # window_daily_ohlc = \
+    #     test_rt_data_manager.get_realtime_daily_close(recent_days_window=test_n_days)
+    
+    # print(f'Last {test_n_days} window data: {window_daily_ohlc}')
                                                                        
-    # test start-end window data function with daily resolution
-    window_limits_daily_ohlc = \
-        test_rt_data_manager.get_realtime_daily_close(day_start=test_day_start,
-                                                      day_end=test_day_end)
+    # # test start-end window data function with daily resolution
+    # window_limits_daily_ohlc = \
+    #     test_rt_data_manager.get_realtime_daily_close(day_start=test_day_start,
+    #                                                   day_end=test_day_end)
      
-    print(f'From {test_day_start} to {test_day_end} ' 
-          'window data: {window_limits_daily_ohlc}')
+    # print(f'From {test_day_start} to {test_day_end} ' 
+    #       'window data: {window_limits_daily_ohlc}')
     
     # test time window data function with timeframe resolution
     window_data_ohlc = \
-        test_rt_data_manager.get_realtime_window_data(time_window=test_timeframe,
-                                                      reframe=True)
+        test_rt_data_manager.get_realtime_window_data(start     = test_day_start,
+                                                      end       = test_day_end,
+                                                      timeframe = test_timeframe)
     
     print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     

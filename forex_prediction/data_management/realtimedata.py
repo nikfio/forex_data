@@ -133,6 +133,12 @@ class RealTime_data_manager():
             
         return tickers_list
      
+    def get_realtime_quote(self):
+        
+        poly_resp = self._poly_reader.get_last_forex_quote(self._from_symbol,
+                                                           self._to_symbol)
+        
+        return av_resp 
                  
     def get_daily_close(self,
                         last_close=False,
@@ -149,16 +155,18 @@ class RealTime_data_manager():
             
             # parse response and return
             return self._parse_av_daily_data(av_daily_data_resp,
-                                             last_close=True,
-                                             recent_days_window=recent_days_window, 
-                                             day_start=day_start, 
-                                             day_end=day_end)  
+                                             last_close=True)
             
         else:
             
             if not day_start or not day_end:
                 assert isinstance(recent_days_window, int), 'recent_days_window must be integer'
             
+            # careful that option "outputsize='full'" does not have constant day start
+            # so it is not possible to guarantee a consistent meeting of the 
+            # function input 'day_start' and 'recent_days_window' when
+            # they imply a large interval outside of the 
+            # "outputsize='full'" option
             av_daily_data_resp = self._av_reader.get_currency_exchange_daily(self._from_symbol,
                                                                              self._to_symbol,
                                                                              outputsize='full')
@@ -187,10 +195,9 @@ class RealTime_data_manager():
         
         # set timestamp index as datetime64 type
         if not pd.api.types.is_datetime64_any_dtype(daily_df.index):
-            daily_df.index = infer_date_dt(daily_df.index)
+            daily_df.index = any_date_to_datetime64(daily_df.index)
         
         daily_df.index.name = BASE_DATA_FEATURE_NAME.TIMESTAMP
-        
         
         if last_close:
             
@@ -205,21 +212,23 @@ class RealTime_data_manager():
             if isinstance(recent_days_window, int):
                 # set window as DateOffset str with num and days
                 days_window = '{days_num}d'.format(days_num=recent_days_window)
+                
+                day_start, day_end = get_date_interval(interval_end_mode='now',
+                                                       interval_timespan=days_window,
+                                                       normalize=True,
+                                                       bdays=True)
+                
             else:
-                days_window = None
                 
-            day_start, day_end = get_date_interval(interval_end_mode='now',
-                                                   interval_timespan=days_window,
-                                                   normalize=True,
-                                                   bdays=True)
-        
-            # return data based on filter output
-            window_data = daily_df[(daily_df.index >= day_start) \
-                                   & (daily_df.index <= day_end)]
-                
-            window_data.as_type(DTYPE_DICT.TF_DTYPE)
+                day_start = any_date_to_datetime64(day_start)
+                day_end   = any_date_to_datetime64(day_end)
             
-            return window_data
+            # TODO: implement try-except if req data is outside
+            #       response data time interval
+            
+            # return data based on filter output
+            return daily_df[(daily_df.index >= day_start) \
+                                   & (daily_df.index <= day_end)].astype(DTYPE_DICT.TF_DTYPE)
 
 
     def _parse_time_window_data(raw_window_data,
@@ -253,7 +262,6 @@ class RealTime_data_manager():
     
     
     def get_time_window_data(self, 
-                             time_window=None, 
                              start=None, 
                              end=None, 
                              timeframe=None):
@@ -284,19 +292,15 @@ class RealTime_data_manager():
            
         """
          
-        start_date, end_date = get_date_interval(start=start,
-                                                 end=end,
-                                                 interval_end_mode='now',
-                                                 interval_timespan=time_window,
-                                                 bdays=True,
-                                                 normalize=False)
+        start = any_date_to_datetime64(start)
+        end = any_date_to_datetime64(end)
             
         data_df = pd.DataFrame()
         data_provider = ''
         
         # try to get data with alpha_vantage if available
         # alpha vantage provides intraday data with high resolution
-        if pd.Timestamp(start_date).tz_localize('UTC')  \
+        if pd.Timestamp(start).tz_localize('UTC')  \
             > pd.Timestamp.utcnow().normalize():
         
             # using alpha vantage wrapper
@@ -314,21 +318,21 @@ class RealTime_data_manager():
         # --> polygon-ai is the backup provider
         if data_df.empty:
         
-            # get dates as datetime dtype
-            start_ts = pd.Timestamp(start_date).to_pydatetime()
-            end_ts = pd.Timestamp(end_date).to_pydatetime()
-                                          
+            poly_aggs = []
             # using Polygon-io client
-            poly_resp = self._poly_reader.get_aggs(ticker      = self._pair_poly_format, 
-                                                   multiplier  = 1, 
-                                                   timespan    = 'minute', 
-                                                   from_       = start_ts,
-                                                   to          = end_ts,
-                                                   adjusted    = True,
-                                                   sort        = 'asc' )
+            for a in self._poly_reader.list_aggs(   ticker      = self._pair_polygon, 
+                                                    multiplier  = 1, 
+                                                    timespan    = 'minute', 
+                                                    from_       = start,
+                                                    to          = end,
+                                                    adjusted    = True,
+                                                    sort        = 'asc' ):
+                
+                poly_aggs.append(a)
         
+            
             # parse response
-            data_df = pd.DataFrame(poly_resp)
+            data_df = pd.DataFrame(poly_aggs)
             data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO
         
         window_data = self._parse_time_window_data(data_df,

@@ -85,6 +85,7 @@ class db_manager:
         self._historical_mngr.download(years = years, 
                                        search_local = True)
         
+        
     def add_timeframe(self, timeframe, update_data=True):
         
         if self._historical_data_enabled \
@@ -101,39 +102,30 @@ class db_manager:
     
     def get_realtime_quote(self):
         
-        return self._realtime_mngr.get_daily_close(last_close=True)
+        return self._realtime_mngr.get_realtime_quote()
     
     
     def get_realtime_daily_close(self,
                                  recent_days_window=None, 
                                  day_start=None, 
-                                 day_end=None):
+                                 day_end=None,
+                                 last_close=False):
         
-        return self._realtime_mngr.get_daily_close(last_close=False,
+        
+        return self._realtime_mngr.get_daily_close(last_close=last_close,
                                                    recent_days_window=recent_days_window,
                                                    day_start=day_start,
                                                    day_end=day_end)
     
 
     def get_realtime_window_data(self,
-                                 time_window=None,
                                  start=None,
                                  end=None,
-                                 reframe=False,
                                  timeframe=None):
         
-        if reframe:
-            
-            self._realtime_mngr.get_time_window_data(time_window        = time_window,
-                                                     start              = start,
-                                                     end                = end,
-                                                     timeframe          = timeframe)
-                                 
-        else:
-            
-            self._realtime_mngr.get_time_window_data(time_window        = time_window,
-                                                     start              = start,
-                                                     end                = end)
+        return self._realtime_mngr.get_time_window_data( start     = start,
+                                                         end       = end,
+                                                         timeframe = timeframe)
         
         
     def plot(self, 
