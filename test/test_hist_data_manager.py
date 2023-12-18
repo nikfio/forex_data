@@ -22,8 +22,6 @@ Description:
     
 """
 
-from absl import app
-
 from forex_prediction import (
                                 DB_MODE,
                                 read_config_file,
@@ -33,7 +31,7 @@ from forex_prediction import (
 
 # TODO: add logging options via input FLAGS
 
-def main(argv):
+def main():
     
     # TODO: get logging handler
     
@@ -51,7 +49,7 @@ def main(argv):
     
     """
     # further data loading 
-    # managed internally if it is necessary to download from the net
+    # managed internally if it is necessary to download from the internet
     # or if data is available in local folder
     
     db_test.add_historical_data([2005])
@@ -73,4 +71,4 @@ def main(argv):
     
     
 if __name__ == '__main__':
-    app.run(main)
+    main()

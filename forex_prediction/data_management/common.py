@@ -28,9 +28,8 @@ MONTHS                          = ['January', 'February', 'March', 'April', 'May
                                    'July', 'August', 'September', 'October', 'November', 'December']
 YEARS                           = list(range(2000, 2022, 1))
 
-RAW_DATE_FORMAT                 = '%Y%m%d %H%M%S%f' 
-DATE_FORMAT                     = '%Y-%m-%d %H:%M:%S' 
 DATE_NO_HOUR_FORMAT             = '%Y-%m-%d'
+DATE_FORMAT_ISO8601             = 'ISO8601'
 
 FILENAME_STR                    = '{pair}_Y{year}_{tf}.csv'
 DEFAULT_TIMEZONE                = 'utc'
@@ -106,11 +105,11 @@ class DTYPE_DICT:
     
     TICK_DTYPE = {'ask': 'float16', 'bid': 'float16',
                              'vol': 'float16', 'p': 'float16'}
-    TF_DTYPE   = {'open': 'float32', 'high': 'float32', 
-                  'low': 'float32', 'close': 'float32'}
+    TF_DTYPE   = {'open': 'float16', 'high': 'float16', 
+                  'low': 'float16', 'close': 'float16'}
     TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ns]',
-                       'open': 'float32', 'high': 'float32', 
-                       'low': 'float32', 'close': 'float32'}
+                       'open': 'float16', 'high': 'float16', 
+                       'low': 'float16', 'close': 'float16'}
 
 class REALTIME_DATA_PROVIDER:
     
@@ -147,24 +146,11 @@ class CANONICAL_INDEX:
     
 ### auxiliary fast functions
 
-# parse date obj and return datetime as template defined 
-def infer_date_dt(s): return to_datetime(s, 
-                                         format   = DATE_FORMAT,
-                                         exact    = True,
-                                         utc      = True)
-
-# parse RAW FILE date obj and return datetime as template defined 
-def infer_raw_date_dt(s): return to_datetime(s, 
-                                             format   = RAW_DATE_FORMAT,
-                                             exact    = True,
-                                             utc      = True)
-
 # parse argument to get datetime object with date format as input
-def infer_date_from_format_dt(s, date_format): 
+def infer_date_from_format_dt(s, date_format='ISO8601'): 
     
     return to_datetime(s, 
-                       format   = date_format,
-                       exact    = True,
+                       format   = 'ISO8601',
                        utc      = True)
 
 
@@ -273,19 +259,24 @@ def timewindow_str_to_timedelta(time_window_str):
         
         
 def any_date_to_datetime64(any_date, 
-                           date_format=DATE_FORMAT):
+                           date_format='ISO8601'):
     
-    any_date_dt64 = any_date
-    
-    # set datetime64 type
-    if not pd.api.types.is_datetime64_any_dtype(any_date_dt64):
-        any_date_dt64 = infer_date_from_format_dt(any_date_dt64, 
-                                                  date_format)
+    try:
         
-    if isinstance(any_date_dt64, pd.Timestamp):
-        any_date_dt64 = any_date_dt64.to_datetime64()
+        any_date = infer_date_from_format_dt(any_date, 
+                                             date_format)
             
-    return any_date_dt64
+    except Exception as e:
+        
+        #TODO: to log
+        raise ValueError(f'date {any_date} conversion failed, '
+                         'required ISO8601 date format')
+    
+    if not any_date.tzinfo:
+        
+        any_date = any_date.tz_localize('utc')
+    
+    return any_date
 
 
 def get_date_interval(start=None,

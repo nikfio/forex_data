@@ -13,7 +13,7 @@ from io import BytesIO
 from dask import dataframe as dd
 
 # external
-from absl import logging
+import logging
 from dotty_dict import dotty
 
 # alternative historical data query lib
@@ -456,7 +456,7 @@ class HistDataManager:
                          dtype=DTYPE_DICT.TICK_DTYPE,
                          index_col=BASE_DATA_FEATURE_NAME.TIMESTAMP,
                          parse_dates=[BASE_DATA_FEATURE_NAME.TIMESTAMP],
-                         date_parser=infer_raw_date_dt)
+                         date_format=DATE_FORMAT_ISO8601)
 
         # set index name to BASE_DATA_FEATURE_NAME.TIMESTAMP
 
@@ -559,18 +559,37 @@ class HistDataManager:
                                 start,
                                 end,
                                 add_timeframe = False):
+        
+        """
+        
+        Main function to get data, considering data currently managed
+        in instance, then searchin in local folders and ultimately
+        recurring to web download.
+
+        Parameters
+        ----------
+        timeframe : TYPE
+            DESCRIPTION.
+        start : TYPE
+            DESCRIPTION.
+        end : TYPE
+            DESCRIPTION.
+        add_timeframe : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        data_df : TYPE
+            DESCRIPTION.
+
+        """
 
         assert check_time_offset_str(timeframe), \
             f'timeframe request {timeframe} invalid'
             
         # try to convert to datetime data type if not already is
-        if not pd.api.types.is_datetime64_any_dtype(start):
-
-            start = infer_date_dt(start)
-
-        if not pd.api.types.is_datetime64_any_dtype(end):
-
-            end = infer_date_dt(end)
+        start = any_date_to_datetime64(start)
+        end = any_date_to_datetime64(end)
 
         assert end > start, \
             'date interval not coherent, start must be older than end'
@@ -581,7 +600,6 @@ class HistDataManager:
             # timeframe list
             self.add_timeframe([timeframe])
 
-        
         # get years including interval requested
         years_interval_req = list(range(start.year, end.year+1, 1))
         
@@ -666,76 +684,7 @@ class HistDataManager:
             
     
         return data_df
-
-
-    def interval_slice_all_data(self,
-                                timeframe,
-                                start=None,
-                                end=None):
-        """
-
-
-        Parameters
-        ----------
-        start : string, optional
-            DESCRIPTION. The default is None.
-        end : string, optional
-            DESCRIPTION. The default is None.
-        tf : TYPE, optional
-            DESCRIPTION. The default is None.
-
-        Returns
-        -------
-        TYPE
-            return a slice of data currently managed
-            by object instance
-
-        """
-        # TODO: use get_date_interval()
-
-        # try to convert to datetime data type if not already is
-        if not pd.api.types.is_datetime64_any_dtype(start):
-
-            start_dt = infer_date_dt(start)
-
-        if not pd.api.types.is_datetime64_any_dtype(end):
-
-            end_dt = infer_date_dt(end)
-
-        # check timeframe req format
-        # and if data is available
-        check_timeframe_str(timeframe)
-
-        if tf == self._tf:
-
-            all_tf_key = self.db_all_key(self._pair, timeframe, 'df')
-            all_df = self._db_dotdict.get(all_tf_key)
-
-            # create an index mask along timestamp axis
-            slice_index = (all_df.index >= start_dt) & (all_df.index <= end_dt)
-
-            return all_df.loc[slice_index]
-
-        else:
-
-            # slice data from the 'all' block, key reference
-            all_tick_key = self.db_all_key(self._pair, 'TICK', 'df')
-            all_df = self._db_dotdict.get(all_tick_key)
-
-            # create an index mask along timestamp axis
-            slice_index = (all_df.index >= start_dt) & (all_df.index <= end_dt)
-
-            if timeframe != TICK_TIMEFRAME:
-
-                # timeframe different from currently managed, further reframe
-                # needed
-                return self._reframe_data(timeframe=tf,
-                                          data=all_df.loc[slice_index])
-
-            else:
-
-                # TICK timeframe specified, no further reframe opeartion needed
-                return all_df.loc[slice_index]
+    
 
     def _year_data_to_file(self, year, tf=None):
         """
@@ -857,6 +806,7 @@ class HistDataManager:
 
         return year_tick_df
 
+
     def download(self,
                  years,
                  search_local=False):
@@ -918,10 +868,12 @@ class HistDataManager:
 
         return local_files, local_files_name
 
+
     def check_local_filename(self, filename):
 
         # consistency check for local data file
         pass
+
 
     def local_load_data(self, folderpath, years_list):
         """
@@ -994,7 +946,7 @@ class HistDataManager:
                                               header=0,
                                               dtype=DTYPE_DICT.TICK_DTYPE,
                                               parse_dates=['timestamp'],
-                                              date_parser=infer_date_dt)
+                                              date_format=DATE_FORMAT_ISO8601)
 
                         self._db_dotdict[year_tf_key] = \
                             dask_df.compute().set_index('timestamp')
@@ -1011,7 +963,7 @@ class HistDataManager:
                                                                     index_col='timestamp',
                                                                     parse_dates=[
                                                                         'timestamp'],
-                                                                    date_parser=infer_date_dt)
+                                                                    date_format=DATE_FORMAT_ISO8601)
 
         # return list of years which tick file has been found and loaded
         return years_tick_files_found
