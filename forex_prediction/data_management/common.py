@@ -98,7 +98,7 @@ class DATA_COLUMN_NAMES:
     POLYGON_IO_AGGS         = ['open','high','low', 'close', 'volume', 'vwap', \
                                'timestamp', 'transactions' ]
     
-BASE_DATA = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
+BASE_DATA = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX ## SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE  
 BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
        
 class DTYPE_DICT:
@@ -128,7 +128,7 @@ class ASSET_TYPE:
     ETF                 = 'ETF'
     FOREX               = 'FOREX'
     
-class BASE_DATA_FEATURE_NAME:
+class BASE_DATA_COLUMN_NAME:
     
     TIMESTAMP = 'timestamp'    
     OPEN      = 'open'
@@ -147,11 +147,19 @@ class CANONICAL_INDEX:
 ### auxiliary fast functions
 
 # parse argument to get datetime object with date format as input
-def infer_date_from_format_dt(s, date_format='ISO8601'): 
+def infer_date_from_format_dt(s, date_format='ISO8601', unit=None):
     
-    return to_datetime(s, 
-                       format   = 'ISO8601',
-                       utc      = True)
+    if unit:
+        
+        return to_datetime(s, 
+                           unit     = unit,
+                           utc      = True)
+    
+    else:
+        
+        return to_datetime(s, 
+                           format   = date_format,
+                           utc      = True)
 
 
 # parse timeframe as string and validate if it is valid
@@ -259,18 +267,21 @@ def timewindow_str_to_timedelta(time_window_str):
         
         
 def any_date_to_datetime64(any_date, 
-                           date_format='ISO8601'):
+                           date_format='ISO8601',
+                           unit=None):
     
     try:
         
         any_date = infer_date_from_format_dt(any_date, 
-                                             date_format)
+                                             date_format,
+                                             unit=unit)
             
     except Exception as e:
         
         #TODO: to log
         raise ValueError(f'date {any_date} conversion failed, '
-                         'required ISO8601 date format')
+                         f'faile conversion to {date_format} '
+                         'date format')
     
     if not any_date.tzinfo:
         
@@ -362,32 +373,41 @@ def get_date_interval(start=None,
         return start_date, end_date
     
     
-def reframe_data(data, tf, from_p_col=True):
+def reframe_data(data, tf):
     
     # assert timeframe input value
     # TODO: to be different from 'TICK'
     tf = check_timeframe_str(tf)
 
+    assert tf != TICK_TIMEFRAME, \
+        f'reframe not possible wih target {TICK_TIMEFRAME}'
     assert isinstance(
         data, pd.DataFrame), 'data input must be pandas DataFrame type'
     assert not data.empty, 'data input must not be empty'
-    assert all(data.columns == DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX), \
-        'data input must be raw downloaded tick data'
-
+   
     assert pd.api.types.is_datetime64_any_dtype(data.index), \
         'data index column must be datetime dtype'
 
-    if from_p_col:
+    # resample based on p value
+    if all([col in DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX
+            for col in data.columns]):
         
-        # resample along 'p' column
-        df_resampler = data.p.resample(tf)
+        # resample along 'p' column, data in ask, bid, p format
+        return data.p.resample(tf).ohlc().interpolate(method=
+                                                      'nearest')
+        
+    elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
+              for col in data.columns]): 
+        
+        # resample along given data already in ohlc format
+        return data.resample(tf).interpolate(method=
+                                             'nearest')
         
     else:
         
-        df_resampler = data.resample(tf)
-    
-    # use native method for pandas dataframe
-    return df_resampler.ohlc().interpolate(method='nearest')
+        raise ValueError(f'data columns {data.columns} invalid, '
+                         f'required {DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX} '
+                         f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
 
 
 ### UTILS FOR DOTTY DICTIONARY

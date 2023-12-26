@@ -66,7 +66,7 @@ def main():
     # timeframe specified
     db_test.plot(data_source = DB_MODE.HISTORICAL_MODE,
                  timeframe   = '1D',
-                 start_date  = '2012-10-02 18:00:00',
+                 start_date  = '2013-02-02 18:00:00',
                  end_date    = '2013-06-23 23:00:00')
     
     
