@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{include = "forex_prediction"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10, <3.14"
+python = ">=3.9.13, <=3.10.11"
 spyder-kernels = ">=2.5.0"
 pyaml = "^21.10.1"
 pandas = ">=2.0.0"
@@ -23,6 +23,8 @@ mpl-finance = "^0.10.1"
 dotty-dict = {path = "C:/python_envs/Tools/generic_libs/dotty_dict"}
 setuptools = "^69.0.2"
 scipy = "^1.11.4"
+pyarrow = "^14.0.2"
+vaex = "^4.17.0"
 
 [build-system]
 requires = ["poetry-core"]

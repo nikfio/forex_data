@@ -14,11 +14,10 @@ test data_manager object realtime feature:
 
 """
 
-import pyaml
-
-from absl import app
-
-
+from pandas import (
+                    Timestamp,
+                    Timedelta
+                    )
 # custom lib
 from forex_prediction import (
                               DB_MODE,
@@ -28,7 +27,7 @@ from forex_prediction import (
                               )
 
 
-def main(argv):
+def main():
     
     # load settings parameters
     config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
@@ -56,27 +55,27 @@ def main(argv):
     # test current quote value function
     # required subscription
     # current_quote = test_rt_data_manager.get_realtime_quote() 
-    
     # print(f'Realtime current quote: {current_quote}')
     
-    # dayclose_quote = \
-    #     test_rt_data_manager.get_realtime_daily_close(last_close=True)
+    # get last close on daily basis
+    dayclose_quote = \
+        test_rt_data_manager.get_realtime_daily_close(last_close=True)
     
-    # print(f'Real time daily close quote {dayclose_quote}')
+    print(f'Real time daily close quote {dayclose_quote}')
     
-    # # test time window data function with daily resolution
-    # window_daily_ohlc = \
-    #     test_rt_data_manager.get_realtime_daily_close(recent_days_window=test_n_days)
+    # test time window data function with daily resolution
+    window_daily_ohlc = \
+        test_rt_data_manager.get_realtime_daily_close(recent_days_window=test_n_days)
     
-    # print(f'Last {test_n_days} window data: {window_daily_ohlc}')
+    print(f'Last {test_n_days} window data: {window_daily_ohlc}')
                                                                        
-    # # test start-end window data function with daily resolution
-    # window_limits_daily_ohlc = \
-    #     test_rt_data_manager.get_realtime_daily_close(day_start=test_day_start,
-    #                                                   day_end=test_day_end)
+    # test start-end window data function with daily resolution
+    window_limits_daily_ohlc = \
+        test_rt_data_manager.get_realtime_daily_close(day_start=test_day_start,
+                                                      day_end=test_day_end)
      
-    # print(f'From {test_day_start} to {test_day_end} ' 
-    #       'window data: {window_limits_daily_ohlc}')
+    print(f'From {test_day_start} to {test_day_end} ' 
+          f'window data: {window_limits_daily_ohlc}')
     
     # test time window data function with timeframe resolution
     window_data_ohlc = \
@@ -86,6 +85,17 @@ def main(argv):
     
     print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     
+    # test time window data function with timeframe resolution: intraday case
+    test_day_start = Timestamp.now() - Timedelta('10h')
+    test_day_end   = Timestamp.now() - Timedelta('1h')
+    
+    window_data_ohlc = \
+        test_rt_data_manager.get_realtime_window_data(start     = test_day_start,
+                                                      end       = test_day_end,
+                                                      timeframe = test_timeframe)
+    
+    print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
+    
     
 if __name__ == '__main__':
-    app.run(main)
+    main()

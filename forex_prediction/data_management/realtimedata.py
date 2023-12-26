@@ -48,10 +48,10 @@ class RealTime_data_manager():
         self._pair         = pair.upper()
         
         self._pair_polygon = to_source_symbol(self._pair, 
-                                                  REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
+                                                  REALTIME_DATA_PROVIDER.POLYGON_IO)
         
         self._pair_alphavantage = to_source_symbol(self._pair, 
-                                                  REALTIME_DATA_PROVIDER.POLYGON_IO)
+                                                  REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
         
         assert isinstance(timeframe, list)   \
                 and all([check_timeframe_str(tf) 
@@ -133,6 +133,7 @@ class RealTime_data_manager():
             
         return tickers_list
      
+        
     def get_realtime_quote(self):
         
         poly_resp = self._poly_reader.get_last_forex_quote(self._from_symbol,
@@ -194,10 +195,12 @@ class RealTime_data_manager():
         daily_df.columns = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
         
         # set timestamp index as datetime64 type
-        if not pd.api.types.is_datetime64_any_dtype(daily_df.index):
+        if not pd.api.types.is_datetime64_any_dtype(daily_df.index) \
+            or \
+            not daily_df.index.tzinfo:
             daily_df.index = any_date_to_datetime64(daily_df.index)
         
-        daily_df.index.name = BASE_DATA_FEATURE_NAME.TIMESTAMP
+        daily_df.index.name = BASE_DATA_COLUMN_NAME.TIMESTAMP
         
         if last_close:
             
@@ -228,35 +231,36 @@ class RealTime_data_manager():
             
             # return data based on filter output
             return daily_df[(daily_df.index >= day_start) \
-                                   & (daily_df.index <= day_end)].astype(DTYPE_DICT.TF_DTYPE)
+                            & (daily_df.index <= day_end)].astype(DTYPE_DICT.TF_DTYPE)
 
 
-    def _parse_time_window_data(raw_window_data,
+    def _parse_time_window_data(self, 
+                                raw_window_data,
                                 data_provider):
         
         # parse raw data and format data as common defined 
-        
         data_df = raw_window_data.copy()
+        
+        # keep base data columns
+        extra_columns = list(set(data_df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
+        data_df.drop(extra_columns, axis=1, inplace=True)
+        
+        # set index as timestamp datetime64
+        data_df.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP, \
+                          inplace = True)
         
         if data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
             
-            # keep base data columns
-            extra_columns = DATA_COLUMN_NAMES.TF_DATA - data_df.columns
-            data_df.drop(extra_columns, inplace=True)
-            
-            # set index as timestamp datetime64
-            data_df.set_index(BASE_DATA_FEATURE_NAME.TIMESTAMP, \
-                              inplace = True)
-            
-            data_df.index = any_date_to_datetime64(data_df.index)
-            
-            # conventional dtype
-            data_df.astype(DTYPE_DICT.TF_DTYPE)
+            data_df.index = any_date_to_datetime64(data_df.index,
+                                                   unit='ms')
             
         elif data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
             
+            # TODO
             pass
         
+        # convert to conventional dtype
+        data_df = data_df.astype(DTYPE_DICT.TF_DTYPE)
         
         return data_df
     
@@ -300,19 +304,23 @@ class RealTime_data_manager():
         
         # try to get data with alpha_vantage if available
         # alpha vantage provides intraday data with high resolution
-        if pd.Timestamp(start).tz_localize('UTC')  \
-            > pd.Timestamp.utcnow().normalize():
         
-            # using alpha vantage wrapper
-            # use alpha vantage intraday option if start date is later than last midnight
-            data, meta_data = self._av_reader.get_currency_exchange_intraday(self._to_symbol,
-                                                                             self._from_symbol,
-                                                                             interval='1min',
-                                                                             outputsize='full')
+        # TODO: add check if alpha vantage key relates to
+        #       premium subscription
+        # if pd.Timestamp(start).tz_convert('utc')  \
+        #     > pd.Timestamp.utcnow().normalize():
+        
+        #     # using alpha vantage wrapper
+        #     # use alpha vantage intraday option if start date is later than last midnight
+        #     # intraday from alpha vantage needs premium subscription
+        #     data, meta_data = self._av_reader.get_currency_exchange_intraday(self._to_symbol,
+        #                                                                      self._from_symbol,
+        #                                                                      interval='1min',
+        #                                                                      outputsize='full')
             
-            # parse response
-            data_df = pd.DataFrame(data)
-            data_provider = REALTIME_DATA_PROVIDER.ALPHA_VANTAGE
+        #     # parse response
+        #     data_df = pd.DataFrame(data)
+        #     data_provider = REALTIME_DATA_PROVIDER.ALPHA_VANTAGE
         
         # if alpha vantage fails or it is not available 
         # --> polygon-ai is the backup provider
@@ -340,9 +348,7 @@ class RealTime_data_manager():
         
         if check_timeframe_str(timeframe):
         
-            window_data_reframed = reframe_data(window_data, self._timeframe)
-            
-            return window_data_reframed
+            return reframe_data(window_data, timeframe)
         
         else:
         
