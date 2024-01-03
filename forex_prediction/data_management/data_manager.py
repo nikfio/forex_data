@@ -14,8 +14,13 @@ Description:
 __all__ = ['db_parameters', 
            'db_manager']
 
-from typing import NamedTuple
+import logging
 
+from attrs import ( 
+                    define,
+                    field,
+                    validators
+                )
 # custom lib
 from .historicaldata import HistDataManager
 from .realtimedata import RealTime_data_manager
@@ -43,11 +48,11 @@ class db_parameters(NamedTuple):
     poly_api_key        : str  = ''
     
     
+@define
+class db_manager():
     
-
-class db_manager:
     
-    def __init__(self, parameters):
+    def __attrs_post_init(self):
                  
         assert isinstance( parameters, db_parameters), \
                 'Parameters must be a data_manager_parameters instance'
