@@ -1,29 +1,41 @@
 
-import sys
-import zipfile
-import re
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
-import mplfinance as mpf
-import time
-import mplfinance as mpf    
+import logging
+
+from attrs import ( 
+                    define,
+                    field,
+                    validators
+                )
+
+from sys import stdout
+
+from zipfile import (
+                        ZipFile,
+                        BadZipFile
+                )
+
+from re import (
+                findall,
+                search
+            )
+
+from mplfinance import (
+                        plot as mpf_plot,
+                        show as mpf_show
+                    )
+
 from pathlib import Path
 from requests import Session
 from io import BytesIO
 from dask import dataframe as dd
 
-# external
-import logging
 from dotty_dict import dotty
 
 # alternative historical data query lib
-import histdata.api
+#import histdata.api
 
 # internally defined
 from .common import *
-
-# TODO: replace 'pair' with 'symbol' so it is semantically correct
-# for any market item
 
 
 def get_key_year(key):
@@ -44,37 +56,21 @@ def get_key_year(key):
 
 
 # class HISTORICAL DATA MANAGER
+@define
 class HistDataManager:
+    
+    ticker      : str = field(validator=validators.instance_of(str))
+    data_path   : str = field(factory=Path(),
+                              validator=validator_dir_path)
+    years       : list = field(validator=validator_list_greater_than(min(YEARS)))
+    timeframe   : list = field(validator=validator_list_timeframe)
+    datafiles_type : str = field(default='csv',
+                                 validator=validators.instance_of(SUPPORTED_DATA_FILES))
 
-    def __init__(self,
-                 pair,
-                 data_path,
-                 years=None,
-                 timeframe=None):
-        """
+    
 
-
-        Parameters
-        ----------
-        pair : TYPE
-            DESCRIPTION.
-        data_path : TYPE
-            DESCRIPTION.
-        years : TYPE, optional
-            DESCRIPTION. The default is None.
-        months : TYPE, optional
-            DESCRIPTION. The default is None.
-        timeframe : TYPE, optional
-            DESCRIPTION. The default is None.
-        perform_download : TYPE, optional
-            DESCRIPTION. The default is False.
-
-        Returns
-        -------
-        None.
-
-        """
-
+    def __attrs_post_init__(self):
+    
         # internal
         # list of years currently managed by object instance
         # data type: int
@@ -84,10 +80,10 @@ class HistDataManager:
         self.add_timeframe(timeframe)
 
         # Fundamentals parameters initialization
-        self._pair = pair.upper()
+        self._ticker = ticker.upper()
+        
         self.session = Session()
-        self.url = str()
-
+        
         # files details variable initialization
         self._data_path = Path(data_path)
 
@@ -98,16 +94,17 @@ class HistDataManager:
         self.download(years=self._years_int,
                       search_local=True)
 
-    def db_key(self, pair, year, timeframe, data_type):
+    
+    def db_key(self, ticker, year, timeframe, data_type):
         """
 
         get a str key of dotted divided elements
 
-        key template = pair.year.timeframe.data_type
+        key template = ticker.year.timeframe.data_type
 
         Parameters
         ----------
-        pair : TYPE
+        ticker : TYPE
             DESCRIPTION.
         year : TYPE
             DESCRIPTION.
@@ -122,27 +119,27 @@ class HistDataManager:
 
         tf = check_timeframe_str(timeframe)
 
-        return '.'.join([str(pair), 'Y'+str(year),
+        return '.'.join([str(ticker), 'Y'+str(year),
                          str(tf), str(data_type)])
 
 
-    def db_all_key(self, pair, timeframe, data_type):
+    def db_all_key(self, ticker, timeframe, data_type):
 
-        # all key template = pair.ALL.timeframe.data_type
+        # all key template = ticker.ALL.timeframe.data_type
 
         tf = check_timeframe_str(timeframe)
 
-        return '.'.join([str(pair), 'ALL', str(tf), str(data_type)])
+        return '.'.join([str(ticker), 'ALL', str(tf), str(data_type)])
 
 
-    def _get_years_list(self, pair, vartype):
+    def _get_years_list(self, ticker, vartype):
 
         # work on copy as pop operation is 'inplace'
         # so the original db is not modified
         db_copy = self._db_dotdict.copy()
 
         # get keys at year level
-        years_filter_keys = '{pair}'.format(pair=self._pair)
+        years_filter_keys = '{ticker}'.format(ticker=self._ticker)
 
         # pop at year level in data copy
         year_db = db_copy.pop(years_filter_keys)
@@ -186,11 +183,11 @@ class HistDataManager:
             return [int(year) for year in years_list]
 
 
-    def _get_year_timeframe_list(self, pair, year):
+    def _get_year_timeframe_list(self, ticker, year):
 
         # work on copy as pop operation is 'inplace'
         # so the original db is not modified
-        db_copy = self._db_dotdict.get(self._pair).copy()
+        db_copy = self._db_dotdict.get(self._ticker).copy()
 
         # get key at timeframe level
         tf_key = 'Y{year}'.format(year=year)
@@ -223,11 +220,11 @@ class HistDataManager:
         # instantiate empty list
         years_complete = list()
 
-        for year in self._get_years_list(self._pair, 'int'):
+        for year in self._get_years_list(self._ticker, 'int'):
 
             year_complete = all([
                 # create key for dataframe type
-                isinstance(self._db_dotdict.get(self.db_key(self._pair,
+                isinstance(self._db_dotdict.get(self.db_key(self._ticker,
                                                             year,
                                                             tf,
                                                             'df')),
@@ -243,23 +240,15 @@ class HistDataManager:
         return years_complete
 
 
-    def _prepare(self):
-        """
-
-
-        Returns
-        -------
-        None.
-
-        """
-
-        r = self.session.get(self.url)
+    def _prepare(self, url):
+        
+        r = self.session.get(url)
         m = re.search('id="tk" value="(.*?)"', r.text)
         tk = m.groups()[0]
         self.tk = tk
 
 
-    def _download_month_raw(self, year, month_num):
+    def _download_month_raw(self, url, year, month_num):
         """
 
         Download a month data
@@ -279,36 +268,45 @@ class HistDataManager:
 
         """
 
-        headers = {'Referer': self.url}
+        headers = {'Referer': url}
         data = {'tk': self.tk, 'date': year, 'datemonth': "%d%02d" % (year, month_num), 'platform': 'ASCII',
-                'timeframe': 'T', 'fxpair': self._pair}
-        r = self.session.request(DOWNLOAD_METHOD,
-                                 DOWNLOAD_URL,
+                'timeframe': 'T', 'fxpair': self._ticker}
+        r = self.session.request(HISTDATA_BASE_DOWNLOAD_METHOD,
+                                 HISTDATA_BASE_DOWNLOAD_URL,
                                  data=data,
                                  headers=headers,
                                  stream=True)
         bio = BytesIO()
         size = 0
         if logging.level_info():
-            logging.info("Starting to download: %s - %d - %s" % (self._pair,
-                                                                 year,
-                                                                 MONTHS[month_num-1]))
+            
+            logging.warning("Starting to download: %s - %d - %s" 
+                             % (self._ticker,
+                                year,
+                                MONTHS[month_num-1])
+            )
+            
         for chunk in r.iter_content(chunk_size=2 ** 19):
             bio.write(chunk)
             size += len(chunk)
             if logging.level_info():
-                sys.stdout.write("\rDownloaded %.2f kB" %
-                                 (1. * size / 2 ** 10))
+                stdout.write("\rDownloaded %.2f kB" %
+                             (1. * size / 2 ** 10))
 
         print(flush=True)
         try:
-            zf = zipfile.ZipFile(bio)
-        except zipfile.BadZipFile:
+            
+            zf = ZipFile(bio)
+            
+        except BadZipFile:
 
             # here will be a warning log
-            print('%s - %d - %s not found or invalid download' % (self._pair,
-                                                                  year,
-                                                                  MONTHS[month_num-1]))
+            logging.error('%s - %d - %s not found or invalid download'
+                            %  (self._ticker,
+                                year,
+                                MONTHS[month_num-1])
+            )
+            
             return None
 
         else:
@@ -317,47 +315,9 @@ class HistDataManager:
             return zf.open(zf.namelist()[0])
 
 
-    def _reframe_from_tick_data(self, tick_data, tf):
-        """
-
-        Resample data to have the whole block in the target timeframe
-
-        Parameters
-        ----------
-        tick_data : TYPE, optional
-            DESCRIPTION. The default is None.
-        tf : TYPE, optional
-            DESCRIPTION. The default is None.
-
-        Returns
-        -------
-        data : TYPE
-            DESCRIPTION.
-
-        """
-
-        # assert timeframe input value
-        # TODO: to be different from 'TICK'
-        tf = check_timeframe_str(tf)
-
-        assert not tick_data.empty, 'tick_data input must not be empty'
-        assert isinstance(
-            tick_data, pd.DataFrame), 'tick_data input must be pandas DataFrame type'
-        assert all(tick_data.columns == DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX), \
-            'tick data input must be raw downloaded tick data'
-
-        assert pd.api.types.is_datetime64_any_dtype(tick_data.index), \
-            'index column must be datetime dtype'
-
-        # resample along 'p' column
-        df_resampler = tick_data.p.resample(tf)
-        
-        # use native method for pandas dataframe
-        return df_resampler.ohlc().interpolate(method='nearest')
-    
     def _add_tf_data_key(self, year, tf):
         
-        year_tf_key = self.db_key(self._pair,
+        year_tf_key = self.db_key(self._ticker,
                                   year,
                                   tf,
                                   'df')
@@ -367,7 +327,7 @@ class HistDataManager:
                               pd.DataFrame):
 
             # get tick key
-            year_tick_key = self.db_key(self._pair,
+            year_tick_key = self.db_key(self._ticker,
                                         year,
                                         'TICK',
                                         'df')
@@ -379,20 +339,21 @@ class HistDataManager:
             except KeyError:
 
                 # to logging
-                print('year {}: tick data not found'.format(year))
+                logging.error(f'Requested to reframe {self._ticker} '
+                              f'{year} in timeframe {tf} '
+                              f'but tick data was not found')
 
             else:
 
                 # produce reframed data at the timeframe requested
                 self._db_dotdict[year_tf_key] \
-                    = self._reframe_from_tick_data(aux_base_df,
-                                                   tf)
+                    = reframe_data(aux_base_df, tf)
         
 
     def _complete_years_timeframe(self):
 
         # get all years available from db keys
-        years_list = self._get_years_list(self._pair, 'int')
+        years_list = self._get_years_list(self._ticker, 'int')
 
         # get years that has not all timeframes
         years_complete = self._get_tf_complete_years()
@@ -426,7 +387,7 @@ class HistDataManager:
                 self._add_tf_data_key(year, tf)
 
         # assert no incomplete years found after operation
-        assert self._get_years_list(self._pair, 'int') \
+        assert self._get_years_list(self._ticker, 'int') \
             == self._get_tf_complete_years(), \
             'timeframe completing operation NOT OK'
 
@@ -456,7 +417,8 @@ class HistDataManager:
                          dtype=DTYPE_DICT.TICK_DTYPE,
                          index_col=BASE_DATA_FEATURE_NAME.TIMESTAMP,
                          parse_dates=[BASE_DATA_FEATURE_NAME.TIMESTAMP],
-                         date_format=DATE_FORMAT_ISO8601)
+                         date_format=DATE_FORMAT_ISO8601,
+                         engine = 'pyarrow')
 
         # set index name to BASE_DATA_FEATURE_NAME.TIMESTAMP
 
@@ -473,7 +435,7 @@ class HistDataManager:
         # specific timeframe
 
         # get year keys
-        years_list = self._get_years_list(self._pair, 'int')
+        years_list = self._get_years_list(self._ticker, 'int')
 
         aux_df = pd.DataFrame()
 
@@ -482,7 +444,7 @@ class HistDataManager:
         for year in years_list:
 
             # get df from year key
-            year_tick_key = self.db_key(self._pair,
+            year_tick_key = self.db_key(self._ticker,
                                         year,
                                         'TICK',
                                         'df')
@@ -496,7 +458,7 @@ class HistDataManager:
                                copy=False)
 
         # assign 'ALL' tick key
-        all_tick_key = self.db_all_key(self._pair, 'TICK', 'df')
+        all_tick_key = self.db_all_key(self._ticker, 'TICK', 'df')
         self._db_dotdict[all_tick_key] = aux_df
 
         # assign 'ALL' key with specified timeframe if set
@@ -509,7 +471,7 @@ class HistDataManager:
             for year in years_list:
 
                 # get df from year key
-                year_tf_key = self.db_key(self._pair,
+                year_tf_key = self.db_key(self._ticker,
                                           year,
                                           tf,
                                           'df')
@@ -524,7 +486,7 @@ class HistDataManager:
 
             # call sort by ascending time index?
 
-            all_tf_key = self.db_all_key(self._pair, tf, 'df')
+            all_tf_key = self.db_all_key(self._ticker, tf, 'df')
             self._db_dotdict[all_tf_key] = aux_df
 
 
@@ -703,21 +665,21 @@ class HistDataManager:
 
         """
 
-        pair_path = self._data_path / self._pair
-        if not pair_path.is_dir() or not pair_path.exists():
-            pair_path.mkdir(parents=True, exist_ok=False)
+        ticker_path = self._data_path / self._ticker
+        if not ticker_path.is_dir() or not ticker_path.exists():
+            ticker_path.mkdir(parents=True, exist_ok=False)
 
-        year_path = pair_path / str(year).upper()
+        year_path = ticker_path / str(year).upper()
         if not year_path.is_dir() or not year_path.exists():
             year_path.mkdir(parents=True, exist_ok=False)
 
         # alternative: get year by referenced key
-        year_tf_key = self.db_key(self._pair, year, tf, 'df')
+        year_tf_key = self.db_key(self._ticker, year, tf, 'df')
         assert isinstance(self._db_dotdict.get(year_tf_key), pd.DataFrame), \
             'key %s is no valid DataFrame' % (year_tf_key)
         year_data = self._db_dotdict.get(year_tf_key)
 
-        filepath = year_path / self._get_filename(self._pair, year, tf)
+        filepath = year_path / self._get_filename(self._ticker, year, tf)
 
         if filepath.exists() and filepath.is_file():
             logging.info("File {} already exists".format(filepath))
@@ -741,25 +703,27 @@ class HistDataManager:
         filename_details = filename.replace('_', '.').split(sep='.')
 
         # store each file details in local variables
-        file_pair = filename_details[FILENAME_TEMPLATE.PAIR_INDEX]
+        file_ticker = filename_details[FILENAME_TEMPLATE.PAIR_INDEX]
         file_year = int(
             filename_details[FILENAME_TEMPLATE.YEAR_INDEX][FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:])
         file_tf = filename_details[FILENAME_TEMPLATE.TF_INDEX]
 
         # return each file details
-        return file_pair, file_year, file_tf
+        return file_ticker, file_year, file_tf
 
-    def _get_filename(self, pair, year, tf):
+
+    def _get_filename(self, ticker, year, tf):
 
         # based on standard filename template
-        return FILENAME_STR.format(pair=self._pair,
+        return FILENAME_STR.format(ticker=self._ticker,
                                    year=year,
                                    tf=tf)
+
 
     def _update_local_data_folder(self, local_folderpath):
 
         # get active years loaded on db manager
-        years_list = self._get_years_list(self._pair, 'int')
+        years_list = self._get_years_list(self._ticker, 'int')
 
         # get file names in local folder
         _, local_files_name = self._list_local_data(local_folderpath)
@@ -767,16 +731,16 @@ class HistDataManager:
         # loop through years
         for year in years_list:
 
-            year_tf_list = self._get_year_timeframe_list(self._pair, year)
+            year_tf_list = self._get_year_timeframe_list(self._ticker, year)
 
             # loop through timeframes loaded
             for tf in year_tf_list:
 
-                tf_filename = self._get_filename(self._pair,
+                tf_filename = self._get_filename(self._ticker,
                                                  year,
                                                  tf)
 
-                tf_key = self.db_key(self._pair, year, tf, 'df')
+                tf_key = self.db_key(self._ticker, year, tf, 'df')
 
                 # check if file is present in local data folder
                 # and if valid dataframe is currently loaded in database
@@ -786,6 +750,7 @@ class HistDataManager:
 
                     self._year_data_to_file(year, tf=tf)
 
+
     def _download_year(self, year):
 
         year_tick_df = pd.DataFrame()
@@ -793,11 +758,13 @@ class HistDataManager:
         for month in MONTHS:
 
             month_num = MONTHS.index(month) + 1
-            self.url = URL_TEMPLATE.format(pair=self._pair,
-                                           year=year,
-                                           month_num=month_num)
-            self._prepare()
-            file = self._download_month_raw(year, month_num)
+            url = HISTDATA_URL_TICKDATA_TEMPLATE.format(
+                                        ticker=self._ticker,
+                                        year=year,
+                                        month_num=month_num)
+            
+            self._prepare(url)
+            file = self._download_month_raw(url, year, month_num)
             if file:
                 month_data = self._raw_file_to_df(file)
                 year_tick_df = pd.concat([year_tick_df, month_data],
@@ -840,17 +807,17 @@ class HistDataManager:
                 year_tick_df = self._download_year(year)
 
                 # get key for dotty dict: TICK
-                year_tick_key = self.db_key(self._pair, year, 'TICK', 'df')
+                year_tick_key = self.db_key(self._ticker, year, 'TICK', 'df')
                 self._db_dotdict[year_tick_key] = year_tick_df
 
         # update manager database
         self.update_db()
         
 
-    def _list_local_data(self, folderpath):
+    def _list_local_data(self, folderpath, filetype='csv'):
 
         # prepare predefined path and check if exists
-        folderpath = Path(folderpath) / self._pair
+        folderpath = Path(folderpath) / self._ticker
         if not folderpath.exists():
             raise FileNotFoundError(
                 "Directory {0} Not Found".format(folderpath.name))
@@ -858,9 +825,8 @@ class HistDataManager:
             raise NotADirectoryError(
                 "{0} is Not a Directory".format(folderpath.name))
 
-        # list all specifed pair data files in folder path and subdirs
-        local_files = list(folderpath.glob(
-            '**/{pair}_*.csv'.format(pair=self._pair)))
+        # list all specifed ticker data files in folder path and subdirs
+        local_files = list(folderpath.glob(f'**/{self._ticker}_*.{filetype}'))
         local_files_name = [file.name for file in local_files]
 
         # check compliance of files to convention (see notes)
@@ -914,19 +880,19 @@ class HistDataManager:
             local_filepath_key = file.name.replace('_', '.')
 
             # get file details
-            file_pair, file_year, file_tf = self._get_file_details(file.name)
+            file_ticker, file_year, file_tf = self._get_file_details(file.name)
 
             # check at timeframe index file has a valid timeframe
             if check_timeframe_str(file_tf) == file_tf:
 
                 # create key for dataframe type
-                year_tf_key = self.db_key(file_pair,
+                year_tf_key = self.db_key(file_ticker,
                                           file_year,
                                           file_tf,
                                           'df')
 
                 # check if year is needed to be loaded
-                if file_pair == self._pair \
+                if file_ticker == self._ticker \
                         and (int(file_year) in years_list):
 
                     if file_tf == TICK_TIMEFRAME:
@@ -970,9 +936,6 @@ class HistDataManager:
 
     def update_db(self):
 
-        # update internal list of years
-        self._years_int = self._get_years_list(self._pair, 'int')
-
         # complete year keys along timeframes required
         self._complete_years_timeframe()
 
@@ -1008,9 +971,9 @@ class HistDataManager:
                             figratio = (10,8),
                             figscale = 1)
         
-        mpf.plot(chart_data,type='candle',**chart_kwargs)
+        mpf_plot(chart_data,type='candle',**chart_kwargs)
 
-        mpf.show()
+        mpf_show()
 
 
 

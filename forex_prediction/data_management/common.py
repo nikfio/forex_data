@@ -6,23 +6,51 @@ Created on Sat Apr 30 09:23:19 2022
 """
 
 # python base
-from re import fullmatch, findall, search
-import pandas as pd
+from re import ( 
+                fullmatch,
+                findall,
+                search
+            )
+
+from pandas import (
+                    DataFrame,
+                    Timestamp,
+                    isnull,
+                    bdate_range,
+                    to_datetime,
+                    Timedelta
+                )
+
+from pandas.api.types import is_datetime64_any_dtype
 from pandas.tseries.frequencies import to_offset
 from pandas.tseries.offsets import DateOffset
-from pandas import to_datetime, Timedelta
-from dateutil.rrule import rrule, DAILY, MO, TU, WE, TH, FR
 
+from dateutil.rrule import (
+                            rrule,
+                            DAILY,
+                            MO,
+                            TU,
+                            WE,
+                            TH,
+                            FR 
+                        )
+
+from pathlib import Path
+
+from pyarrow import (
+                    Table
+                )
 
 # common functions, constants and templates
 
-
-URL_TEMPLATE                    = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
+HISTDATA_URL_TICKDATA_TEMPLATE  = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
                                   'ascii/tick-data-quotes/{pair}/{year}/{month_num}'
-# TODO: template for 1-minute bar data request  
-                        
-DOWNLOAD_URL                    = "http://www.histdata.com/get.php"
-DOWNLOAD_METHOD                 = 'POST'
+
+HISTDATA_URL_ONEMINDATA_TEMPLATE= 'http://www.histdata.com/download-free-forex-data/?/' \
+                                  'ascii/1-minute-bar-quotes/{pair}/{year}/{month_num}'
+
+HISTDATA_BASE_DOWNLOAD_URL      = "http://www.histdata.com/get.php"
+HISTDATA_BASE_DOWNLOAD_METHOD   = 'POST'
 
 MONTHS                          = ['January', 'February', 'March', 'April', 'May', 'June',
                                    'July', 'August', 'September', 'October', 'November', 'December']
@@ -35,7 +63,7 @@ FILENAME_STR                    = '{pair}_Y{year}_{tf}.csv'
 DEFAULT_TIMEZONE                = 'utc'
 TICK_TIMEFRAME                  = 'TICK'
 
-## PAIR ticker
+## ticker PAIR of forex market
 PAIR_GENERIC_FORMAT             = '{TO}/{FROM}'
 SINGLE_CURRENCY_PATTERN_STR     = '[A-Z]{3}'
 
@@ -79,11 +107,21 @@ class FILENAME_TEMPLATE:
     TF_INDEX                = 2
     FILETYPE_INDEX          = 3
 
-# default path to store data in local disk
+# default path to store data in locally
 class DEFAULT_PATHS:
     
     FOREX_LOCAL_HIST_DATA_PATH     = "C:/Database/Forex/Historical"
     FOREX_LOCAL_REALTIME_DATA_PATH = "C:/Database/Forex/RealTime"
+    
+class DATA_FILE_TYPE:
+    
+    CSV_FILETYPE            = 'csv'
+    PARQUET_FILETYPE        = 'parquet'
+    
+SUPPORTED_DATA_FILES = [
+                        DATA_FILE_TYPE.CSV_FILETYPE,
+                        DATA_FILE_TYPE.PARQUET_FILETYPE
+                    ]
 
 ### SINGLE BASE DATA COMPOSIION TEMPLATE: ['open','close','high','low']
 ###                                       with datetime/timestamp as index     
@@ -104,7 +142,7 @@ BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
 class DTYPE_DICT:
     
     TICK_DTYPE = {'ask': 'float16', 'bid': 'float16',
-                             'vol': 'float16', 'p': 'float16'}
+                  'vol': 'float16', 'p': 'float16'}
     TF_DTYPE   = {'open': 'float16', 'high': 'float16', 
                   'low': 'float16', 'close': 'float16'}
     TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ns]',
@@ -300,8 +338,8 @@ def get_date_interval(start=None,
                       bdays=False):
 
     # create start and end date as timestamp instances
-    start_date = pd.Timestamp(start)
-    end_date = pd.Timestamp(end)
+    start_date = Timestamp(start)
+    end_date = Timestamp(end)
                 
     if interval_timespan:
     
@@ -310,7 +348,7 @@ def get_date_interval(start=None,
         # 'now' - end of date interval is timestamp now
         if interval_end_mode == 'now':
             
-            end_date = pd.Timestamp.utcnow()
+            end_date = Timestamp.utcnow()
             start_date = end_date - timewindow_str_to_timedelta(interval_timespan)
             
         
@@ -340,17 +378,17 @@ def get_date_interval(start=None,
                                         byweekday=(MO,TU,WE,TH,FR))
                                     )
                 
-    assert isinstance(start_date, pd.Timestamp) \
-           and isinstance(end_date, pd.Timestamp), \
+    assert isinstance(start_date, Timestamp) \
+           and isinstance(end_date, Timestamp), \
            'start or end is not a valid Timestamp instance'
     
     if normalize:
         
-        if not pd.isnull(start_date):
-            start_date = pd.Timestamp.normalize(start_date)
+        if not isnull(start_date):
+            start_date = Timestamp.normalize(start_date)
             
-        if not pd.isnull(end_date):
-            end_date   = pd.Timestamp.normalize(end_date)
+        if not isnull(end_date):
+            end_date   = Timestamp.normalize(end_date)
             
     start_date = any_date_to_datetime64(start_date)
     end_date   = any_date_to_datetime64(end_date)
@@ -359,7 +397,7 @@ def get_date_interval(start=None,
     # otherwise return just start and end of interval
     if freq:
         
-        bdate_dtindex = pd.bdate_range(start = start_date,
+        bdate_dtindex = bdate_range(start = start_date,
                                        end   = end_date,
                                        freq  = freq,
                                        tz    = 'UTC',
@@ -382,32 +420,41 @@ def reframe_data(data, tf):
     assert tf != TICK_TIMEFRAME, \
         f'reframe not possible wih target {TICK_TIMEFRAME}'
     assert isinstance(
-        data, pd.DataFrame), 'data input must be pandas DataFrame type'
+        data, DataFrame), 'data input must be pandas DataFrame type'
     assert not data.empty, 'data input must not be empty'
    
-    assert pd.api.types.is_datetime64_any_dtype(data.index), \
+    assert is_datetime64_any_dtype(data.index), \
         'data index column must be datetime dtype'
 
-    # resample based on p value
-    if all([col in DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX
-            for col in data.columns]):
+    if isinstance(data, DataFrame):
         
-        # resample along 'p' column, data in ask, bid, p format
-        return data.p.resample(tf).ohlc().interpolate(method=
-                                                      'nearest')
+        ## use pandas functions to reframe data on pandas Dataframe
         
-    elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
-              for col in data.columns]): 
+        # resample based on p value
+        if all([col in DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX
+                for col in data.columns]):
+            
+            # resample along 'p' column, data in ask, bid, p format
+            return data.p.resample(tf).ohlc().interpolate(method=
+                                                          'nearest')
+            
+        elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
+                  for col in data.columns]): 
+            
+            # resample along given data already in ohlc format
+            return data.resample(tf).interpolate(method=
+                                                 'nearest')
+            
+        else:
+            
+            raise ValueError(f'data columns {data.columns} invalid, '
+                             f'required {DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX} '
+                             f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
+            
+    elif isinstance(data, Table):
         
-        # resample along given data already in ohlc format
-        return data.resample(tf).interpolate(method=
-                                             'nearest')
-        
-    else:
-        
-        raise ValueError(f'data columns {data.columns} invalid, '
-                         f'required {DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX} '
-                         f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
+        ## use pyarrow functions to reframe data on pyarrow Table
+        pass
 
 
 ### UTILS FOR DOTTY DICTIONARY
@@ -524,7 +571,7 @@ def get_dotty_key_parent(key):
 
 #def get_list_key_values(index):
     
-    # generic function to return keys index value
+    # generic function to return key value
     # as a list
 
 
@@ -533,5 +580,75 @@ def get_dotty_key_parent(key):
 
 # TODO: function that returns all leafs at a given
         # given level
-                                               
+        
+        
+### ATTRS GENERIC VALIDATORS
+
+def validator_dir_path(instance, attribute, value):
+    
+    if not (
+        Path(value).exists()
+        and 
+        Path(value).is_dir()
+    ):
+        
+        raise ValueError('Required a valid directory path')
+        
+              
+def validator_list_timeframe(instance, attribute, value):
+    
+    if not isinstance(value, list):
+        
+        raise TypeError(f'Required type list for argument {attribute}')
+        
+    if not all([
+                check_time_offset_str(val) 
+                for val in value
+                ]):
+        
+        fails = value[
+                 [
+                    check_time_offset_str(val) 
+                    for val in value
+                ]           
+        ]
+        
+        return ValueError('Values are not timeframe compatible: '
+                          f'{fails}')
+        
+    
+def validator_list_greater_than(min_value):
+    
+    def validator_list_values(instance, attribute, value):
+        
+        if not(
+                isinstance(value, list)
+                and 
+                all([isinstance(val, int)
+                     for val in value])
+        ):
+            
+            raise TypeError('Required list of int type for argument '
+                            f'{attribute}')
+            
+        if any([ 
+                val < min_value
+                for val in value
+            ]):
+            
+            fails = value[ 
+                [ 
+                    val < min_value
+                    for val in value
+                ]
+            ]
+            
+            raise ValueError(f'Values in {attribute}: {fails} '
+                             f'are not greater than {min_value}')
+    
+    
+    
+    
+
+                             
         
