@@ -13,21 +13,16 @@ Description:
            available (TICK) to avoid further downloads at each run
            
         2) resample TICK data to to have any larger timeframe specified
-            2.1) manage read/write of lmdb files 
+            2.1) manage read/write of .csv files and .parquet files 
     
         3) plot ticker between date interval specified
     
-        4) add download of any indicator or generic data other than 
-           pair exchange data
     
 """
 
 from forex_prediction import (
-                                DB_MODE,
-                                read_config_file,
-                                db_parameters,
-                                db_manager
-                             )
+                            historical_manager
+                        )
 
 # TODO: add logging options via input FLAGS
 
@@ -35,39 +30,28 @@ def main():
     
     # TODO: get logging handler
     
-    # load settings parameters
-    config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
+    # historical manager instantiation                            
+    histmanager = historical_manager(
+                    ticker='USDJPY',
+                    config_file=r'C:\Database\config.yaml'
+    )
     
-    # create parameters structure
-    init_param = db_parameters(mode           = DB_MODE.HISTORICAL_MODE,
-                               pair           = config_set['PAIR'],
-                               timeframe      = config_set['TIMEFRAME'],
-                               years          = config_set['YEARS'])
+    # example dates 
+    ex_start_date = '2004-10-03 10:00:00'
+    ex_end_date   = '2005-12-03 10:00:00'
     
-    # db instantiation                            
-    db_test = db_manager(init_param)
-    
-    """
-    # further data loading 
-    # managed internally if it is necessary to download from the internet
-    # or if data is available in local folder
-    
-    db_test.add_historical_data([2005])
-    
-    
+    # get data
+    yeardata = histmanager.get_data(timeframe = '1H',
+                                    start     = ex_start_date,
+                                    end       = ex_end_date)
+                                        
     # add new timeframe
-    '''
-    db_test.add_timeframe('1W',
-                          update_data=True)
-    '''
-    """
-    # plot data with
-    # timestamp start and end bounds
-    # timeframe specified
-    db_test.plot(data_source = DB_MODE.HISTORICAL_MODE,
-                 timeframe   = '1D',
-                 start_date  = '2013-02-02 18:00:00',
-                 end_date    = '2013-06-23 23:00:00')
+    histmanager.add_timeframe('1W')
+    
+    # plot data 
+    histmanager.plot(   timeframe   = '1D',
+                        start_date  = '2013-02-02 18:00:00',
+                        end_date    = '2013-06-23 23:00:00')
     
     
 if __name__ == '__main__':
