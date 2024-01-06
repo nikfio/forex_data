@@ -5,13 +5,20 @@ Created on Mon Apr 25 18:07:21 2022
 @author: fiora
 """
 
+import logging
+
+from attrs import ( 
+                    define,
+                    field,
+                    validators
+                )
+
 # python base 
 from time import sleep 
 from requests import Session
 from dotty_dict import dotty
 from io import StringIO
 from typing import Union, Optional
-
 
 
 # external 
@@ -31,49 +38,51 @@ READ_CHUNKSIZE   = 96
 
 MINIMAL_RECENT_TIME_WINDOW_DAYS = 3 
 
+
+__all__ = ['realtime_manager']
+
 ## Realtime data manager
 #  source data providers to test APIs: polygon-IO, alpha-vantage
 
-class RealTime_data_manager():
+@define
+class realtime_manager:
     
-    def __init__(self, 
-                 pair:str,   
-                 av_api_key:str=None, 
-                 poly_api_key:str=None, 
-                 timeframe:list=None):
+    #ticker          : str = field(validator=validators.instance_of(str))
+    #timeframe       : list = field(validator=validator_list_timeframe)
+    #av_api_key      : str = field(validator=validators.instance_of(str))
+    poly_api_key    : str = field(validator=validators.instance_of(str),
+                                  init=False)
+    
+    
+    def __init__(self):
         
-        self._to_symbol, self._from_symbol = get_pair_symbols(pair)
+        pass
+    
+    
+    # def __attrs_post_init__(self):
         
-        # pair
-        self._pair         = pair.upper()
         
-        self._pair_polygon = to_source_symbol(self._pair, 
-                                                  REALTIME_DATA_PROVIDER.POLYGON_IO)
+    #     # pair
+    #     self.ticker         = self.ticker.upper()
+    #     self._to_symbol, self._from_symbol = get_pair_symbols(pair)
         
-        self._pair_alphavantage = to_source_symbol(self._pair, 
-                                                  REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
+    #     self._pair_polygon = to_source_symbol(self.ticker, 
+    #                                               REALTIME_DATA_PROVIDER.POLYGON_IO)
         
-        assert isinstance(timeframe, list)   \
-                and all([check_timeframe_str(tf) 
-                         for tf in timeframe]), \
-                f'requested non compliant timeframe {timeframe}'
+    #     self._pair_alphavantage = to_source_symbol(self.ticker, 
+    #                                               REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
         
-        self._tf_list  = timeframe
+    #     # http session instance
+    #     self._session       = Session()
         
-        # http session instance
-        self._session       = Session()
         
-        # keys for data providers
-        self._av_api_key       = av_api_key
-        self._poly_api_key     = poly_api_key
+    #     # alpha vantage client
+    #     self._av_reader = av_FX_reader( key   = self.av_api_key,
+    #                                     output_format= 'pandas',
+    #                                     indexing_type= 'date')
         
-        # alpha vantage client
-        self._av_reader = av_FX_reader( key   = self._av_api_key,
-                                        output_format= 'pandas',
-                                        indexing_type= 'date')
-        
-        # Polygon-io client 
-        self._poly_reader = RESTClient(api_key=self._poly_api_key)          
+    #     # Polygon-io client 
+    #     self._poly_reader = RESTClient(api_key=self.poly_api_key)          
     
 
     def tickers_list(self, 
@@ -353,10 +362,5 @@ class RealTime_data_manager():
         else:
         
             return window_data
-        
-           
-    def dump_data_to_file(file_nrows):
-         
-        pass        
     
     

@@ -110,8 +110,9 @@ class FILENAME_TEMPLATE:
 # default path to store data in locally
 class DEFAULT_PATHS:
     
-    FOREX_LOCAL_HIST_DATA_PATH     = "C:/Database/Forex/Historical"
-    FOREX_LOCAL_REALTIME_DATA_PATH = "C:/Database/Forex/RealTime"
+    HIST_DATA_PATH     = "C:/Database/Historical"
+    REALTIME_DATA_PATH = "C:/Database/RealTime"
+    CONFIG_FILE_PATH   = "C:/Database/config.yaml"
     
 class DATA_FILE_TYPE:
     
