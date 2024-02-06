@@ -4,12 +4,21 @@ import logging
 from attrs import ( 
                     define,
                     field,
+                    Factory,
+                    validate,
                     validators
                 )
 
-from inspect import getmembers
+from pandas import (
+                    DataFrame,
+                    read_csv,
+                    read_parquet,
+                    concat
+    )
 
-from sys import stdout
+from pyarrow import (
+                    BufferReader
+    )
 
 from zipfile import (
                         ZipFile,
@@ -26,84 +35,193 @@ from mplfinance import (
                         show as mpf_show
                     )
 
+from re import (
+                search
+            )
+
+from numpy import array
+
 from pathlib import Path
 from requests import Session
 from io import BytesIO
 from dask import dataframe as dd
 
-from dotty_dict import dotty
+from dotty_dict import (Dotty, 
+                        dotty
+                    )
 
 # internally defined
 from .common import *
+from ..config import read_config_file
 
 
 
 __all__ = ['historical_manager']
 
+def _get_attrs_names(instance_object, **kwargs):
+    
+    if hasattr(instance_object, '__attrs_attrs__'):
+        
+        return [attr.name 
+                for attr in instance_object.__attrs_attrs__]
+        
+    else:
+        
+        raise KeyError('attribute "__attrs__attrs__" not found in '
+                       f'object {self}')
+    
+
 # HISTORICAL DATA MANAGER
-@define
+@define(kw_only=True, slots=True)
 class historical_manager:
     
-    ticker      : str = field(default=None,
+    # interface parameters
+    config_file     : str = field(default=None,
                               validator=validators.instance_of(str))
-    timeframe   : list = field(default=None,
-                               validator=validator_list_timeframe)
-    years       : list = field(default=None,
-                                validator=validator_list_greater_than(min(YEARS)))
-    datafiles_type : str = field(default='csv',
-                                 validator=validators.instance_of(SUPPORTED_DATA_FILES))
-    data_path   : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
+    ticker          : str = field(default=None,
+                              validator=validators.instance_of(str))
+    data_filetype   : str = field(default='parquet',
+                                 validator=validators.in_(SUPPORTED_DATA_FILES))
+    data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
                               validator=validator_dir_path)
-    config_file : str = field(default=DEFAULT_PATHS.CONFIG_FILE_PATH,
-                              validator=validators.instance_of(str))
-
-    def __attrs_pre_init__(self, **kwargs):
+    
+    # internal parameters
+    _db_dict = field(factory=dotty, validator=validators.instance_of(Dotty))
+    _years   = field(factory=list, validator=validators.instance_of(list))
+    _tf_list = field(factory=list, validator=validators.instance_of(list))
+    
+    # if a valid config file is passed
+    # arguments contained are assigned here 
+    # if instantiation passed values are present
+    # they will override the related argument
+    # value in the next initialization step
+    
+    # if neither by instantation or config file
+    # an argument value is set, the argument
+    # will be set by asociated defined default 
+    # or factory
         
-        # if a valid config file is passed
-        # arguments contained are assigned here 
-        # if instantiation passed values are present
-        # they will override the related argument
-        # value
-        
-        # if neither by instantation or config file
-        # an argument value is set, the argument
-        # will be set by asociated defined default 
-        # or factory
-        
-        if 'config_file' in kwargs.keys():
+    def __init__(self, **kwargs):
             
-            config_path = Path(self.config_file)
+        _class_attributes_name = _get_attrs_names(self, **kwargs)
+        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
+        
+        if kwargs['config_file']:
+            
+            self.config_file = kwargs['config_file']
+            config_path = Path(kwargs['config_file'])
             if config_path.exists() \
                 and  \
                 config_path.is_file() \
                 and  \
                 config_path.suffix == '.yaml':
                 
-                config_args = read_config_file(config_path.absolute())
+                # read parameters from config file 
+                # and force keys to lower case
+                config_args = {key.lower(): val for key, val in 
+                               read_config_file(config_path.absolute()).items()
+                               }
                 
-                attrs = getmembers(self)
+                # set args from config file
+                attrs_keys_configfile = \
+                        set(_class_attributes_name).intersection(config_args.keys())
+                
+                for attr_key in attrs_keys_configfile:
+                    
+                    self.__setattr__(attr_key, 
+                                     config_args[attr_key])
+                    
+                    _not_assigned_attrs_index_mask[ 
+                           _class_attributes_name.index(attr_key)  
+                    ] = False
+                    
+                # set args from instantiation 
+                # override if attr already has a value from config
+                attrs_keys_input = \
+                        set(_class_attributes_name).intersection(kwargs.keys())
+                
+                for attr_key in attrs_keys_input:
+                    
+                    self.__setattr__(attr_key, 
+                                     kwargs[attr_key])
+                    
+                    _not_assigned_attrs_index_mask[ 
+                           _class_attributes_name.index(attr_key)  
+                    ] = False
+                
+                # attrs not present in config file or instance inputs
+                # --> self.attr leads to KeyError
+                # are manually assigned to default value derived
+                # from __attrs_attrs__
+                
+                for attr_key in array(_class_attributes_name)[
+                        _not_assigned_attrs_index_mask
+                ]:
+                    
+                    try:
+                        
+                        attr = [attr 
+                                for attr in self.__attrs_attrs__
+                                if attr.name == attr_key][0]
+                        
+                    except KeyError:
+                        
+                        logging.warning('KeyError: initializing object has no '
+                                        f'attribute {attr.name}')
+                        
+                    except IndexError:
+                        
+                        logging.warning('IndexError: initializing object has no '
+                                        f'attribute {attr.name}')
+                    
+                    else:
+                        
+                        # assign default value
+                        # try default and factory sabsequently
+                        # if neither are present
+                        # assign None
+                        if hasattr(attr, 'default'):
+                            
+                            if hasattr(attr.default, 'factory'): 
+                    
+                                self.__setattr__(attr.name, 
+                                                 attr.default.factory())
+                                
+                            else:
+                                
+                                self.__setattr__(attr.name, 
+                                                 attr.default)
+                            
+                        else:
+                                
+                            self.__setattr__(attr.name, 
+                                             None)
+                
+                
+            else:
+                
+                raise ValueError('invalid config_file')
+                        
+        else:
             
+            # no config file is defined
+            # call generated init 
+            self.__attrs_init__(**kwargs)
             
+        validate(self)
         
-    def __attrs_post_init__(self, **kwargs):
+        self.__attrs_post_init__()
+        
+            
+    def __attrs_post_init__(self):
         
         # Fundamentals parameters initialization
-        self._ticker = ticker.upper()
+        self.ticker = self.ticker.upper()
         
         # files details variable initialization
-        self._data_path = Path(data_path)
+        self.data_path = Path(self.data_path)
 
-        # instance an empty data dictionary
-        self._db_dotdict = dotty()
-
-        # initial download at object instantiation
-        self._download(years=list(map(int, years)),
-                       search_local=True)
         
-        # timeframe list
-        self.add_timeframe(timeframe)
-
-    
     def _db_key(self, ticker, year, timeframe, data_type):
         """
 
@@ -132,23 +250,14 @@ class historical_manager:
                          str(tf), str(data_type)])
 
 
-    def _db_all_key(self, ticker, timeframe, data_type):
-
-        # all key template = ticker.ALL.timeframe.data_type
-
-        tf = check_timeframe_str(timeframe)
-
-        return '.'.join([str(ticker), 'ALL', str(tf), str(data_type)])
-
-
     def _get_years_list(self, ticker, vartype):
 
         # work on copy as pop operation is 'inplace'
         # so the original db is not modified
-        db_copy = self._db_dotdict.copy()
+        db_copy = self._db_dict.copy()
 
         # get keys at year level
-        years_filter_keys = '{ticker}'.format(ticker=self._ticker)
+        years_filter_keys = '{ticker}'.format(ticker=self.ticker)
 
         # pop at year level in data copy
         year_db = db_copy.pop(years_filter_keys)
@@ -162,12 +271,12 @@ class historical_manager:
                 return []
             else:
 
-                # if present do not include 'ALL' key element
-                # remove first identifier character 'Y' to have canonical
-                # year values
+                # get year value from data keys
                 years_list = [key[FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:]
-                              for key in years_keys
-                              if key != 'ALL']
+                              for key in years_keys]
+                
+                # remove duplicates
+                years_list = list_remove_duplicates(years_list)
 
         else:
 
@@ -196,7 +305,7 @@ class historical_manager:
 
         # work on copy as pop operation is 'inplace'
         # so the original db is not modified
-        db_copy = self._db_dotdict.get(self._ticker).copy()
+        db_copy = self._db_dict.get(self.ticker).copy()
 
         # get key at timeframe level
         tf_key = 'Y{year}'.format(year=year)
@@ -229,15 +338,15 @@ class historical_manager:
         # instantiate empty list
         years_complete = list()
 
-        for year in self._get_years_list(self._ticker, 'int'):
+        for year in self._get_years_list(self.ticker, 'int'):
 
             year_complete = all([
                 # create key for dataframe type
-                isinstance(self._db_dotdict.get(self._db_key(self._ticker,
+                isinstance(self._db_dict.get(self._db_key(self.ticker,
                                                             year,
                                                             tf,
                                                             'df')),
-                           pd.DataFrame)
+                           DataFrame)
                 for tf in self._tf_list
             ])
 
@@ -271,35 +380,36 @@ class historical_manager:
 
         session = Session()
         r = session.get(url)
-        m = re.search('id="tk" value="(.*?)"', r.text)
-        tk = m.groups()[0]
-        self.tk = tk
+        tk = search('id="tk" value="(.*?)"', r.text).groups()[0]
         
         headers = {'Referer': url}
-        data = {'tk': self.tk, 'date': year, 'datemonth': "%d%02d" % (year, month_num), 'platform': 'ASCII',
-                'timeframe': 'T', 'fxpair': self._ticker}
-        r = self.session.request(HISTDATA_BASE_DOWNLOAD_METHOD,
-                                 HISTDATA_BASE_DOWNLOAD_URL,
-                                 data=data,
-                                 headers=headers,
-                                 stream=True)
+        data = {'tk': tk, 
+                'date': year,
+                'datemonth': "%d%02d" % (year, month_num), 
+                'platform': 'ASCII',
+                'timeframe': 'T', 
+                'fxpair': self.ticker
+            }
+        
+        r = session.request(HISTDATA_BASE_DOWNLOAD_METHOD,
+                            HISTDATA_BASE_DOWNLOAD_URL,
+                            data=data,
+                            headers=headers,
+                            stream=True
+                        )
+        
         bio = BytesIO()
         size = 0
-        if logging.level_info():
+         
+        logging.warning("Starting to download: %s - %d - %s" 
+                         % (self.ticker,
+                            year,
+                            MONTHS[month_num-1])
+        )
             
-            logging.warning("Starting to download: %s - %d - %s" 
-                             % (self._ticker,
-                                year,
-                                MONTHS[month_num-1])
-            )
-            
-        for chunk in r.iter_content(chunk_size=2 ** 19):
-            bio.write(chunk)
-            size += len(chunk)
-            if logging.level_info():
-                stdout.write("\rDownloaded %.2f kB" %
-                             (1. * size / 2 ** 10))
-
+        # write content to stream
+        bio.write(r.content)
+        
         print(flush=True)
         try:
             
@@ -309,7 +419,7 @@ class historical_manager:
 
             # here will be a warning log
             logging.error('%s - %d - %s not found or invalid download'
-                            %  (self._ticker,
+                            %  (self.ticker,
                                 year,
                                 MONTHS[month_num-1])
             )
@@ -318,49 +428,49 @@ class historical_manager:
 
         else:
 
-            # return raw zip files
+            # return opened zip file
             return zf.open(zf.namelist()[0])
 
 
     def _add_tf_data_key(self, year, tf):
         
-        year_tf_key = self._db_key(self._ticker,
+        year_tf_key = self._db_key(self.ticker,
                                   year,
                                   tf,
                                   'df')
 
-        if self._db_dotdict.get(year_tf_key) is None \
-            or not isinstance(self._db_dotdict.get(year_tf_key),
-                              pd.DataFrame):
+        if self._db_dict.get(year_tf_key) is None \
+            or not isinstance(self._db_dict.get(year_tf_key),
+                              DataFrame):
 
             # get tick key
-            year_tick_key = self._db_key(self._ticker,
+            year_tick_key = self._db_key(self.ticker,
                                         year,
                                         'TICK',
                                         'df')
 
             try:
 
-                aux_base_df = self._db_dotdict.get(year_tick_key)
+                aux_base_df = self._db_dict.get(year_tick_key)
 
             except KeyError:
 
                 # to logging
-                logging.error(f'Requested to reframe {self._ticker} '
+                logging.error(f'Requested to reframe {self.ticker} '
                               f'{year} in timeframe {tf} '
                               f'but tick data was not found')
 
             else:
 
                 # produce reframed data at the timeframe requested
-                self._db_dotdict[year_tf_key] \
+                self._db_dict[year_tf_key] \
                     = reframe_data(aux_base_df, tf)
         
 
     def _complete_years_timeframe(self):
 
         # get all years available from db keys
-        years_list = self._get_years_list(self._ticker, 'int')
+        years_list = self._get_years_list(self.ticker, 'int')
 
         # get years that has not all timeframes
         years_complete = self._get_tf_complete_years()
@@ -368,23 +478,20 @@ class historical_manager:
         # get years not having all timeframes data
         years_incomplete = set(years_list).difference(years_complete)
 
-        # all current data keys
-        data_paths = [key for key in get_dotty_leafs(self._db_dotdict)
-                      if get_dotty_key_field(key, DATA_KEY.YEAR_INDEX)
-                      != 'ALL' ]
-
         # get years missing timeframes data but with tick data available
         # in current data instance (no further search offline)
-        incomplete_with_tick = [get_key_year(key)
-                                for key in data_paths
+        incomplete_with_tick = [int(get_dotty_key_field(key, 
+                                                    DATA_KEY.YEAR_INDEX)[1:])
+                                for key in get_dotty_leafs(self._db_dict)
                                 if get_dotty_key_field(key, DATA_KEY.TF_INDEX)
                                 == TICK_TIMEFRAME
                                 and
-                                get_key_year(key)
+                                int(get_dotty_key_field(key, 
+                                                    DATA_KEY.YEAR_INDEX)[1:])
                                 in years_incomplete
                                 ]
 
-        aux_base_df = pd.DataFrame()
+        aux_base_df = DataFrame()
 
         # complete years reframing from tick/minimal timeframe data
         for year in incomplete_with_tick:
@@ -394,12 +501,12 @@ class historical_manager:
                 self._add_tf_data_key(year, tf)
 
         # assert no incomplete years found after operation
-        assert self._get_years_list(self._ticker, 'int') \
+        assert self._get_years_list(self.ticker, 'int') \
             == self._get_tf_complete_years(), \
             'timeframe completing operation NOT OK'
 
 
-    def _raw_file_to_df(self, raw_file):
+    def _raw_zipfile_to_df(self, raw_file, engine='pyarrow'):
         """
 
 
@@ -414,87 +521,63 @@ class historical_manager:
 
         """
 
-        assert raw_file, 'raw files list must not be empty'
-
-        # funtions is specific for format of files downloaded
-        # parse file passed as input
-        df = pd.read_csv(raw_file,
-                         sep=',',
-                         names=DATA_COLUMN_NAMES.TICK_DATA,
-                         dtype=DTYPE_DICT.TICK_DTYPE,
-                         index_col=BASE_DATA_FEATURE_NAME.TIMESTAMP,
-                         parse_dates=[BASE_DATA_FEATURE_NAME.TIMESTAMP],
-                         date_format=DATE_FORMAT_ISO8601,
-                         engine = 'pyarrow')
-
-        # set index name to BASE_DATA_FEATURE_NAME.TIMESTAMP
-
+        if engine == 'python':
+        
+            # pandas with python engine can read a runtime opened
+            # zip file
+        
+            # funtions is specific for format of files downloaded
+            # parse file passed as input
+            df = read_csv(  raw_file,
+                            sep=',',
+                            names=DATA_COLUMN_NAMES.TICK_DATA,
+                            dtype=DTYPE_DICT.TICK_DTYPE,
+                            parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
+                            date_format=DATE_FORMAT_HISTDATA_CSV,
+                            engine = 'python'
+            )
+            
+        elif engine == 'pyarrow':
+        
+            # no way found to directly open a runtime zip file
+            # with pyarrow
+            # strategy rolls back to temporary file download 
+            # open and read all
+            # delete temporary file
+            
+            # alternative using pyarrow
+            buf = BufferReader(raw_file.read())
+            tempdir_path = self.data_path / 'Temp'
+            # create temperary files directory if not present
+            tempdir_path.mkdir(exist_ok=True)
+            # download buffer to file
+            buf.download(str(tempdir_path)+'\\temp.csv')
+            
+            # from histdata raw files column 'p' is not present
+            raw_file_dtypes = DTYPE_DICT.TICK_DTYPE.copy()
+            raw_file_dtypes.pop('p')
+                        
+            # read temporary csv file
+            df = read_csv(  str(tempdir_path)+'\\temp.csv',
+                            sep=',',
+                            index_col=0,
+                            names=DATA_COLUMN_NAMES.TICK_DATA,
+                            dtype=raw_file_dtypes,
+                            parse_dates=[0],
+                            date_format=DATE_FORMAT_HISTDATA_CSV,
+                            engine = 'pyarrow'
+            )
+            
+            # perform step to covnert index
+            # into a datetime64 dtype
+            df.index = any_date_to_datetime64(df.index,
+                                    date_format=DATE_FORMAT_HISTDATA_CSV,
+                                    unit='ms')
+            
         # calculate 'p'
         df['p'] = (df.ask + df.bid) / 2
-
+        
         return df
-
-
-    def _update_all_block_data(self):
-
-        # update ALL. block data instance
-        # meant as all years data grouped referring to a
-        # specific timeframe
-
-        # get year keys
-        years_list = self._get_years_list(self._ticker, 'int')
-
-        aux_df = pd.DataFrame()
-
-        # Reserved loop for 'TICK' timeframe
-        # loop through years in order from oldest to most recent
-        for year in years_list:
-
-            # get df from year key
-            year_tick_key = self._db_key(self._ticker,
-                                        year,
-                                        'TICK',
-                                        'df')
-
-            assert isinstance(self._db_dotdict.get(year_tick_key), pd.DataFrame), \
-                'UPD ALL BLOCK: key %s is no valid DataFrame' % (year_tick_key)
-
-            # concat to all_df
-            aux_df = pd.concat([aux_df, self._db_dotdict.get(year_tick_key)],
-                               ignore_index=False,
-                               copy=False)
-
-        # assign 'ALL' tick key
-        all_tick_key = self._db_all_key(self._ticker, 'TICK', 'df')
-        self._db_dotdict[all_tick_key] = aux_df
-
-        # assign 'ALL' key with specified timeframe if set
-        # loop through timeframes
-        for tf in self._tf_list:
-
-            aux_df = pd.DataFrame()
-
-            # loop through years
-            for year in years_list:
-
-                # get df from year key
-                year_tf_key = self._db_key(self._ticker,
-                                          year,
-                                          tf,
-                                          'df')
-
-                assert isinstance(self._db_dotdict.get(year_tick_key), pd.DataFrame), \
-                    f'UPD ALL BLOCK: key {year_tf_key} is no valid DataFrame'
-
-                # concat to all_df
-                aux_df = pd.concat([aux_df, self._db_dotdict.get(year_tf_key)],
-                                   ignore_index=False,
-                                   copy=False)
-
-            # call sort by ascending time index?
-
-            all_tf_key = self._db_all_key(self._ticker, tf, 'df')
-            self._db_dotdict[all_tf_key] = aux_df
 
 
     def _year_data_to_file(self, year, tf=None):
@@ -514,7 +597,7 @@ class historical_manager:
 
         """
 
-        ticker_path = self._data_path / self._ticker
+        ticker_path = self.data_path / self.ticker
         if not ticker_path.is_dir() or not ticker_path.exists():
             ticker_path.mkdir(parents=True, exist_ok=False)
 
@@ -523,26 +606,38 @@ class historical_manager:
             year_path.mkdir(parents=True, exist_ok=False)
 
         # alternative: get year by referenced key
-        year_tf_key = self._db_key(self._ticker, year, tf, 'df')
-        assert isinstance(self._db_dotdict.get(year_tf_key), pd.DataFrame), \
+        year_tf_key = self._db_key(self.ticker, year, tf, 'df')
+        assert isinstance(self._db_dict.get(year_tf_key), DataFrame), \
             'key %s is no valid DataFrame' % (year_tf_key)
-        year_data = self._db_dotdict.get(year_tf_key)
+        year_data = self._db_dict.get(year_tf_key)
 
-        filepath = year_path / self._get_filename(self._ticker, year, tf)
+        filepath = year_path / self._get_filename(self.ticker, year, tf)
 
         if filepath.exists() and filepath.is_file():
             logging.info("File {} already exists".format(filepath))
             return
 
-        # IMPORTANT
-        # avoid date_format parameter since it is reported that
-        # it makes to_csv to be excessively long with column data
-        # being datetime data type
-        # see: https://github.com/pandas-dev/pandas/issues/37484
-        #      https://stackoverflow.com/questions/65903287/pandas-1-2-1-to-csv-performance-with-datetime-as-the-index-and-setting-date-form
-        year_data.to_csv(filepath.absolute(),
-                         index=True,
-                         header=True)
+        if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
+            
+            # csv data files
+            
+            # IMPORTANT
+            # avoid date_format parameter since it is reported that
+            # it makes to_csv to be excessively long with column data
+            # being datetime data type
+            # see: https://github.com/pandas-dev/pandas/issues/37484
+            #      https://stackoverflow.com/questions/65903287/pandas-1-2-1-to-csv-performance-with-datetime-as-the-index-and-setting-date-form
+            year_data.to_csv(filepath.absolute(),
+                             index=True,
+                             header=True)
+            
+        elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
+            
+            # parquet data files
+            
+            year_data.to_parquet(filepath.absolute(),
+                                 index=True)
+            
 
     def _get_file_details(self, filename):
 
@@ -564,58 +659,60 @@ class historical_manager:
     def _get_filename(self, ticker, year, tf):
 
         # based on standard filename template
-        return FILENAME_STR.format(ticker=self._ticker,
+        return FILENAME_STR.format(ticker=self.ticker,
                                    year=year,
-                                   tf=tf)
+                                   tf=tf,
+                                   file_ext=self.data_filetype)
 
 
-    def _update_local_data_folder(self, local_folderpath):
+    def _update_local_data_folder(self):
 
         # get active years loaded on db manager
-        years_list = self._get_years_list(self._ticker, 'int')
+        years_list = self._get_years_list(self.ticker, 'int')
 
         # get file names in local folder
-        _, local_files_name = self._list_local_data(local_folderpath)
+        _, local_files_name = self._list_local_data()
 
         # loop through years
         for year in years_list:
 
-            year_tf_list = self._get_year_timeframe_list(self._ticker, year)
+            year_tf_list = self._get_year_timeframe_list(self.ticker, year)
 
             # loop through timeframes loaded
             for tf in year_tf_list:
 
-                tf_filename = self._get_filename(self._ticker,
+                tf_filename = self._get_filename(self.ticker,
                                                  year,
                                                  tf)
 
-                tf_key = self._db_key(self._ticker, year, tf, 'df')
+                tf_key = self._db_key(self.ticker, year, tf, 'df')
 
                 # check if file is present in local data folder
                 # and if valid dataframe is currently loaded in database
                 if tf_filename not in local_files_name \
-                   and isinstance(self._db_dotdict.get(tf_key),
-                                  pd.DataFrame):
+                   and isinstance(self._db_dict.get(tf_key),
+                                  DataFrame):
 
-                    self._year_data_to_file(year, tf=tf)
+                    self._year_data_to_file(year,
+                                            tf=tf)
 
 
     def _download_year(self, year):
 
-        year_tick_df = pd.DataFrame()
+        year_tick_df = DataFrame()
 
         for month in MONTHS:
 
             month_num = MONTHS.index(month) + 1
             url = HISTDATA_URL_TICKDATA_TEMPLATE.format(
-                                        ticker=self._ticker,
+                                        ticker=self.ticker,
                                         year=year,
                                         month_num=month_num)
             
             file = self._download_month_raw(url, year, month_num)
             if file:
-                month_data = self._raw_file_to_df(file)
-                year_tick_df = pd.concat([year_tick_df, month_data],
+                month_data = self._raw_zipfile_to_df(file)
+                year_tick_df = concat([year_tick_df, month_data],
                                          ignore_index=False,
                                          copy=False)
 
@@ -639,8 +736,7 @@ class historical_manager:
 
         # search if years data are already available offline
         if search_local:
-            years_tickdata_offline = self._local_load_data(self._data_path,
-                                                          years)
+            years_tickdata_offline = self._local_load_data(years)
         else:
             years_tickdata_offline = list()
 
@@ -655,35 +751,45 @@ class historical_manager:
                 year_tick_df = self._download_year(year)
 
                 # get key for dotty dict: TICK
-                year_tick_key = self._db_key(self._ticker, year, 'TICK', 'df')
-                self._db_dotdict[year_tick_key] = year_tick_df
+                year_tick_key = self._db_key(self.ticker, year, 'TICK', 'df')
+                self._db_dict[year_tick_key] = year_tick_df
 
         # update manager database
-        self.update_db()
+        self._update_db()
         
 
-    def _list_local_data(self, folderpath, filetype='csv'):
+    def _list_local_data(self):
 
+        local_files = []
+        local_files_name = []
+        
         # prepare predefined path and check if exists
-        folderpath = Path(folderpath) / self._ticker
-        if not folderpath.exists():
-            raise FileNotFoundError(
-                "Directory {0} Not Found".format(folderpath.name))
-        elif not folderpath.is_dir():
-            raise NotADirectoryError(
-                "{0} is Not a Directory".format(folderpath.name))
+        tickerfolder_path = Path(self.data_path) / self.ticker
+        if not (
+            tickerfolder_path.exists() \
+            and 
+            tickerfolder_path.is_dir()
+        ):
+            
+            tickerfolder_path.mkdir(parents=True, 
+                                    exist_ok=False)
+            
+        else:
+            
+            # list all specifed ticker data files in folder path and subdirs
+            local_files = list(tickerfolder_path.glob(
+                f'**/{self.ticker}_*.{self.data_filetype}'
+                )
+            )
+            local_files_name = [file.name for file in local_files]
 
-        # list all specifed ticker data files in folder path and subdirs
-        local_files = list(folderpath.glob(f'**/{self._ticker}_*.{filetype}'))
-        local_files_name = [file.name for file in local_files]
-
-        # check compliance of files to convention (see notes)
-        # TODO: warning if no compliant and filter out from files found
+            # check compliance of files to convention (see notes)
+            # TODO: warning if no compliant and filter out from files found
 
         return local_files, local_files_name
 
 
-    def _local_load_data(self, folderpath, years_list):
+    def _local_load_data(self, years_list):
         """
 
 
@@ -711,7 +817,7 @@ class historical_manager:
         """
 
         # list data available in local folder
-        local_files, local_files_name = self._list_local_data(folderpath)
+        local_files, local_files_name = self._list_local_data()
 
         years_tick_files_found = list()
 
@@ -734,58 +840,64 @@ class historical_manager:
                                           'df')
 
                 # check if year is needed to be loaded
-                if file_ticker == self._ticker \
+                if file_ticker == self.ticker \
                         and (int(file_year) in years_list):
 
                     if file_tf == TICK_TIMEFRAME:
                         years_tick_files_found.append(file_year)
 
-                    # year requested: upload tick file if not already present
-                    if file_tf == TICK_TIMEFRAME \
-                            and self._db_dotdict.get(year_tf_key) is None:
-
-                        # perform tick file upload
-
-                        # use dask library as tick csv files can be very large
-                        # time gain is significative even compared to using
-                        # pandas read_csv with chunksize tuning
-                        dask_df = dd.read_csv(file,
-                                              sep=',',
-                                              header=0,
-                                              dtype=DTYPE_DICT.TICK_DTYPE,
-                                              parse_dates=['timestamp'],
-                                              date_format=DATE_FORMAT_ISO8601)
-
-                        self._db_dotdict[year_tf_key] = \
-                            dask_df.compute().set_index('timestamp')
-
-                    # year requested: upload tf file if not already present
-                    #                 and tf is requested
-                    elif self._db_dotdict.get(year_tf_key) is None \
-                            and file_tf in self._tf_list:
-
-                        self._db_dotdict[year_tf_key] = pd.read_csv(file,
-                                                                    sep=',',
-                                                                    header=0,
-                                                                    dtype=DTYPE_DICT.TF_DTYPE,
-                                                                    index_col='timestamp',
-                                                                    parse_dates=[
-                                                                        'timestamp'],
-                                                                    date_format=DATE_FORMAT_ISO8601)
-
+                    if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
+                        
+                        # year requested: upload tick file if not already present
+                        if file_tf == TICK_TIMEFRAME \
+                                and self._db_dict.get(year_tf_key) is None:
+    
+                            # perform tick file upload
+    
+                            # use dask library as tick csv files can be very large
+                            # time gain is significative even compared to using
+                            # pandas read_csv with chunksize tuning
+                            dask_df = dd.read_csv(file,
+                                                  sep=',',
+                                                  header=0,
+                                                  dtype=DTYPE_DICT.TICK_DTYPE,
+                                                  parse_dates=['timestamp'],
+                                                  date_format=DATE_FORMAT_ISO8601)
+    
+                            self._db_dict[year_tf_key] = \
+                                dask_df.compute().set_index('timestamp')
+    
+                        # year requested: upload tf file if not already present
+                        #                 and tf is requested
+                        elif self._db_dict.get(year_tf_key) is None \
+                                and file_tf in self._tf_list:
+    
+                            self._db_dict[year_tf_key] = read_csv(
+                                file,
+                                sep=',',
+                                header=0,
+                                dtype=DTYPE_DICT.TF_DTYPE,
+                                index_col='timestamp',
+                                parse_dates=[
+                                    'timestamp'],
+                                date_format=DATE_FORMAT_ISO8601)
+                    
+                    elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
+                    
+                        data_df = read_parquet(file)
+                            
+                        
         # return list of years which tick file has been found and loaded
         return years_tick_files_found
+    
 
     def _update_db(self):
 
         # complete year keys along timeframes required
         self._complete_years_timeframe()
 
-        # update 'ALL' key block data
-        self._update_all_block_data()
-
         # dump new downloaded data not already present in local data folder
-        self._update_local_data_folder(self._data_path)
+        self._update_local_data_folder()
 
 
     def add_timeframe(self, timeframe, update_data=False):
@@ -865,23 +977,30 @@ class historical_manager:
         
         # get data keys referred to interval years 
         # at the given timeframe
-        interval_keys = [key for key in get_dotty_leafs(self._db_dotdict)
-                          if get_key_year(key) in years_interval_req \
-                              and get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
+        interval_keys = [key for key in get_dotty_leafs(self._db_dict)
+                          if int(get_dotty_key_field(key, 
+                                                     DATA_KEY.YEAR_INDEX)[1:])
+                              in years_interval_req \
+                              and get_dotty_key_field(key, 
+                                                      DATA_KEY.TF_INDEX) 
                                   == timeframe]
         
         # get years covered by interval keys
-        interval_keys_years = [get_key_year(key) for key in interval_keys]
+        interval_keys_years = [int(get_dotty_key_field(key, 
+                                                       DATA_KEY.YEAR_INDEX)[1:])
+                               for key in interval_keys]
         
         # aggregate data to current instance if necessary
         if years_interval_req != interval_keys_years:
             
             year_tf_missing = list(set(years_interval_req).difference(interval_keys_years))
             
-            year_tick_keys = [get_key_year(key) for key in get_dotty_leafs(self._db_dotdict)
-                                  if get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
-                                      == TICK_TIMEFRAME \
-                                     and get_key_year(key) != 'ALL']
+            year_tick_keys = [int(get_dotty_key_field(key, 
+                                                      DATA_KEY.YEAR_INDEX)[1:])
+                              for key in get_dotty_leafs(self._db_dict)
+                                if get_dotty_key_field(key, 
+                                                       DATA_KEY.TF_INDEX) \
+                                    == TICK_TIMEFRAME ]
             
             year_tick_missing = list(set(years_interval_req).difference(year_tick_keys))
             
@@ -889,7 +1008,7 @@ class historical_manager:
             if year_tick_missing:
                 
                 self._download(year_tick_missing, 
-                              search_local=True)
+                               search_local=True)
                 
             # if timeframe req is in tf_list 
             # data requested should at this point be available
@@ -903,10 +1022,13 @@ class historical_manager:
                     
                     
             # get years covered by interval keys
-            interval_keys_years = [get_key_year(key) for key in get_dotty_leafs(self._db_dotdict)
-                                      if get_key_year(key) in years_interval_req and \
-                                          get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
-                                          == timeframe]
+            interval_keys_years = [int(get_dotty_key_field(key, DATA_KEY.YEAR_INDEX)[1:]) 
+                                   for key in get_dotty_leafs(self._db_dict)
+                                   if int(get_dotty_key_field(key, DATA_KEY.YEAR_INDEX)[1:])
+                                       in years_interval_req and \
+                                        get_dotty_key_field(key, 
+                                                            DATA_KEY.TF_INDEX) \
+                                        == timeframe]
             
             assert years_interval_req == interval_keys_years, \
                     f'processing year data completion for {years_interval_req} ' \
@@ -916,16 +1038,17 @@ class historical_manager:
         
         # get data keys referred to interval years 
         # at the given timeframe
-        interval_keys = [key for key in get_dotty_leafs(self._db_dotdict)
-                          if get_key_year(key) in years_interval_req \
+        interval_keys = [key for key in get_dotty_leafs(self._db_dict)
+                          if int(get_dotty_key_field(key, DATA_KEY.YEAR_INDEX)[1:])
+                              in years_interval_req \
                               and get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
                                   == timeframe]
             
-        data_df = pd.DataFrame()
+        data_df = DataFrame()
         
         if len(interval_keys) == 1: 
 
-            data_df = self._db_dotdict.get(interval_keys[0])
+            data_df = self._db_dict.get(interval_keys[0])
 
             # return data slice
             data_df = data_df[(data_df.index >= start)
@@ -934,19 +1057,21 @@ class historical_manager:
         else:
 
             # order keys by ascending year value
-            interval_keys.sort(key=lambda x: get_key_year(x))
+            interval_keys.sort(key=lambda x: 
+                               int(get_dotty_key_field(x, 
+                                                       DATA_KEY.YEAR_INDEX)[1:]))
 
             # get data interval
-            data_df = pd.concat([self._db_dotdict.get(key)[
-                                 (self._db_dotdict.get(key).index >= start)
-                                 & (self._db_dotdict.get(key).index <= end)].copy()
+            data_df = concat([self._db_dict.get(key)[
+                                 (self._db_dict.get(key).index >= start)
+                                 & (self._db_dict.get(key).index <= end)].copy()
                                  for key in interval_keys])
             
     
         return data_df
     
 
-    def plot_data(self, timeframe, start_date, end_date):
+    def plot(self, timeframe, start_date, end_date):
         """
         Plot data in selected time frame and start and end date bound
         :param date_bounds: start and end of plot
@@ -954,15 +1079,13 @@ class historical_manager:
         :return: void
         """
 
-        logging.info("Chart request: from {start} to {end} with timeframe {tf}".format(start=str(start_date),
-                                                                                       end=str(
-                                                                                           end_date),
-                                                                                       tf=str(timeframe)))
-
+        logging.info(f'Chart request: from {start_date} '
+                     f'to {end_date} with timeframe {timeframe}')
+        
         chart_data = self.add_histdata(timeframe=timeframe,
-                                                  start=start_date,
-                                                  end=end_date,
-                                                  add_timeframe=True)
+                                        start=start_date,
+                                        end=end_date,
+                                        add_timeframe=True)
 
         # candlestick chart type
         # use mplfinance
