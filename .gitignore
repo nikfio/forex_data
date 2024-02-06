@@ -4,3 +4,4 @@ saved_workspaces/
 issues/
 .vscode/
 notes/
+*.yaml

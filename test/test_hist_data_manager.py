@@ -33,7 +33,7 @@ def main():
     # historical manager instantiation                            
     histmanager = historical_manager(
                     ticker='USDJPY',
-                    config_file=r'C:\Database\config.yaml'
+                    config_file=r'C:/Projects/forex_prediction_project/appconfig/config.yaml'
     )
     
     # example dates 
@@ -41,7 +41,7 @@ def main():
     ex_end_date   = '2005-12-03 10:00:00'
     
     # get data
-    yeardata = histmanager.get_data(timeframe = '1H',
+    yeardata = histmanager.get_data(timeframe = '1h',
                                     start     = ex_start_date,
                                     end       = ex_end_date)
                                         

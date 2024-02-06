@@ -44,7 +44,7 @@ from pyarrow import (
 # common functions, constants and templates
 
 HISTDATA_URL_TICKDATA_TEMPLATE  = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
-                                  'ascii/tick-data-quotes/{pair}/{year}/{month_num}'
+                                  'ascii/tick-data-quotes/{ticker}/{year}/{month_num}'
 
 HISTDATA_URL_ONEMINDATA_TEMPLATE= 'http://www.histdata.com/download-free-forex-data/?/' \
                                   'ascii/1-minute-bar-quotes/{pair}/{year}/{month_num}'
@@ -58,8 +58,9 @@ YEARS                           = list(range(2000, 2022, 1))
 
 DATE_NO_HOUR_FORMAT             = '%Y-%m-%d'
 DATE_FORMAT_ISO8601             = 'ISO8601'
+DATE_FORMAT_HISTDATA_CSV        = '%Y%m%d %H%M%S%f'
 
-FILENAME_STR                    = '{pair}_Y{year}_{tf}.csv'
+FILENAME_STR                    = '{ticker}_Y{year}_{tf}.{file_ext}'
 DEFAULT_TIMEZONE                = 'utc'
 TICK_TIMEFRAME                  = 'TICK'
 
@@ -112,12 +113,15 @@ class DEFAULT_PATHS:
     
     HIST_DATA_PATH     = "C:/Database/Historical"
     REALTIME_DATA_PATH = "C:/Database/RealTime"
-    CONFIG_FILE_PATH   = "C:/Database/config.yaml"
     
 class DATA_FILE_TYPE:
     
     CSV_FILETYPE            = 'csv'
     PARQUET_FILETYPE        = 'parquet'
+    
+class DATA_FILE_COLUMN_INDEX:
+    
+    TIMESTAMP               = 0
     
 SUPPORTED_DATA_FILES = [
                         DATA_FILE_TYPE.CSV_FILETYPE,
@@ -130,7 +134,7 @@ SUPPORTED_DATA_FILES = [
 # OHLC and related column names
 class DATA_COLUMN_NAMES:
     
-    TICK_DATA               = ['timestamp','ask','bid','vol','p']
+    TICK_DATA               = ['timestamp','ask','bid','vol']
     TF_DATA                 = ['timestamp','open','high','low', 'close']
     TICK_DATA_TIME_INDEX    = ['ask','bid','vol','p']
     TF_DATA_TIME_INDEX      = ['open','high','low', 'close']             ## SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE          
@@ -142,13 +146,20 @@ BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
        
 class DTYPE_DICT:
     
-    TICK_DTYPE = {'ask': 'float16', 'bid': 'float16',
-                  'vol': 'float16', 'p': 'float16'}
-    TF_DTYPE   = {'open': 'float16', 'high': 'float16', 
-                  'low': 'float16', 'close': 'float16'}
-    TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ns]',
-                       'open': 'float16', 'high': 'float16', 
-                       'low': 'float16', 'close': 'float16'}
+    TICK_DTYPE = {'ask': 'float32', 
+                  'bid': 'float32',
+                  'vol': 'float32',
+                  'p'  : 'float32'}
+    TF_DTYPE   = {'open': 'float32', 'high': 'float32', 
+                  'low': 'float32', 'close': 'float32'}
+    TIME_TICK_DTYPE = {'timestamp' : 'datetime64[ms]',
+                       'ask': 'float32', 
+                       'bid': 'float32',
+                       'vol': 'float32',
+                       'p'  : 'float32'}
+    TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ms]',
+                       'open': 'float32', 'high': 'float32', 
+                       'low': 'float32', 'close': 'float32'}
 
 class REALTIME_DATA_PROVIDER:
     
@@ -618,7 +629,7 @@ def validator_list_timeframe(instance, attribute, value):
                           f'{fails}')
         
     
-def validator_list_greater_than(min_value):
+def validator_list_ge(min_value):
     
     def validator_list_values(instance, attribute, value):
         
@@ -649,6 +660,11 @@ def validator_list_greater_than(min_value):
     
     
     
+# GENERIC UTILITIES
+
+def list_remove_duplicates(list_in):
+    
+    return list(dict.fromkeys(list_in))
     
 
                              
