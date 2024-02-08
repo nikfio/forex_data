@@ -10,6 +10,8 @@ import logging
 from attrs import ( 
                     define,
                     field,
+                    Factory,
+                    validate,
                     validators
                 )
 
@@ -20,6 +22,7 @@ from dotty_dict import dotty
 from io import StringIO
 from typing import Union, Optional
 
+from dotty_dict import Dotty
 
 # external 
 
@@ -44,45 +47,157 @@ __all__ = ['realtime_manager']
 ## Realtime data manager
 #  source data providers to test APIs: polygon-IO, alpha-vantage
 
-@define
+@define(kw_only=True, slots=True)
 class realtime_manager:
     
-    #ticker          : str = field(validator=validators.instance_of(str))
-    #timeframe       : list = field(validator=validator_list_timeframe)
-    #av_api_key      : str = field(validator=validators.instance_of(str))
+    # interface parameters
+    av_api_key      : str = field(validator=validators.instance_of(str))
     poly_api_key    : str = field(validator=validators.instance_of(str),
                                   init=False)
+    # interface parameters
+    config_file     : str = field(default=None,
+                              validator=validators.instance_of(str))
+    ticker          : str = field(default=None,
+                              validator=validators.instance_of(str))
+    data_filetype   : str = field(default='parquet',
+                                 validator=validators.in_(SUPPORTED_DATA_FILES))
+    data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
+                              validator=validator_dir_path)
+    
+    # internal parameters
+    _db_dict = field(factory=dotty, validator=validators.instance_of(Dotty))
     
     
-    def __init__(self):
-        
-        pass
+    # if a valid config file is passed
+    # arguments contained are assigned here 
+    # if instantiation passed values are present
+    # they will override the related argument
+    # value in the next initialization step
     
-    
-    # def __attrs_post_init__(self):
+    # if neither by instantation or config file
+    # an argument value is set, the argument
+    # will be set by asociated defined default 
+    # or factory
         
+    def __init__(self, **kwargs):
+            
+        _class_attributes_name = _get_attrs_names(self, **kwargs)
+        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
         
-    #     # pair
-    #     self.ticker         = self.ticker.upper()
-    #     self._to_symbol, self._from_symbol = get_pair_symbols(pair)
+        if kwargs['config_file']:
+            
+            self.config_file = kwargs['config_file']
+            config_path = Path(kwargs['config_file'])
+            if config_path.exists() \
+                and  \
+                config_path.is_file() \
+                and  \
+                config_path.suffix == '.yaml':
+                
+                # read parameters from config file 
+                # and force keys to lower case
+                config_args = {key.lower(): val for key, val in 
+                               read_config_file(config_path.absolute()).items()
+                               }
+                
+                # set args from config file
+                attrs_keys_configfile = \
+                        set(_class_attributes_name).intersection(config_args.keys())
+                
+                for attr_key in attrs_keys_configfile:
+                    
+                    self.__setattr__(attr_key, 
+                                     config_args[attr_key])
+                    
+                    _not_assigned_attrs_index_mask[ 
+                           _class_attributes_name.index(attr_key)  
+                    ] = False
+                    
+                # set args from instantiation 
+                # override if attr already has a value from config
+                attrs_keys_input = \
+                        set(_class_attributes_name).intersection(kwargs.keys())
+                
+                for attr_key in attrs_keys_input:
+                    
+                    self.__setattr__(attr_key, 
+                                     kwargs[attr_key])
+                    
+                    _not_assigned_attrs_index_mask[ 
+                           _class_attributes_name.index(attr_key)  
+                    ] = False
+                
+                # attrs not present in config file or instance inputs
+                # --> self.attr leads to KeyError
+                # are manually assigned to default value derived
+                # from __attrs_attrs__
+                
+                for attr_key in array(_class_attributes_name)[
+                        _not_assigned_attrs_index_mask
+                ]:
+                    
+                    try:
+                        
+                        attr = [attr 
+                                for attr in self.__attrs_attrs__
+                                if attr.name == attr_key][0]
+                        
+                    except KeyError:
+                        
+                        logging.warning('KeyError: initializing object has no '
+                                        f'attribute {attr.name}')
+                        
+                    except IndexError:
+                        
+                        logging.warning('IndexError: initializing object has no '
+                                        f'attribute {attr.name}')
+                    
+                    else:
+                        
+                        # assign default value
+                        # try default and factory sabsequently
+                        # if neither are present
+                        # assign None
+                        if hasattr(attr, 'default'):
+                            
+                            if hasattr(attr.default, 'factory'): 
+                    
+                                self.__setattr__(attr.name, 
+                                                 attr.default.factory())
+                                
+                            else:
+                                
+                                self.__setattr__(attr.name, 
+                                                 attr.default)
+                            
+                        else:
+                                
+                            self.__setattr__(attr.name, 
+                                             None)
+                
+                
+            else:
+                
+                raise ValueError('invalid config_file')
+                        
+        else:
+            
+            # no config file is defined
+            # call generated init 
+            self.__attrs_init__(**kwargs)
+            
+        validate(self)
         
-    #     self._pair_polygon = to_source_symbol(self.ticker, 
-    #                                               REALTIME_DATA_PROVIDER.POLYGON_IO)
+        self.__attrs_post_init__()
         
-    #     self._pair_alphavantage = to_source_symbol(self.ticker, 
-    #                                               REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
+            
+    def __attrs_post_init__(self):
         
-    #     # http session instance
-    #     self._session       = Session()
+        # Fundamentals parameters initialization
+        self.ticker = self.ticker.upper()
         
-        
-    #     # alpha vantage client
-    #     self._av_reader = av_FX_reader( key   = self.av_api_key,
-    #                                     output_format= 'pandas',
-    #                                     indexing_type= 'date')
-        
-    #     # Polygon-io client 
-    #     self._poly_reader = RESTClient(api_key=self.poly_api_key)          
+        # files details variable initialization
+        self.data_path = Path(self.data_path)         
     
 
     def tickers_list(self, 

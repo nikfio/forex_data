@@ -32,7 +32,7 @@ def main():
     
     # historical manager instantiation                            
     histmanager = historical_manager(
-                    ticker='USDJPY',
+                    ticker='AUDUSD',
                     config_file=r'C:/Projects/forex_prediction_project/appconfig/config.yaml'
     )
     
@@ -43,15 +43,17 @@ def main():
     # get data
     yeardata = histmanager.get_data(timeframe = '1h',
                                     start     = ex_start_date,
-                                    end       = ex_end_date)
+                                    end       = ex_end_date
+    )
                                         
     # add new timeframe
     histmanager.add_timeframe('1W')
     
     # plot data 
-    histmanager.plot(   timeframe   = '1D',
-                        start_date  = '2013-02-02 18:00:00',
-                        end_date    = '2013-06-23 23:00:00')
+    histmanager.plot( timeframe   = '1D',
+                      start_date  = '2013-02-02 18:00:00',
+                      end_date    = '2013-06-23 23:00:00'
+    )
     
     
 if __name__ == '__main__':

@@ -25,6 +25,7 @@ scipy = "^1.11.4"
 pyarrow = "^14.0.2"
 vaex = "^4.17.0"
 dotty-dict = {git = "https://github.com/nikfio/dotty_dict.git"}
+polars = "^0.20.7"
 
 [build-system]
 requires = ["poetry-core"]
