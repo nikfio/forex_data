@@ -20,9 +20,19 @@ from pyarrow import (
                     BufferReader
     )
 
+from vaex import (
+                    open as vaex_open,
+                    from_csv,
+                    from_csv_arrow
+    )
+
+from polars import (
+                    read_csv as polars_read_csv
+    )
+
 from zipfile import (
-                        ZipFile,
-                        BadZipFile
+                    ZipFile,
+                    BadZipFile
                 )
 
 from re import (
@@ -506,7 +516,7 @@ class historical_manager:
             'timeframe completing operation NOT OK'
 
 
-    def _raw_zipfile_to_df(self, raw_file, engine='pyarrow'):
+    def _raw_zipfile_to_df(self, raw_file, engine='polars'):
         """
 
 
@@ -573,6 +583,27 @@ class historical_manager:
             df.index = any_date_to_datetime64(df.index,
                                     date_format=DATE_FORMAT_HISTDATA_CSV,
                                     unit='ms')
+            
+        elif engine == 'vaex':
+            
+            # TODO: implement vaex dataframe variant
+            df = from_csv(raw_file,
+                          sep=',',
+                          names=DATA_COLUMN_NAMES.TICK_DATA,
+                          dtype=DTYPE_DICT.TF_DTYPE,
+                          parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
+                          date_format=DATE_FORMAT_HISTDATA_CSV
+            )
+            
+        elif engine == 'polars':
+            
+            df = polars_read_csv(raw_file,
+                                 separator=',',
+                                 has_header=False
+            )
+            
+            df = df.to_pandas()
+            
             
         # calculate 'p'
         df['p'] = (df.ask + df.bid) / 2
@@ -884,7 +915,7 @@ class historical_manager:
                     
                     elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
                     
-                        data_df = read_parquet(file)
+                        self._db_dict[year_tf_key] = read_parquet(file)
                             
                         
         # return list of years which tick file has been found and loaded
@@ -1082,17 +1113,18 @@ class historical_manager:
         logging.info(f'Chart request: from {start_date} '
                      f'to {end_date} with timeframe {timeframe}')
         
-        chart_data = self.add_histdata(timeframe=timeframe,
-                                        start=start_date,
-                                        end=end_date,
-                                        add_timeframe=True)
+        chart_data = self.get_data(timeframe     = timeframe,
+                                   start         = start_date,
+                                   end           = end_date,
+                                   add_timeframe = True)
 
         # candlestick chart type
         # use mplfinance
         chart_kwargs = dict(style    = 'charles',
                             volume   = False,
                             figratio = (10,8),
-                            figscale = 1)
+                            figscale = 1
+        )
         
         mpf_plot(chart_data,type='candle',**chart_kwargs)
 

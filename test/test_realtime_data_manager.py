@@ -20,7 +20,6 @@ from pandas import (
                     )
 # custom lib
 from forex_prediction import (
-                              DB_MODE,
                               db_parameters,
                               db_manager,
                               read_config_file
@@ -33,14 +32,13 @@ def main():
     config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
     
     # realtime manager instantiation
-    rt_param = db_parameters(mode            = DB_MODE.REALTIME_MODE,
+    rt_param = db_parameters(
                              pair            = config_set['PAIR'],
                              timeframe       = config_set['TIMEFRAME'],
                              av_api_key      = config_set['DATA_PROVIDER_KEY']['ALPHA_VANTAGE_KEY'], 
                              poly_api_key    = config_set['DATA_PROVIDER_KEY']['POLYGON_IO_KEY'])
     
     test_rt_data_manager = db_manager(rt_param)
-    
     
     # input test request definition
     test_day_end     = '2022-03-26'

@@ -41,6 +41,12 @@ from pyarrow import (
                     Table
                 )
 
+from vaex import (
+                    dataframe,
+                    BinnerTime,
+                    agg
+                )
+
 # common functions, constants and templates
 
 HISTDATA_URL_TICKDATA_TEMPLATE  = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
@@ -465,9 +471,18 @@ def reframe_data(data, tf):
             
     elif isinstance(data, Table):
         
-        ## use pyarrow functions to reframe data on pyarrow Table
+        # use pyarrow functions to reframe data on pyarrow Table
+        # could not find easy way to filter an arrow table
+        # based on time interval
         pass
 
+    elif isinstance(data, dataframe.DataFrameLocal):
+        
+        # Per minute
+        df_reframe = data.groupby(by=BinnerTime(data.timestamp, 
+                                                resolution='m'),
+                                agg={'count' : 'count',
+                                     'mean_x': agg.mean(data.x)})
 
 ### UTILS FOR DOTTY DICTIONARY
 
