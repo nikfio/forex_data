@@ -9,26 +9,28 @@ from attrs import (
                     validators
                 )
 
+# PANDAS
 from pandas import (
-                    DataFrame,
-                    read_csv,
-                    read_parquet,
-                    concat
+                    DataFrame as pandas_dataframe
     )
 
+# PYARROW
 from pyarrow import (
                     BufferReader
     )
 
-from vaex import (
-                    open as vaex_open,
-                    from_csv,
-                    from_csv_arrow
-    )
-
+# POLARS
 from polars import (
+                    String as polars_string,
+                    col,
                     read_csv as polars_read_csv
     )
+
+from polars.dataframe import ( 
+                    DataFrame as polars_dataframe
+    )
+
+from datetime import datetime
 
 from zipfile import (
                     ZipFile,
@@ -94,11 +96,15 @@ class historical_manager:
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
     data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
                               validator=validator_dir_path)
+    engine          : str = field(default='pandas',
+                                  validator=validators.in_(SUPPORTED_DATA_ENGINES))
+    
     
     # internal parameters
     _db_dict = field(factory=dotty, validator=validators.instance_of(Dotty))
     _years   = field(factory=list, validator=validators.instance_of(list))
     _tf_list = field(factory=list, validator=validators.instance_of(list))
+    _dataframe_type = field(default=pandas_dataframe)
     
     # if a valid config file is passed
     # arguments contained are assigned here 
@@ -230,7 +236,15 @@ class historical_manager:
         
         # files details variable initialization
         self.data_path = Path(self.data_path)
+        
+        if self.engine == 'pandas':
+            
+            self._dataframe_type = pandas_dataframe 
 
+        elif self.engine == 'polars':
+            
+            self._dataframe_type = polars_dataframe
+            
         
     def _db_key(self, ticker, year, timeframe, data_type):
         """
@@ -356,7 +370,7 @@ class historical_manager:
                                                             year,
                                                             tf,
                                                             'df')),
-                           DataFrame)
+                           self._dataframe_type)
                 for tf in self._tf_list
             ])
 
@@ -409,8 +423,7 @@ class historical_manager:
                         )
         
         bio = BytesIO()
-        size = 0
-         
+    
         logging.warning("Starting to download: %s - %d - %s" 
                          % (self.ticker,
                             year,
@@ -451,7 +464,7 @@ class historical_manager:
 
         if self._db_dict.get(year_tf_key) is None \
             or not isinstance(self._db_dict.get(year_tf_key),
-                              DataFrame):
+                              self._dataframe_type):
 
             # get tick key
             year_tick_key = self._db_key(self.ticker,
@@ -501,7 +514,7 @@ class historical_manager:
                                 in years_incomplete
                                 ]
 
-        aux_base_df = DataFrame()
+        aux_base_df = self._dataframe_type()
 
         # complete years reframing from tick/minimal timeframe data
         for year in incomplete_with_tick:
@@ -547,6 +560,9 @@ class historical_manager:
                             engine = 'python'
             )
             
+            # calculate 'p'
+            df['p'] = (df['ask'] + df['bid']) / 2
+            
         elif engine == 'pyarrow':
         
             # no way found to directly open a runtime zip file
@@ -583,35 +599,57 @@ class historical_manager:
             df.index = any_date_to_datetime64(df.index,
                                     date_format=DATE_FORMAT_HISTDATA_CSV,
                                     unit='ms')
-            
-        elif engine == 'vaex':
-            
-            # TODO: implement vaex dataframe variant
-            df = from_csv(raw_file,
-                          sep=',',
-                          names=DATA_COLUMN_NAMES.TICK_DATA,
-                          dtype=DTYPE_DICT.TF_DTYPE,
-                          parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
-                          date_format=DATE_FORMAT_HISTDATA_CSV
-            )
+                
+            # calculate 'p'
+            df['p'] = (df['ask'] + df['bid']) / 2
             
         elif engine == 'polars':
             
-            df = polars_read_csv(raw_file,
-                                 separator=',',
-                                 has_header=False
+            # download to temporary csv file 
+            # for best performance with polars
+            
+            # alternative using pyarrow
+            buf = BufferReader(raw_file.read())
+            tempdir_path = self.data_path / 'Temp'
+            # create temperary files directory if not present
+            tempdir_path.mkdir(exist_ok=True)
+            # download buffer to file
+            buf.download(str(tempdir_path)+'\\temp.csv')
+            
+            # from histdata raw files column 'p' is not present
+            raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
+            raw_file_dtypes.pop('p')
+            raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
+            
+            # read file
+            # set schema for columns but avoid timestamp columns
+            df = polars_read_csv(str(tempdir_path)+'\\temp.csv',
+                                 separator  = ',',
+                                 has_header = False,
+                                 new_columns = DATA_COLUMN_NAMES.TICK_DATA,
+                                 schema      = raw_file_dtypes,
+                                 use_pyarrow = True
             )
             
-            df = df.to_pandas()
+            # check schema, recall cast if needed
+            if not dict(df.schema) == raw_file_dtypes:
+                df = df.cast(raw_file_dtypes)
             
-            
-        # calculate 'p'
-        df['p'] = (df.ask + df.bid) / 2
+            # fix timestamp column data type
+            df = df.with_columns(
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(polars_datetime('ms'), 
+                                                                  format=DATE_FORMAT_HISTDATA_CSV))
+    
+            # calculate 'p'
+            df = df.with_columns(
+                    ( (col('ask') + col('bid')) / 2).alias('p') 
+                 ) 
+        
         
         return df
 
 
-    def _year_data_to_file(self, year, tf=None):
+    def _year_data_to_file(self, year, tf=None, engine='polars'):
         """
 
 
@@ -638,7 +676,7 @@ class historical_manager:
 
         # alternative: get year by referenced key
         year_tf_key = self._db_key(self.ticker, year, tf, 'df')
-        assert isinstance(self._db_dict.get(year_tf_key), DataFrame), \
+        assert isinstance(self._db_dict.get(year_tf_key), self._dataframe_type), \
             'key %s is no valid DataFrame' % (year_tf_key)
         year_data = self._db_dict.get(year_tf_key)
 
@@ -658,16 +696,14 @@ class historical_manager:
             # being datetime data type
             # see: https://github.com/pandas-dev/pandas/issues/37484
             #      https://stackoverflow.com/questions/65903287/pandas-1-2-1-to-csv-performance-with-datetime-as-the-index-and-setting-date-form
-            year_data.to_csv(filepath.absolute(),
+            year_data.to_csv(str(filepath.absolute()),
                              index=True,
                              header=True)
             
         elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
             
             # parquet data files
-            
-            year_data.to_parquet(filepath.absolute(),
-                                 index=True)
+            write_parquet(year_data, str(filepath.absolute()))
             
 
     def _get_file_details(self, filename):
@@ -722,15 +758,16 @@ class historical_manager:
                 # and if valid dataframe is currently loaded in database
                 if tf_filename not in local_files_name \
                    and isinstance(self._db_dict.get(tf_key),
-                                  DataFrame):
+                                  self._dataframe_type):
 
                     self._year_data_to_file(year,
-                                            tf=tf)
+                                            tf=tf,
+                                            engine=self.engine)
 
 
     def _download_year(self, year):
 
-        year_tick_df = DataFrame()
+        year_tick_df = self._dataframe_type()        
 
         for month in MONTHS:
 
@@ -742,10 +779,10 @@ class historical_manager:
             
             file = self._download_month_raw(url, year, month_num)
             if file:
-                month_data = self._raw_zipfile_to_df(file)
-                year_tick_df = concat([year_tick_df, month_data],
-                                         ignore_index=False,
-                                         copy=False)
+                month_data = self._raw_zipfile_to_df(file)                 
+                year_tick_df = concat_data([year_tick_df, 
+                                            month_data])    
+                
 
         return year_tick_df
 
@@ -767,7 +804,8 @@ class historical_manager:
 
         # search if years data are already available offline
         if search_local:
-            years_tickdata_offline = self._local_load_data(years)
+            years_tickdata_offline = self._local_load_data(years, 
+                                                           engine=self.engine)
         else:
             years_tickdata_offline = list()
 
@@ -820,7 +858,7 @@ class historical_manager:
         return local_files, local_files_name
 
 
-    def _local_load_data(self, years_list):
+    def _local_load_data(self, years_list, engine='polars'):
         """
 
 
@@ -915,7 +953,8 @@ class historical_manager:
                     
                     elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
                     
-                        self._db_dict[year_tf_key] = read_parquet(file)
+                        self._db_dict[year_tf_key] = read_parquet(engine,
+                                                                  file)
                             
                         
         # return list of years which tick file has been found and loaded
@@ -991,8 +1030,18 @@ class historical_manager:
             f'timeframe request {timeframe} invalid'
             
         # try to convert to datetime data type if not already is
-        start = any_date_to_datetime64(start)
-        end = any_date_to_datetime64(end)
+        if self.engine == 'polars':
+            
+            start = any_date_to_datetime64(start,
+                                           to_pydatetime=True)
+            
+            end = any_date_to_datetime64(end, 
+                                         to_pydatetime=True)
+            
+        else:
+            
+            start = any_date_to_datetime64(start)
+            end = any_date_to_datetime64(end)
 
         assert end > start, \
             'date interval not coherent, start must be older than end'
@@ -1075,28 +1124,84 @@ class historical_manager:
                               and get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
                                   == timeframe]
             
-        data_df = DataFrame()
+        data_df = self._dataframe_type()
         
         if len(interval_keys) == 1: 
 
             data_df = self._db_dict.get(interval_keys[0])
 
             # return data slice
-            data_df = data_df[(data_df.index >= start)
-                              & (data_df.index <= end)].copy()
-
+            if self.engine == 'pandas':
+            
+                data_df = data_df[(data_df.index >= start)
+                                  & (data_df.index <= end)].copy()
+            
+            elif self.engine == 'polars':
+                
+                data_df = \
+                    \
+                    (
+                        data_df
+                        .filter(
+                            col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_between(start,
+                                                                            end   
+                            )
+                        ).clone()
+                    )
+            
+            else:
+                
+                raise TypeError(f'engine {self.engine} not supported'
+                                ' for get_data function')
+            
         else:
 
             # order keys by ascending year value
             interval_keys.sort(key=lambda x: 
                                int(get_dotty_key_field(x, 
-                                                       DATA_KEY.YEAR_INDEX)[1:]))
+                                                       DATA_KEY.YEAR_INDEX)[1:])
+                               )
 
+                
+            # TODO: need to differentiate dataframe slicing filterin and
+            #       selection depending on engine used
+                
             # get data interval
-            data_df = concat([self._db_dict.get(key)[
-                                 (self._db_dict.get(key).index >= start)
-                                 & (self._db_dict.get(key).index <= end)].copy()
-                                 for key in interval_keys])
+            
+            if self.engine == 'pandas':
+                
+                data_df = concat_data([self._db_dict.get(key)[
+                              (self._db_dict.get(key)[BASE_DATA_COLUMN_NAME.TIMESTAMP] 
+                                   >= start)
+                              & (self._db_dict.get(key)[BASE_DATA_COLUMN_NAME.TIMESTAMP] 
+                                   <= end)].copy()
+                            for key in interval_keys]
+                )
+                
+            elif self.engine == 'polars':
+            
+                # slice data using polars sintax:
+                    
+                data_df = \
+                    \
+                    concat_data(
+                        [
+                            (
+                                self._db_dict.get(key)
+                                .filter(
+                                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_between(start,
+                                                                                    end   
+                                    )
+                                ).clone()
+                            )
+                            for key in interval_keys
+                        ]
+                    )
+                    
+            else:
+                
+                raise TypeError(f'engine {self.engine} not supported'
+                                ' for get_data function')
             
     
         return data_df
@@ -1118,6 +1223,15 @@ class historical_manager:
                                    end           = end_date,
                                    add_timeframe = True)
 
+        chart_data = to_pandas_dataframe(chart_data)
+        
+        if chart_data.index.name != BASE_DATA_COLUMN_NAME.TIMESTAMP:
+            
+            chart_data.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                 inplace=True)
+            
+            chart_data.index = to_datetime(chart_data.index)
+        
         # candlestick chart type
         # use mplfinance
         chart_kwargs = dict(style    = 'charles',
