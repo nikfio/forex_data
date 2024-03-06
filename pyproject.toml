@@ -23,9 +23,9 @@ mpl-finance = "^0.10.1"
 setuptools = "^69.0.2"
 scipy = "^1.11.4"
 pyarrow = "^14.0.2"
-vaex = "^4.17.0"
 dotty-dict = {git = "https://github.com/nikfio/dotty_dict.git"}
 polars = "^0.20.7"
+awswrangler = {extras = ["redshift"], version = "^3.6.0"}
 
 [build-system]
 requires = ["poetry-core"]

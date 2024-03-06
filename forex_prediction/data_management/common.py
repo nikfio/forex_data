@@ -5,47 +5,73 @@ Created on Sat Apr 30 09:23:19 2022
 @author: fiora
 """
 
-# python base
 from re import ( 
                 fullmatch,
                 findall,
                 search
-            )
+    )
 
+# PANDAS
 from pandas import (
-                    DataFrame,
-                    Timestamp,
-                    isnull,
-                    bdate_range,
-                    to_datetime,
-                    Timedelta
-                )
+                DataFrame as pandas_dataframe,
+                concat as pandas_concat,
+                Timestamp,
+                isnull,
+                bdate_range,
+                to_datetime,
+                Timedelta,
+                read_parquet as pandas_read_parquet
+    )
 
 from pandas.api.types import is_datetime64_any_dtype
 from pandas.tseries.frequencies import to_offset
 from pandas.tseries.offsets import DateOffset
 
+# PYARROW
+from pyarrow import (
+                float32 as pyarrow_float32,
+                timestamp as pyarrow_timestamp,
+                Schema as pyarrow_schema,
+                Table,
+                concat_tables,
+                csv as arrow_csv
+    )
+
+from pyarrow.parquet import (
+                write_table,
+                read_table
+    )
+
+# POLARS
+from polars import (
+                Float32 as polars_float32,
+                Datetime as polars_datetime,
+                read_csv as polars_read_csv,
+                concat as polars_concat,
+                col,
+                read_parquet as polars_read_parquet
+    )
+
+from polars.dataframe import ( 
+                DataFrame as polars_dataframe
+    )
+
 from dateutil.rrule import (
-                            rrule,
-                            DAILY,
-                            MO,
-                            TU,
-                            WE,
-                            TH,
-                            FR 
-                        )
+                rrule,
+                DAILY,
+                MO,
+                TU,
+                WE,
+                TH,
+                FR 
+    )
 
 from pathlib import Path
 
-from pyarrow import (
-                    Table
-                )
-
-from vaex import (
-                    dataframe,
-                    BinnerTime,
-                    agg
-                )
+from attrs import (
+                field,
+                validators
+    )
 
 # common functions, constants and templates
 
@@ -134,6 +160,14 @@ SUPPORTED_DATA_FILES = [
                         DATA_FILE_TYPE.PARQUET_FILETYPE
                     ]
 
+# supported dataframe engines
+# pyarrow not inserted because it is not yet found a way to implement
+# reframe_data() on pyarrow Table
+SUPPORTED_DATA_ENGINES = [
+                            'pandas',
+                            'polars'
+    ]
+
 ### SINGLE BASE DATA COMPOSIION TEMPLATE: ['open','close','high','low']
 ###                                       with datetime/timestamp as index     
 # column names for dataframes TICK and timeframe filtered
@@ -149,23 +183,6 @@ class DATA_COLUMN_NAMES:
     
 BASE_DATA = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX ## SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE  
 BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
-       
-class DTYPE_DICT:
-    
-    TICK_DTYPE = {'ask': 'float32', 
-                  'bid': 'float32',
-                  'vol': 'float32',
-                  'p'  : 'float32'}
-    TF_DTYPE   = {'open': 'float32', 'high': 'float32', 
-                  'low': 'float32', 'close': 'float32'}
-    TIME_TICK_DTYPE = {'timestamp' : 'datetime64[ms]',
-                       'ask': 'float32', 
-                       'bid': 'float32',
-                       'vol': 'float32',
-                       'p'  : 'float32'}
-    TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ms]',
-                       'open': 'float32', 'high': 'float32', 
-                       'low': 'float32', 'close': 'float32'}
 
 class REALTIME_DATA_PROVIDER:
     
@@ -203,19 +220,19 @@ class CANONICAL_INDEX:
 ### auxiliary fast functions
 
 # parse argument to get datetime object with date format as input
-def infer_date_from_format_dt(s, date_format='ISO8601', unit=None):
+def infer_date_from_format_dt(s, date_format='ISO8601', unit=None, utc=False):
     
     if unit:
         
         return to_datetime(s, 
                            unit     = unit,
-                           utc      = True)
+                           utc      = utc)
     
     else:
         
         return to_datetime(s, 
                            format   = date_format,
-                           utc      = True)
+                           utc      = utc)
 
 
 # parse timeframe as string and validate if it is valid
@@ -238,7 +255,7 @@ def check_timeframe_str(tf):
             return tf
 
 
-## PAIR functions        
+## PAIR symbol functions        
 def get_pair_symbols(ticker):
         
     components  = findall(SINGLE_CURRENCY_PATTERN_STR, ticker)
@@ -305,6 +322,8 @@ def to_source_symbol(ticker, source):
                                           FROM=from_symbol)
     
 
+# TIMESTAMP RELATED FUNCTIONS
+
 def check_time_offset_str(timeoffset_str):
 
     return isinstance(to_offset(timeoffset_str), DateOffset)
@@ -324,13 +343,18 @@ def timewindow_str_to_timedelta(time_window_str):
         
 def any_date_to_datetime64(any_date, 
                            date_format='ISO8601',
-                           unit=None):
+                           unit=None,
+                           to_pydatetime=False):
     
     try:
         
         any_date = infer_date_from_format_dt(any_date, 
                                              date_format,
                                              unit=unit)
+        
+        if to_pydatetime:
+            
+            any_date = any_date.to_pydatetime()
             
     except Exception as e:
         
@@ -339,9 +363,12 @@ def any_date_to_datetime64(any_date,
                          f'faile conversion to {date_format} '
                          'date format')
     
-    if not any_date.tzinfo:
-        
-        any_date = any_date.tz_localize('utc')
+# =============================================================================
+#   TODO: is it necessary utc timezone when source is naive? 
+#   if not any_date.tzinfo:
+#         
+#         any_date = any_date.tz_localize('utc')
+# =============================================================================
     
     return any_date
 
@@ -429,60 +456,303 @@ def get_date_interval(start=None,
         return start_date, end_date
     
     
-def reframe_data(data, tf):
+### BASE OPERATIONS WITH DATAFRAME 
+### depending on dataframe engine support
+### for supported engines see var SUPPORTED_DATA_ENGINES
+
+# DATA TYPES DICTIONARY   
+class DTYPE_DICT:
+    
+    TICK_DTYPE = {'ask': 'float32', 
+                  'bid': 'float32',
+                  'vol': 'float32',
+                  'p'  : 'float32'}
+    TF_DTYPE   = {'open': 'float32',
+                  'high': 'float32', 
+                  'low': 'float32',
+                  'close': 'float32'}
+    TIME_TICK_DTYPE = {'timestamp' : 'datetime64[ms]',
+                       'ask': 'float32', 
+                       'bid': 'float32',
+                       'vol': 'float32',
+                       'p'  : 'float32'}
+    TIME_TF_DTYPE   = {'timestamp' : 'datetime64[ms]',
+                       'open': 'float32', 
+                       'high': 'float32', 
+                       'low': 'float32',
+                       'close': 'float32'}
+    
+class PYARROW_DTYPE_DICT:
+    
+    TICK_DTYPE = {'ask': pyarrow_float32(), 
+                  'bid': pyarrow_float32(),
+                  'vol': pyarrow_float32(),
+                  'p'  : pyarrow_float32()}
+    TF_DTYPE   = {'open' : pyarrow_float32(),
+                  'high' : pyarrow_float32(), 
+                  'low'  : pyarrow_float32(),
+                  'close': pyarrow_float32()}
+    TIME_TICK_DTYPE = {'timestamp'  : pyarrow_timestamp('ms'),
+                       'ask'        : pyarrow_float32(), 
+                       'bid'        : pyarrow_float32(),
+                       'vol'        : pyarrow_float32(),
+                       'p'          : pyarrow_float32()}
+    TIME_TF_DTYPE   = {'timestamp'  : pyarrow_timestamp('ms'),
+                       'open'       : pyarrow_float32(), 
+                       'high'       : pyarrow_float32(), 
+                       'low'        : pyarrow_float32(),
+                       'close'      : pyarrow_float32()}
+    
+class POLARS_DTYPE_DICT:
+    
+    TICK_DTYPE = {'ask': polars_float32, 
+                  'bid': polars_float32,
+                  'vol': polars_float32,
+                  'p'  : polars_float32}
+    TF_DTYPE   = {'open' : polars_float32,
+                  'high' : polars_float32, 
+                  'low'  : polars_float32,
+                  'close': polars_float32}
+    TIME_TICK_DTYPE = {'timestamp'  : polars_datetime('ms'),
+                       'ask'        : polars_float32, 
+                       'bid'        : polars_float32,
+                       'vol'        : polars_float32,
+                       'p'          : polars_float32}
+    TIME_TF_DTYPE   = {'timestamp'  : polars_datetime('ms'),
+                       'open'       : polars_float32, 
+                       'high'       : polars_float32, 
+                       'low'        : polars_float32,
+                       'close'      : polars_float32}
+
+
+def dtype_dict_to_pyarrow_schema(dtype_dict):
+    
+    schema_list = []
+    
+    for item in dtype_dict.items():
+    
+        schema_list.append(item)
+    
+    
+    return pyarrow_schema(schema_list)
+
+
+    
+def astype(dataframe, dtype_dict):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe.astype(dtype_dict)
+    
+    elif isinstance(dataframe, Table):
+        
+        return dataframe.cast(dtype_dict_to_pyarrow_schema(dtype_dict)) 
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe.cast(dtype_dict)
+    
+    else:
+        
+        raise ValueError('function astype not available'
+                         ' for instance of type'
+                         f' {type(dataframe)}')
+
+
+def read_parquet(engine, filepath):
+    
+    if engine == 'pandas':
+        
+        return pandas_read_parquet(filepath)
+    
+    elif engine == 'pyarrow':
+        
+        return read_table(filepath)
+    
+    elif engine == 'polars':
+    
+        return polars_read_parquet(filepath)
+    
+    else:
+        
+        raise ValueError('function read_parquet not available'
+                         f' for engine {engine}')
+                         
+    
+def write_parquet(dataframe, filepath):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        try:
+            
+            dataframe.to_parquet(filepath, index=True)
+        
+        except Exception as e:
+            
+            raise Exception(f'pandas write parquet failed: {e}')
+    
+    elif isinstance(dataframe, Table):
+        
+        try:
+            
+            write_table(dataframe, filepath)
+            
+        except Exception as e:
+            
+            raise Exception(f'pyarrow write parquet failed: {e}')
+            
+    elif isinstance(dataframe, polars_dataframe):
+    
+        try:
+            
+            dataframe.write_parquet(filepath)
+        
+        except Exception as e:
+            
+            raise Exception(f'polars write parquet failed: {e}')
+    
+    else:
+        
+        raise ValueError('function write_parquet not available'
+                         ' for instance of type'
+                         f' {type(dataframe)}')
+
+# MOD: create read/write also for csv files 
+
+def concat_data(data_list = field(validator=
+                                  validators.instance_of(list))):
+    
+    if not isinstance(data_list, list):
+        raise TypeError('required input as list')
+        
+    # assume data type is unique by input
+    # get type from first element
+    
+    if isinstance(data_list[0], pandas_dataframe):
+        
+        return pandas_concat(data_list,
+                             ignore_index=False,
+                             copy=False)
+    
+    elif isinstance(data_list[0], Table):
+        
+        return concat_tables(data_list) 
+    
+    elif isinstance(data_list[0], polars_dataframe):
+    
+        return polars_concat(data_list, how='vertical')
+    
+    else:
+        
+        raise ValueError('function concat not available'
+                         ' for instance of type'
+                         f' {type(data_list[0])}')
+    
+
+def to_pandas_dataframe(dataframe):
+    
+    # convert to pandas dataframe
+    # useful for those calls
+    # requiring pandas as input
+    # or pandas functions not covered
+    # by other dataframe instance
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe
+    
+    elif isinstance(dataframe, Table):
+        
+        return dataframe.to_pandas() 
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe.to_pandas(use_pyarrow_extension_array=True)
+    
+    else:
+        
+        raise ValueError('function to_pandas() not available'
+                         ' for instance of type'
+                         f' {type(dataframe)}')
+    
+    
+def reframe_data(dataframe, tf):
+    '''
+    
+
+    Parameters
+    ----------
+    data : TYPE
+        DESCRIPTION.
+    tf : TYPE
+        DESCRIPTION.
+
+    Raises
+    ------
+    ValueError
+        DESCRIPTION.
+
+    Returns
+    -------
+    Dataframe
+        DESCRIPTION.
+
+    '''
+    
     
     # assert timeframe input value
-    # TODO: to be different from 'TICK'
     tf = check_timeframe_str(tf)
 
     assert tf != TICK_TIMEFRAME, \
         f'reframe not possible wih target {TICK_TIMEFRAME}'
-    assert isinstance(
-        data, DataFrame), 'data input must be pandas DataFrame type'
-    assert not data.empty, 'data input must not be empty'
-   
-    assert is_datetime64_any_dtype(data.index), \
-        'data index column must be datetime dtype'
-
-    if isinstance(data, DataFrame):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        assert is_datetime64_any_dtype(dataframe.index), \
+            'data index column must be datetime dtype'
         
         ## use pandas functions to reframe data on pandas Dataframe
         
         # resample based on p value
         if all([col in DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX
-                for col in data.columns]):
+                for col in dataframe.columns]):
             
             # resample along 'p' column, data in ask, bid, p format
-            return data.p.resample(tf).ohlc().interpolate(method=
+            return dataframe.p.resample(tf).ohlc().interpolate(method=
                                                           'nearest')
             
         elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
-                  for col in data.columns]): 
+                  for col in dataframe.columns]): 
             
             # resample along given data already in ohlc format
-            return data.resample(tf).interpolate(method=
-                                                 'nearest')
+            return dataframe.resample(tf).interpolate(method=
+                                                      'nearest')
             
         else:
             
-            raise ValueError(f'data columns {data.columns} invalid, '
+            raise ValueError(f'data columns {dataframe.columns} invalid, '
                              f'required {DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX} '
                              f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
             
-    elif isinstance(data, Table):
+    elif isinstance(dataframe, Table):
         
         # use pyarrow functions to reframe data on pyarrow Table
         # could not find easy way to filter an arrow table
         # based on time interval
         pass
-
-    elif isinstance(data, dataframe.DataFrameLocal):
+    
+    elif isinstance(dataframe, polars_dataframe):
         
-        # Per minute
-        df_reframe = data.groupby(by=BinnerTime(data.timestamp, 
-                                                resolution='m'),
-                                agg={'count' : 'count',
-                                     'mean_x': agg.mean(data.x)})
+        tf = tf.lower()
+        
+        dataframe = dataframe.sort('timestamp', nulls_last=True)
+        return dataframe.group_by_dynamic(
+                BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                every=tf).agg(col('p').first().alias('open'),
+                              col('p').max().alias('high'),
+                              col('p').min().alias('low'),
+                              col('p').last().alias('close') 
+                )
 
 ### UTILS FOR DOTTY DICTIONARY
 
@@ -596,20 +866,12 @@ def get_dotty_key_parent(key):
     return parent_key
 
 
-#def get_list_key_values(index):
-    
-    # generic function to return key value
-    # as a list
-
-
-
-
 
 # TODO: function that returns all leafs at a given
-        # given level
+#       given level
         
         
-### ATTRS GENERIC VALIDATORS
+### ATTRS ADDED VALIDATORS
 
 def validator_dir_path(instance, attribute, value):
     
@@ -681,6 +943,3 @@ def list_remove_duplicates(list_in):
     
     return list(dict.fromkeys(list_in))
     
-
-                             
-        
