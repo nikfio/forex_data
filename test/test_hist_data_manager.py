@@ -37,8 +37,8 @@ def main():
     )
     
     # example dates 
-    ex_start_date = '2004-10-03 10:00:00'
-    ex_end_date   = '2005-12-03 10:00:00'
+    ex_start_date = '2008-10-03 10:00:00'
+    ex_end_date   = '2008-12-03 10:00:00'
     
     # get data
     yeardata = histmanager.get_data(timeframe = '1h',

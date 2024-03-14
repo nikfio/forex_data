@@ -63,6 +63,8 @@ class realtime_manager:
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
     data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
                               validator=validator_dir_path)
+    engine          : str = field(default='pandas',
+                                  validator=validators.in_(SUPPORTED_DATA_ENGINES))
     
     # internal parameters
     _db_dict = field(factory=dotty, validator=validators.instance_of(Dotty))

@@ -5,3 +5,4 @@ issues/
 .vscode/
 notes/
 *.yaml
+test/test_dynamodb.py
