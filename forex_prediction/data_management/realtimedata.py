@@ -15,6 +15,32 @@ from attrs import (
                     validators
                 )
 
+# PANDAS
+from pandas import (
+                    DataFrame as pandas_dataframe,
+                    read_csv as pandas_read_csv
+    )
+
+# PYARROW
+from pyarrow import (
+                    BufferReader
+    )
+
+# POLARS
+from polars import (
+                    String as polars_string,
+                    col,
+                    read_csv as polars_read_csv
+    )
+
+from polars.dataframe import ( 
+                    DataFrame as polars_dataframe
+    )
+
+from datetime import datetime
+
+from numpy import array
+
 # python base 
 from time import sleep 
 from requests import Session
@@ -32,7 +58,8 @@ from polygon import RESTClient
 # alpha-vantage source
 from alpha_vantage.foreignexchange import ForeignExchange as av_FX_reader
  
-from .common import * 
+from .common import *
+from ..config import read_config_file 
 
 # constants
 READ_RETRY_COUNT = 2 
@@ -51,8 +78,7 @@ __all__ = ['realtime_manager']
 class realtime_manager:
     
     # interface parameters
-    av_api_key      : str = field(validator=validators.instance_of(str))
-    poly_api_key    : str = field(validator=validators.instance_of(str),
+    providers_key   : dict = field(validator=validators.instance_of(dict),
                                   init=False)
     # interface parameters
     config_file     : str = field(default=None,
@@ -61,13 +87,15 @@ class realtime_manager:
                               validator=validators.instance_of(str))
     data_filetype   : str = field(default='parquet',
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
-    data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
+    data_path       : str = field(default=Path(DEFAULT_PATHS.REALTIME_DATA_PATH),
                               validator=validator_dir_path)
     engine          : str = field(default='pandas',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
     
     # internal parameters
-    _db_dict = field(factory=dotty, validator=validators.instance_of(Dotty))
+    _db_dict        = field(factory=dotty,
+                            validator=validators.instance_of(Dotty))
+    _dataframe_type = field(default=pandas_dataframe)
     
     
     # if a valid config file is passed
@@ -83,7 +111,7 @@ class realtime_manager:
         
     def __init__(self, **kwargs):
             
-        _class_attributes_name = _get_attrs_names(self, **kwargs)
+        _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
         
         if kwargs['config_file']:
@@ -199,7 +227,15 @@ class realtime_manager:
         self.ticker = self.ticker.upper()
         
         # files details variable initialization
-        self.data_path = Path(self.data_path)         
+        self.data_path = Path(self.data_path)    
+        
+        if self.engine == 'pandas':
+            
+            self._dataframe_type = pandas_dataframe 
+
+        elif self.engine == 'polars':
+            
+            self._dataframe_type = polars_dataframe
     
 
     def tickers_list(self, 
@@ -360,41 +396,50 @@ class realtime_manager:
                             & (daily_df.index <= day_end)].astype(DTYPE_DICT.TF_DTYPE)
 
 
-    def _parse_time_window_data(self, 
-                                raw_window_data,
-                                data_provider):
+    def _parse_aggs_data(self, 
+                         data,
+                         data_provider,
+                         engine='polars'):
         
-        # parse raw data and format data as common defined 
-        data_df = raw_window_data.copy()
+        if engine == 'pandas':
         
-        # keep base data columns
-        extra_columns = list(set(data_df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
-        data_df.drop(extra_columns, axis=1, inplace=True)
-        
-        # set index as timestamp datetime64
-        data_df.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP, \
-                          inplace = True)
-        
-        if data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
+            # parse data and format data as common defined 
+            data_df = pandas_dataframe(data)
             
-            data_df.index = any_date_to_datetime64(data_df.index,
-                                                   unit='ms')
+            # keep base data columns
+            extra_columns = list(set(data_df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
+            data_df.drop(extra_columns, axis=1, inplace=True)
             
-        elif data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+            # set index as timestamp datetime64
+            data_df.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP, \
+                              inplace = True)
             
-            # TODO
-            pass
+            if data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
+                
+                data_df.index = any_date_to_datetime64(data_df.index,
+                                                       unit='ms')
+                
+            elif data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+                
+                # TODO
+                pass
+        
+        elif engine == 'polars':
+            
+            data_df = polars_dataframe(data)
+            
+        
         
         # convert to conventional dtype
-        data_df = data_df.astype(DTYPE_DICT.TF_DTYPE)
-        
+        data_df = astype(data_df, DTYPE_DICT.TIME_TF_DTYPE)
+            
         return data_df
     
     
-    def get_time_window_data(self, 
-                             start=None, 
-                             end=None, 
-                             timeframe=None):
+    def get_data(self, 
+                 start=None, 
+                 end=None, 
+                 timeframe=None):
         """
          
         
@@ -465,19 +510,18 @@ class realtime_manager:
                 poly_aggs.append(a)
         
             
-            # parse response
-            data_df = pd.DataFrame(poly_aggs)
             data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO
         
-        window_data = self._parse_time_window_data(data_df,
-                                                   data_provider)
+        df = self._parse_aggs_data(poly_aggs,
+                                   data_provider,
+                                   engine=self.engine)
         
         if check_timeframe_str(timeframe):
         
-            return reframe_data(window_data, timeframe)
+            return reframe_data(df, timeframe)
         
         else:
         
-            return window_data
+            return df
     
     
