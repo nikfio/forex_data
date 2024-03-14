@@ -6,7 +6,8 @@ Created on Sat Jul 16 01:31:35 2022
 """
 
 __all__ = ['common',
-           'historical_manager']
+           'historical_manager',
+           'realtime_manager']
 
 from . import common
 from .common import *
@@ -14,5 +15,5 @@ from .common import *
 from . import data_manager
 from .data_manager import *
 
-from .historicaldata import *
-from .realtimedata import *
+from .historicaldata import historical_manager
+from .realtimedata import realtime_manager

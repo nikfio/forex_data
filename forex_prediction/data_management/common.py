@@ -74,6 +74,8 @@ from attrs import (
     )
 
 # common functions, constants and templates
+TEMP_FOLDER                     = "Temp"
+TEMP_CSV_FILE                   = "Temp.csv"
 
 HISTDATA_URL_TICKDATA_TEMPLATE  = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
                                   'ascii/tick-data-quotes/{ticker}/{year}/{month_num}'
@@ -215,7 +217,7 @@ class CANONICAL_INDEX:
     AV_DF_DATA_INDEX        = 0
     AV_DICT_INFO_INDEX      = 1    
 
-        
+
     
 ### auxiliary fast functions
 
@@ -708,8 +710,34 @@ def reframe_data(dataframe, tf):
     
     if isinstance(dataframe, pandas_dataframe):
         
-        assert is_datetime64_any_dtype(dataframe.index), \
-            'data index column must be datetime dtype'
+        if not is_datetime64_any_dtype(dataframe.index):
+            
+            if BASE_DATA_COLUMN_NAME.TIMESTAMP in dataframe.columns:
+                
+                if not is_datetime64_any_dtype(dataframe[BASE_DATA_COLUMN_NAME.TIMESTAMP]):
+                    
+                    try:
+                        
+                        dataframe[BASE_DATA_COLUMN_NAME.TIMESTAMP] = \
+                            any_date_to_datetime64(dataframe[BASE_DATA_COLUMN_NAME.TIMESTAMP])
+                            
+                    except Exception as e:
+                        
+                        raise TypeError('Pandas engine: '
+                                        'Failed conversion of timestamp columns '
+                                        'to DatetimeIndex')
+                        
+                        
+                dataframe.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                    inplace=True,
+                                    drop=True)
+                
+            else:
+                
+                raise ValueError(
+                    'Pandas engine: required column with '
+                    f'name {BASE_DATA_COLUMN_NAME.TIMESTAMP}'
+                )
         
         ## use pandas functions to reframe data on pandas Dataframe
         
@@ -718,21 +746,23 @@ def reframe_data(dataframe, tf):
                 for col in dataframe.columns]):
             
             # resample along 'p' column, data in ask, bid, p format
-            return dataframe.p.resample(tf).ohlc().interpolate(method=
-                                                          'nearest')
+            df =  dataframe.p.resample(tf).ohlc().interpolate(method=
+                                                              'nearest')
             
         elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
                   for col in dataframe.columns]): 
             
             # resample along given data already in ohlc format
-            return dataframe.resample(tf).interpolate(method=
-                                                      'nearest')
+            df = dataframe.resample(tf).interpolate(method=
+                                                    'nearest')
             
         else:
             
             raise ValueError(f'data columns {dataframe.columns} invalid, '
                              f'required {DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX} '
                              f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
+            
+        return df.reset_index(drop=False)
             
     elif isinstance(dataframe, Table):
         

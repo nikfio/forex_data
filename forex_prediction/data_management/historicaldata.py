@@ -11,7 +11,8 @@ from attrs import (
 
 # PANDAS
 from pandas import (
-                    DataFrame as pandas_dataframe
+                    DataFrame as pandas_dataframe,
+                    read_csv as pandas_read_csv
     )
 
 # PYARROW
@@ -529,7 +530,10 @@ class historical_manager:
             'timeframe completing operation NOT OK'
 
 
-    def _raw_zipfile_to_df(self, raw_file, engine='polars'):
+    def _raw_zipfile_to_df(self, 
+                           raw_file,
+                           temp_filepath,
+                           engine='polars'):
         """
 
 
@@ -544,20 +548,21 @@ class historical_manager:
 
         """
 
-        if engine == 'python':
+        if engine == 'pandas':
         
             # pandas with python engine can read a runtime opened
             # zip file
         
             # funtions is specific for format of files downloaded
             # parse file passed as input
-            df = read_csv(  raw_file,
-                            sep=',',
-                            names=DATA_COLUMN_NAMES.TICK_DATA,
-                            dtype=DTYPE_DICT.TICK_DTYPE,
-                            parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
-                            date_format=DATE_FORMAT_HISTDATA_CSV,
-                            engine = 'python'
+            df = pandas_read_csv(  
+                raw_file,
+                sep=',',
+                names=DATA_COLUMN_NAMES.TICK_DATA,
+                dtype=DTYPE_DICT.TICK_DTYPE,
+                parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
+                date_format=DATE_FORMAT_HISTDATA_CSV,
+                engine = 'python'
             )
             
             # calculate 'p'
@@ -573,18 +578,18 @@ class historical_manager:
             
             # alternative using pyarrow
             buf = BufferReader(raw_file.read())
-            tempdir_path = self.data_path / 'Temp'
+            tempdir_path = Path(temp_filepath).parent
             # create temperary files directory if not present
             tempdir_path.mkdir(exist_ok=True)
             # download buffer to file
-            buf.download(str(tempdir_path)+'\\temp.csv')
+            buf.download(temp_filepath)
             
             # from histdata raw files column 'p' is not present
             raw_file_dtypes = DTYPE_DICT.TICK_DTYPE.copy()
             raw_file_dtypes.pop('p')
                         
             # read temporary csv file
-            df = read_csv(  str(tempdir_path)+'\\temp.csv',
+            df = read_csv(  temp_filepath,
                             sep=',',
                             index_col=0,
                             names=DATA_COLUMN_NAMES.TICK_DATA,
@@ -610,11 +615,11 @@ class historical_manager:
             
             # alternative using pyarrow
             buf = BufferReader(raw_file.read())
-            tempdir_path = self.data_path / 'Temp'
+            tempdir_path = Path(temp_filepath).parent
             # create temperary files directory if not present
             tempdir_path.mkdir(exist_ok=True)
             # download buffer to file
-            buf.download(str(tempdir_path)+'\\temp.csv')
+            buf.download(temp_filepath)
             
             # from histdata raw files column 'p' is not present
             raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
@@ -623,7 +628,7 @@ class historical_manager:
             
             # read file
             # set schema for columns but avoid timestamp columns
-            df = polars_read_csv(str(tempdir_path)+'\\temp.csv',
+            df = polars_read_csv(temp_filepath,
                                  separator  = ',',
                                  has_header = False,
                                  new_columns = DATA_COLUMN_NAMES.TICK_DATA,
@@ -645,7 +650,10 @@ class historical_manager:
                     ( (col('ask') + col('bid')) / 2).alias('p') 
                  ) 
         
-        
+        else:
+            
+            raise TypeError(f'Engine {engine} is not supported')
+            
         return df
 
 
@@ -778,12 +786,21 @@ class historical_manager:
                                         month_num=month_num)
             
             file = self._download_month_raw(url, year, month_num)
+            
             if file:
-                month_data = self._raw_zipfile_to_df(file)                 
-                year_tick_df = concat_data([year_tick_df, 
-                                            month_data])    
                 
-
+                month_data = self._raw_zipfile_to_df(file,
+                                                     str(self.data_path 
+                                                         / TEMP_FOLDER
+                                                         / TEMP_CSV_FILE),
+                                                     engine = self.engine
+                )
+                 
+                year_tick_df = concat_data([year_tick_df, month_data])
+                
+                    
+        (self.data_path / TEMP_FOLDER / TEMP_CSV_FILE).unlink(missing_ok=True)
+            
         return year_tick_df
 
 
@@ -1133,8 +1150,11 @@ class historical_manager:
             # return data slice
             if self.engine == 'pandas':
             
-                data_df = data_df[(data_df.index >= start)
-                                  & (data_df.index <= end)].copy()
+                data_df = data_df[(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP]
+                                   >= start)
+                                  & 
+                                  (data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP]
+                                   <= end)].copy()
             
             elif self.engine == 'polars':
                 
