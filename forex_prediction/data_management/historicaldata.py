@@ -68,20 +68,9 @@ from .common import *
 from ..config import read_config_file
 
 
-
 __all__ = ['historical_manager']
 
-def _get_attrs_names(instance_object, **kwargs):
-    
-    if hasattr(instance_object, '__attrs_attrs__'):
-        
-        return [attr.name 
-                for attr in instance_object.__attrs_attrs__]
-        
-    else:
-        
-        raise KeyError('attribute "__attrs__attrs__" not found in '
-                       f'object {self}')
+
     
 
 # HISTORICAL DATA MANAGER
@@ -120,7 +109,7 @@ class historical_manager:
         
     def __init__(self, **kwargs):
             
-        _class_attributes_name = _get_attrs_names(self, **kwargs)
+        _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
         
         if kwargs['config_file']:

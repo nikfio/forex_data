@@ -901,7 +901,9 @@ def get_dotty_key_parent(key):
 #       given level
         
         
-### ATTRS ADDED VALIDATORS
+### ATTRS 
+
+## ADDED VALIDATORS
 
 def validator_dir_path(instance, attribute, value):
     
@@ -965,11 +967,24 @@ def validator_list_ge(min_value):
             raise ValueError(f'Values in {attribute}: {fails} '
                              f'are not greater than {min_value}')
     
+## ATTRIBUTES
+
+def get_attrs_names(instance_object, **kwargs):
     
-    
+    if hasattr(instance_object, '__attrs_attrs__'):
+        
+        return [attr.name 
+                for attr in instance_object.__attrs_attrs__]
+        
+    else:
+        
+        raise KeyError('attribute "__attrs__attrs__" not found in '
+                       f'object {instance_object}')
+        
 # GENERIC UTILITIES
 
 def list_remove_duplicates(list_in):
     
     return list(dict.fromkeys(list_in))
+
     

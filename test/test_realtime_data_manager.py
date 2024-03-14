@@ -20,25 +20,17 @@ from pandas import (
                     )
 # custom lib
 from forex_prediction import (
-                              db_parameters,
-                              db_manager,
+                              realtime_manager,
                               read_config_file
-                              )
+                          )
 
 
 def main():
     
-    # load settings parameters
-    config_set = read_config_file(r'C:\Database\settings\general_config.yaml')
-    
-    # realtime manager instantiation
-    rt_param = db_parameters(
-                             pair            = config_set['PAIR'],
-                             timeframe       = config_set['TIMEFRAME'],
-                             av_api_key      = config_set['DATA_PROVIDER_KEY']['ALPHA_VANTAGE_KEY'], 
-                             poly_api_key    = config_set['DATA_PROVIDER_KEY']['POLYGON_IO_KEY'])
-    
-    test_rt_data_manager = db_manager(rt_param)
+    realtimedata_manager = realtime_manager(
+                            ticker = 'NZDUSD',
+                            config_file = r'C:/Projects/forex_prediction_project/appconfig/config.yaml'
+    )
     
     # input test request definition
     test_day_end     = '2022-03-26'
@@ -54,32 +46,32 @@ def main():
     # required subscription
     # current_quote = test_rt_data_manager.get_realtime_quote() 
     # print(f'Realtime current quote: {current_quote}')
-    
+    '''
     # get last close on daily basis
     dayclose_quote = \
-        test_rt_data_manager.get_realtime_daily_close(last_close=True)
+        realtimedata_manager.get_realtime_daily_close(last_close=True)
     
     print(f'Real time daily close quote {dayclose_quote}')
     
     # test time window data function with daily resolution
     window_daily_ohlc = \
-        test_rt_data_manager.get_realtime_daily_close(recent_days_window=test_n_days)
+        realtimedata_manager.get_realtime_daily_close(recent_days_window=test_n_days)
     
     print(f'Last {test_n_days} window data: {window_daily_ohlc}')
                                                                        
     # test start-end window data function with daily resolution
     window_limits_daily_ohlc = \
-        test_rt_data_manager.get_realtime_daily_close(day_start=test_day_start,
+        realtimedata_manager.get_realtime_daily_close(day_start=test_day_start,
                                                       day_end=test_day_end)
      
     print(f'From {test_day_start} to {test_day_end} ' 
           f'window data: {window_limits_daily_ohlc}')
-    
+    '''
     # test time window data function with timeframe resolution
     window_data_ohlc = \
-        test_rt_data_manager.get_realtime_window_data(start     = test_day_start,
-                                                      end       = test_day_end,
-                                                      timeframe = test_timeframe)
+        realtimedata_manager.get_data(  start     = test_day_start,
+                                        end       = test_day_end,
+                                        timeframe = test_timeframe)
     
     print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     
@@ -88,9 +80,9 @@ def main():
     test_day_end   = Timestamp.now() - Timedelta('1h')
     
     window_data_ohlc = \
-        test_rt_data_manager.get_realtime_window_data(start     = test_day_start,
-                                                      end       = test_day_end,
-                                                      timeframe = test_timeframe)
+        realtimedata_manager.get_data(  start     = test_day_start,
+                                        end       = test_day_end,
+                                        timeframe = test_timeframe)
     
     print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     
