@@ -710,6 +710,10 @@ def reframe_data(dataframe, tf):
     
     if isinstance(dataframe, pandas_dataframe):
         
+        if dataframe.empty:
+            
+            return dataframe 
+        
         if not is_datetime64_any_dtype(dataframe.index):
             
             if BASE_DATA_COLUMN_NAME.TIMESTAMP in dataframe.columns:
@@ -773,16 +777,42 @@ def reframe_data(dataframe, tf):
     
     elif isinstance(dataframe, polars_dataframe):
         
+        if dataframe.is_empty():
+            
+            return dataframe
+        
         tf = tf.lower()
         
         dataframe = dataframe.sort('timestamp', nulls_last=True)
-        return dataframe.group_by_dynamic(
-                BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                every=tf).agg(col('p').first().alias('open'),
-                              col('p').max().alias('high'),
-                              col('p').min().alias('low'),
-                              col('p').last().alias('close') 
-                )
+        
+        if all([col in DATA_COLUMN_NAMES.TICK_DATA
+                for col in dataframe.columns]):
+            
+            return dataframe.group_by_dynamic(
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    every=tf).agg(col('p').first().alias(BASE_DATA_COLUMN_NAME.OPEN),
+                                  col('p').max().alias(BASE_DATA_COLUMN_NAME.HIGH),
+                                  col('p').min().alias(BASE_DATA_COLUMN_NAME.LOW),
+                                  col('p').last().alias(BASE_DATA_COLUMN_NAME.CLOSE) 
+            )
+                                  
+        elif all([col in DATA_COLUMN_NAMES.TF_DATA
+                for col in dataframe.columns]):
+            
+            return dataframe.group_by_dynamic(
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    every=tf).agg(col(BASE_DATA_COLUMN_NAME.OPEN).first(),
+                                  col(BASE_DATA_COLUMN_NAME.HIGH).max(),
+                                  col(BASE_DATA_COLUMN_NAME.LOW).min(),
+                                  col(BASE_DATA_COLUMN_NAME.CLOSE).last()
+                  )
+        
+        else:
+            
+            raise ValueError(f'data columns {dataframe.columns} invalid, '
+                             f'required {DATA_COLUMN_NAMES.TICK_DATA} '
+                             f'or {DATA_COLUMN_NAMES.TF_DATA}')
+
 
 ### UTILS FOR DOTTY DICTIONARY
 

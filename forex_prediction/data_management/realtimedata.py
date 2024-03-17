@@ -29,8 +29,9 @@ from pyarrow import (
 # POLARS
 from polars import (
                     String as polars_string,
+                    read_csv as polars_read_csv,
                     col,
-                    read_csv as polars_read_csv
+                    from_epoch 
     )
 
 from polars.dataframe import ( 
@@ -53,10 +54,10 @@ from dotty_dict import Dotty
 # external 
 
 # polygon-io source
-from polygon import RESTClient
+from polygon import RESTClient as polygonio_client
 
 # alpha-vantage source
-from alpha_vantage.foreignexchange import ForeignExchange as av_FX_reader
+from alpha_vantage.foreignexchange import ForeignExchange as av_forex_client
  
 from .common import *
 from ..config import read_config_file 
@@ -78,8 +79,7 @@ __all__ = ['realtime_manager']
 class realtime_manager:
     
     # interface parameters
-    providers_key   : dict = field(validator=validators.instance_of(dict),
-                                  init=False)
+    providers_key   : dict = field(validator=validators.instance_of(dict))
     # interface parameters
     config_file     : str = field(default=None,
                               validator=validators.instance_of(str))
@@ -96,8 +96,11 @@ class realtime_manager:
     _db_dict        = field(factory=dotty,
                             validator=validators.instance_of(Dotty))
     _dataframe_type = field(default=pandas_dataframe)
-    
-    
+    _ticker_polygonio    = field(default='',
+                                 validator=validators.instance_of(str))
+    _ticker_alphavantage = field(default='',
+                                 validator=validators.instance_of(str))
+  
     # if a valid config file is passed
     # arguments contained are assigned here 
     # if instantiation passed values are present
@@ -236,8 +239,26 @@ class realtime_manager:
         elif self.engine == 'polars':
             
             self._dataframe_type = polars_dataframe
-    
 
+        # set ticker in polygon format
+        self._ticker_polygonio = to_source_symbol(
+                self.ticker,
+                REALTIME_DATA_PROVIDER.POLYGON_IO
+        )
+    
+    def _getClient(self, provider, **kwargs):
+        
+        if provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+            
+            pass
+            
+        elif provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
+            
+            return polygonio_client(api_key =
+                                    self.providers_key[POLY_IO_KEY_ENV])
+        
+        
+    
     def tickers_list(self, 
                      data_source, 
                      asset_class : Optional[ASSET_TYPE] = None):
@@ -404,20 +425,18 @@ class realtime_manager:
         if engine == 'pandas':
         
             # parse data and format data as common defined 
-            data_df = pandas_dataframe(data)
+            df = pandas_dataframe(data)
             
             # keep base data columns
             extra_columns = list(set(data_df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
             data_df.drop(extra_columns, axis=1, inplace=True)
             
-            # set index as timestamp datetime64
-            data_df.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP, \
-                              inplace = True)
-            
             if data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
                 
-                data_df.index = any_date_to_datetime64(data_df.index,
-                                                       unit='ms')
+                data_df.index = any_date_to_datetime64(
+                    data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                    unit='ms'
+                )
                 
             elif data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
                 
@@ -426,14 +445,23 @@ class realtime_manager:
         
         elif engine == 'polars':
             
-            data_df = polars_dataframe(data)
+            df = polars_dataframe(data)
             
+            extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA))
+            
+            df = df.drop(extra_columns)
+            
+            # convert timestamp column to datetime data type
+            df = df.with_columns(
+                    from_epoch(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                               time_unit='ms').alias(BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                )
         
         
         # convert to conventional dtype
-        data_df = astype(data_df, DTYPE_DICT.TIME_TF_DTYPE)
+        df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
             
-        return data_df
+        return df
     
     
     def get_data(self, 
@@ -470,7 +498,6 @@ class realtime_manager:
         start = any_date_to_datetime64(start)
         end = any_date_to_datetime64(end)
             
-        data_df = pd.DataFrame()
         data_provider = ''
         
         # try to get data with alpha_vantage if available
@@ -495,33 +522,42 @@ class realtime_manager:
         
         # if alpha vantage fails or it is not available 
         # --> polygon-ai is the backup provider
-        if data_df.empty:
         
+        avdata_valid = False
+        
+        if not avdata_valid:
+            
+            client = self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO)
+            
             poly_aggs = []
+            
+            # TODO: set up try-except with BadResponse to manage provider 
+            # subcription limitation
+            
             # using Polygon-io client
-            for a in self._poly_reader.list_aggs(   ticker      = self._pair_polygon, 
-                                                    multiplier  = 1, 
-                                                    timespan    = 'minute', 
-                                                    from_       = start,
-                                                    to          = end,
-                                                    adjusted    = True,
-                                                    sort        = 'asc' ):
+            for a in client.list_aggs(  ticker      = self._ticker_polygonio, 
+                                        multiplier  = 1, 
+                                        timespan    = 'minute', 
+                                        from_       = start,
+                                        to          = end,
+                                        adjusted    = True,
+                                        sort        = 'asc' ):
                 
                 poly_aggs.append(a)
         
             
-            data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO
+        data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO
         
-        df = self._parse_aggs_data(poly_aggs,
-                                   data_provider,
-                                   engine=self.engine)
+        data_df = self._parse_aggs_data(poly_aggs,
+                                        data_provider,
+                                        engine=self.engine)
         
         if check_timeframe_str(timeframe):
         
-            return reframe_data(df, timeframe)
+            return reframe_data(data_df, timeframe)
         
         else:
         
-            return df
+            return data_df
     
     

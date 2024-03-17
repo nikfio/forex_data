@@ -629,10 +629,13 @@ class historical_manager:
             if not dict(df.schema) == raw_file_dtypes:
                 df = df.cast(raw_file_dtypes)
             
-            # fix timestamp column data type
+            # convert timestamp column to datetime data type
             df = df.with_columns(
-                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(polars_datetime('ms'), 
-                                                                  format=DATE_FORMAT_HISTDATA_CSV))
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        polars_datetime('ms'), 
+                        format=DATE_FORMAT_HISTDATA_CSV
+                    )
+                )
     
             # calculate 'p'
             df = df.with_columns(
