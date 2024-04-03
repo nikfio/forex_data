@@ -5,6 +5,13 @@ Created on Sat Apr 30 09:23:19 2022
 @author: fiora
 """
 
+__all__ = [
+            'BASE_DATA_COLUMN_NAME'
+    ]
+
+
+from platform import platform
+
 from re import ( 
                 fullmatch,
                 findall,
@@ -20,7 +27,8 @@ from pandas import (
                 bdate_range,
                 to_datetime,
                 Timedelta,
-                read_parquet as pandas_read_parquet
+                read_parquet as pandas_read_parquet,
+                read_csv as pandas_read_csv
     )
 
 from pandas.api.types import is_datetime64_any_dtype
@@ -143,10 +151,20 @@ class FILENAME_TEMPLATE:
     FILETYPE_INDEX          = 3
 
 # default path to store data in locally
-class DEFAULT_PATHS:
+if search('windows', platform()):
     
-    HIST_DATA_PATH     = "C:/Database/Historical"
-    REALTIME_DATA_PATH = "C:/Database/RealTime"
+    class DEFAULT_PATHS:
+        
+        HIST_DATA_PATH     = "~/.Database/Historical"
+        REALTIME_DATA_PATH = "~/.Database/RealTime"
+        
+else:
+    
+    class DEFAULT_PATHS:
+        
+        HIST_DATA_PATH     = "~/.Database/Historical"
+        REALTIME_DATA_PATH = "~/.Database/RealTime"
+    
     
 class DATA_FILE_TYPE:
     
@@ -619,7 +637,70 @@ def write_parquet(dataframe, filepath):
                          ' for instance of type'
                          f' {type(dataframe)}')
 
-# MOD: create read/write also for csv files 
+
+def read_csv(engine, file, **kwargs):
+    
+    if engine == 'pandas':
+        
+        return pandas_read_csv(file, **kwargs)
+    
+    elif engine == 'pyarrow':
+        
+        return arrow_csv.read_csv(file, **kwargs)
+    
+    elif engine == 'polars':
+    
+        return polars_read_csv(file, **kwargs)
+    
+    else:
+        
+        raise ValueError('function read_csv not available'
+                         f' for engine {engine}')
+        
+
+def write_csv(dataframe, file, **kwargs):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        try:
+            
+            dataframe.to_csv(file, 
+                             header=True,
+                             **kwargs)
+            
+        except Exception as e:
+            
+            raise IOError(f'Error writing csv file {file}'
+                          f' with data type {type(dataframe)}: {e}')
+    
+    elif isinstance(dataframe, Table):
+        
+        try:
+            
+            arrow_csv.write_csv(dataframe, file, **kwargs)
+            
+        except Exception as e:
+            
+            raise IOError(f'Error writing csv file {file}'
+                          f' with data type {type(dataframe)}: {e}')
+    
+    elif isinstance(dataframe, polars_dataframe):
+        
+        try:
+            
+           dataframe.write_csv(file, **kwargs)
+            
+        except Exception as e:
+            
+            raise IOError(f'Error writing csv file {file}'
+                          f' with data type {type(dataframe)}: {e}')
+    
+    else:
+        
+        raise ValueError('function write_csv not available'
+                         ' for instance of type'
+                         f' {type(dataframe)}')
+
 
 def concat_data(data_list = field(validator=
                                   validators.instance_of(list))):

@@ -10,6 +10,20 @@ import yaml
 from pathlib import Path
 
 
+appconfig_folder = Path(__file__).parent / 'appconfig'
+
+# search for config file
+
+appconfig_filepath = list(appconfig_folder.glob('appconfig.yaml'))
+
+if ( 
+    bool(appconfig_filepath)
+    and
+    len(appconfig_filepath)
+    ):
+    
+    APPCONFIG_YAML = str(appconfig_filepath.absolute())
+
 def read_config_file(config_file):
     
     # assert compliant filepath 

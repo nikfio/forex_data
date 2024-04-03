@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "forex-prediction"
+name = "forex_data"
 version = "0.1.0"
-description = "Tools to enable management of forex data on multiple timeframes at the same time and prediction algorithms following reinforcement learning paradigm"
+description = "Tools to enable management of forex data on multiple timeframes at the same time, via historical data data provider or real time provider"
 authors = ["Nicola Fiorato <fiorato.nicola@gmail.com>"]
 license = "GPL"
 readme = "README.md"
-packages = [{include = "forex_prediction"}]
+packages = [{include = "forex_data"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9.*, <=3.10.13"
