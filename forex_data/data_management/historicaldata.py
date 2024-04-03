@@ -79,11 +79,11 @@ class historical_manager:
     
     # interface parameters
     config_file     : str = field(default=None,
-                              validator=validators.instance_of(str))
+                                  validator=validators.instance_of(str))
     ticker          : str = field(default=None,
-                              validator=validators.instance_of(str))
+                                  validator=validators.instance_of(str))
     data_filetype   : str = field(default='parquet',
-                                 validator=validators.in_(SUPPORTED_DATA_FILES))
+                                  validator=validators.in_(SUPPORTED_DATA_FILES))
     data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
                               validator=validator_dir_path)
     engine          : str = field(default='pandas',
@@ -226,6 +226,15 @@ class historical_manager:
         
         # files details variable initialization
         self.data_path = Path(self.data_path)
+        
+        if ( 
+            not self.data_path.is_dir() 
+            or
+            not self.data_path.exists()
+            ):
+                    
+            self.data_path.mkdir(parents=True,
+                                 exist_ok=True)
         
         if self.engine == 'pandas':
             
@@ -544,14 +553,14 @@ class historical_manager:
         
             # funtions is specific for format of files downloaded
             # parse file passed as input
-            df = pandas_read_csv(  
-                raw_file,
-                sep=',',
-                names=DATA_COLUMN_NAMES.TICK_DATA,
-                dtype=DTYPE_DICT.TICK_DTYPE,
-                parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
-                date_format=DATE_FORMAT_HISTDATA_CSV,
-                engine = 'python'
+            df = read_csv(  
+                    raw_file,
+                    sep=',',
+                    names=DATA_COLUMN_NAMES.TICK_DATA,
+                    dtype=DTYPE_DICT.TICK_DTYPE,
+                    parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
+                    date_format=DATE_FORMAT_HISTDATA_CSV,
+                    engine = 'python'
             )
             
             # calculate 'p'
@@ -690,15 +699,16 @@ class historical_manager:
             
             # csv data files
             
-            # IMPORTANT
+            # IMPORTANT 
+            # pandas dataframe case
             # avoid date_format parameter since it is reported that
             # it makes to_csv to be excessively long with column data
             # being datetime data type
             # see: https://github.com/pandas-dev/pandas/issues/37484
             #      https://stackoverflow.com/questions/65903287/pandas-1-2-1-to-csv-performance-with-datetime-as-the-index-and-setting-date-form
-            year_data.to_csv(str(filepath.absolute()),
-                             index=True,
-                             header=True)
+            
+            write_csv(year_data, filepath)
+            
             
         elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
             
@@ -926,39 +936,54 @@ class historical_manager:
 
                     if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
                         
-                        # year requested: upload tick file if not already present
-                        if file_tf == TICK_TIMEFRAME \
-                                and self._db_dict.get(year_tf_key) is None:
-    
-                            # perform tick file upload
-    
-                            # use dask library as tick csv files can be very large
-                            # time gain is significative even compared to using
-                            # pandas read_csv with chunksize tuning
-                            dask_df = dd.read_csv(file,
-                                                  sep=',',
-                                                  header=0,
-                                                  dtype=DTYPE_DICT.TICK_DTYPE,
-                                                  parse_dates=['timestamp'],
-                                                  date_format=DATE_FORMAT_ISO8601)
-    
-                            self._db_dict[year_tf_key] = \
-                                dask_df.compute().set_index('timestamp')
-    
-                        # year requested: upload tf file if not already present
-                        #                 and tf is requested
-                        elif self._db_dict.get(year_tf_key) is None \
-                                and file_tf in self._tf_list:
-    
-                            self._db_dict[year_tf_key] = read_csv(
-                                file,
-                                sep=',',
-                                header=0,
-                                dtype=DTYPE_DICT.TF_DTYPE,
-                                index_col='timestamp',
-                                parse_dates=[
-                                    'timestamp'],
-                                date_format=DATE_FORMAT_ISO8601)
+                        if engine == 'pandas':
+                            
+                            # year requested: upload tick file if not already present
+                            if file_tf == TICK_TIMEFRAME \
+                                    and self._db_dict.get(year_tf_key) is None:
+        
+                                # perform tick file upload
+        
+                                # use dask library as tick csv files can be very large
+                                # time gain is significative even compared to using
+                                # pandas read_csv with chunksize tuning
+                                dask_df = dd.read_csv(file,
+                                                      sep=',',
+                                                      header=0,
+                                                      dtype=DTYPE_DICT.TICK_DTYPE,
+                                                      parse_dates=['timestamp'],
+                                                      date_format=DATE_FORMAT_ISO8601)
+        
+                                self._db_dict[year_tf_key] = \
+                                    dask_df.compute().set_index('timestamp')
+        
+                            # year requested: upload tf file if not already present
+                            #                 and tf is requested
+                            elif self._db_dict.get(year_tf_key) is None \
+                                    and file_tf in self._tf_list:
+        
+                                self._db_dict[year_tf_key] = \
+                                    read_csv(
+                                    file,
+                                    sep=',',
+                                    header=0,
+                                    dtype=DTYPE_DICT.TF_DTYPE,
+                                    index_col='timestamp',
+                                    parse_dates=[
+                                        'timestamp'],
+                                    date_format=DATE_FORMAT_ISO8601)
+                                
+                        elif engine == 'pyarrow':
+                            
+                            read_csv('pyarrow', file, separator=',')
+                            
+                        elif engine == 'polars':
+                            
+                            read_csv('polars', file)
+                            
+                        else:
+                            
+                            raise TypeError('')
                     
                     elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
                     
