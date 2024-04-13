@@ -12,8 +12,6 @@ __all__ = ['common',
 from . import common
 from .common import *
 
-from . import data_manager
-from .data_manager import *
-
 from .historicaldata import historical_manager
+
 from .realtimedata import realtime_manager
