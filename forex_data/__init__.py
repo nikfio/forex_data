@@ -6,16 +6,12 @@ Created on Sun Jul 17 17:07:39 2022
 """
 
 __all__ = ['datalib',
-           'agent',
            'data_management',
            'config' ]
 
 
 from . import data_management
 from .data_management import *
-
-from . import agent
-from .agent import *
 
 from . import config
 from .config import *

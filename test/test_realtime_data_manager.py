@@ -19,7 +19,7 @@ from pandas import (
                     Timedelta
                     )
 # custom lib
-from forex_prediction import (
+from forex_data import (
                               realtime_manager,
                               read_config_file
                           )
@@ -29,7 +29,7 @@ def main():
     
     realtimedata_manager = realtime_manager(
                             ticker = 'NZDUSD',
-                            config_file = r'C:/Projects/forex_prediction_project/appconfig/config.yaml'
+                            config_file = r'C:/Projects/forex_data/appconfig/config.yaml'
     )
     
     # input test request definition

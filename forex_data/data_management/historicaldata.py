@@ -4,34 +4,40 @@ import logging
 from attrs import ( 
                     define,
                     field,
-                    Factory,
                     validate,
                     validators
-                )
+    )
 
 # PANDAS
 from pandas import (
                     DataFrame as pandas_dataframe,
-                    read_csv as pandas_read_csv
+                    to_datetime
     )
 
 # PYARROW
 from pyarrow import (
-                    BufferReader
+                    int64 as pyarrow_int64,
+                    string as pyarrow_string,
+                    timestamp as pyarrow_timestamp,
+                    BufferReader,
+                    csv as arrow_csv,
+                    compute as pc,
+                    array as pyarrow_array,
+                    schema,
+                    Table,
+                    table as pyarrow_table,
+                    duration
     )
 
 # POLARS
 from polars import (
                     String as polars_string,
-                    col,
-                    read_csv as polars_read_csv
+                    col
     )
 
 from polars.dataframe import ( 
                     DataFrame as polars_dataframe
     )
-
-from datetime import datetime
 
 from zipfile import (
                     ZipFile,
@@ -39,7 +45,6 @@ from zipfile import (
                 )
 
 from re import (
-                findall,
                 search
             )
 
@@ -48,10 +53,6 @@ from mplfinance import (
                         show as mpf_show
                     )
 
-from re import (
-                search
-            )
-
 from numpy import array
 
 from pathlib import Path
@@ -59,7 +60,8 @@ from requests import Session
 from io import BytesIO
 from dask import dataframe as dd
 
-from dotty_dict import (Dotty, 
+from dotty_dict import (
+                        Dotty, 
                         dotty
                     )
 
@@ -70,8 +72,6 @@ from ..config import read_config_file
 
 __all__ = ['historical_manager']
 
-
-    
 
 # HISTORICAL DATA MANAGER
 @define(kw_only=True, slots=True)
@@ -85,7 +85,7 @@ class historical_manager:
     data_filetype   : str = field(default='parquet',
                                   validator=validators.in_(SUPPORTED_DATA_FILES))
     data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
-                              validator=validator_dir_path)
+                              validator=validator_dir_path(create_if_missing=True))
     engine          : str = field(default='pandas',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
     
@@ -240,6 +240,10 @@ class historical_manager:
             
             self._dataframe_type = pandas_dataframe 
 
+        elif self.engine == 'pyarrow':
+            
+            self._dataframe_type = pyarrow_table 
+            
         elif self.engine == 'polars':
             
             self._dataframe_type = polars_dataframe
@@ -369,7 +373,7 @@ class historical_manager:
                                                             year,
                                                             tf,
                                                             'df')),
-                           self._dataframe_type)
+                           type(self._dataframe_type([])))
                 for tf in self._tf_list
             ])
 
@@ -463,7 +467,7 @@ class historical_manager:
 
         if self._db_dict.get(year_tf_key) is None \
             or not isinstance(self._db_dict.get(year_tf_key),
-                              self._dataframe_type):
+                              type(self._dataframe_type([]))):
 
             # get tick key
             year_tick_key = self._db_key(self.ticker,
@@ -513,7 +517,7 @@ class historical_manager:
                                 in years_incomplete
                                 ]
 
-        aux_base_df = self._dataframe_type()
+        aux_base_df = self._dataframe_type([])
 
         # complete years reframing from tick/minimal timeframe data
         for year in incomplete_with_tick:
@@ -553,14 +557,16 @@ class historical_manager:
         
             # funtions is specific for format of files downloaded
             # parse file passed as input
+            
             df = read_csv(  
+                    'pandas',
                     raw_file,
                     sep=',',
-                    names=DATA_COLUMN_NAMES.TICK_DATA,
+                    names=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
                     dtype=DTYPE_DICT.TICK_DTYPE,
                     parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
                     date_format=DATE_FORMAT_HISTDATA_CSV,
-                    engine = 'python'
+                    engine = 'c'
             )
             
             # calculate 'p'
@@ -583,28 +589,102 @@ class historical_manager:
             buf.download(temp_filepath)
             
             # from histdata raw files column 'p' is not present
-            raw_file_dtypes = DTYPE_DICT.TICK_DTYPE.copy()
-            raw_file_dtypes.pop('p')
+            # raw_file_dtypes = DTYPE_DICT.TICK_DTYPE.copy()
+            # raw_file_dtypes.pop('p')
                         
             # read temporary csv file
-            df = read_csv(  temp_filepath,
-                            sep=',',
-                            index_col=0,
-                            names=DATA_COLUMN_NAMES.TICK_DATA,
-                            dtype=raw_file_dtypes,
-                            parse_dates=[0],
-                            date_format=DATE_FORMAT_HISTDATA_CSV,
-                            engine = 'pyarrow'
+            
+            # use panda read_csv an its options with 
+            # engine = 'pyarrow'
+            # dtype_backend = 'pyarrow'
+            # df = read_csv(  
+            #             'pyarrow',
+            #             temp_filepath,
+            #             sep=',',
+            #             index_col=0,
+            #             names=DATA_COLUMN_NAMES.TICK_DATA,
+            #             dtype=raw_file_dtypes,
+            #             parse_dates=[0],
+            #             date_format=DATE_FORMAT_HISTDATA_CSV,
+            #             engine = 'pyarrow',
+            #             dtype_backend = 'pyarrow'
+            # )
+            # perform step to convert index
+            # into a datetime64 dtype
+            # df.index = any_date_to_datetime64(df.index,
+            #                         date_format=DATE_FORMAT_HISTDATA_CSV,
+            #                         unit='ms')
+            
+            # use pyarrow native options
+            read_opts = arrow_csv.ReadOptions(
+                        use_threads  = True,
+                        column_names = DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
+                        
+                )
+            
+            parse_opts = arrow_csv.ParseOptions(
+                        delimiter = ','
+                )
+            
+            modtypes = PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy()
+            modtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = pyarrow_string()
+            modtypes.pop(BASE_DATA_COLUMN_NAME.P_VALUE)
+            
+            convert_opts = arrow_csv.ConvertOptions(
+                        column_types = modtypes
             )
             
-            # perform step to covnert index
-            # into a datetime64 dtype
-            df.index = any_date_to_datetime64(df.index,
-                                    date_format=DATE_FORMAT_HISTDATA_CSV,
-                                    unit='ms')
-                
+            # at first read file with timestmap as a string
+            df = read_csv(  
+                        'pyarrow',
+                        temp_filepath,
+                        read_options    = read_opts,
+                        parse_options   = parse_opts,
+                        convert_options = convert_opts
+            )
+            
+            
+            # convert timestamp  string array to pyarrow timestamp('ms')
+            
+            # pandas/numpy solution
+            # std_datetime = to_datetime(df[BASE_DATA_COLUMN_NAME.TIMESTAMP].to_numpy(), 
+            #                            format=DATE_FORMAT_HISTDATA_CSV)
+            
+            # timecol = pyarrow_array(std_datetime, 
+            #                        type=pyarrow_timestamp('ms'))
+            
+            # all pyarrow ops solution
+            # suggested here
+            # https://github.com/apache/arrow/issues/41132#issuecomment-2052555361
+            
+            mod_format = DATE_FORMAT_HISTDATA_CSV.removesuffix('%f')
+            ts2 = pc.strptime(pc.utf8_slice_codeunits(df[BASE_DATA_COLUMN_NAME.TIMESTAMP], 
+                                                      0,
+                                                      15),
+                              format=mod_format, 
+                              unit="ms")
+            d = pc.utf8_slice_codeunits(df[BASE_DATA_COLUMN_NAME.TIMESTAMP], 
+                                        15,
+                                        99).cast(pyarrow_int64()).cast(duration("ms"))
+            timecol = pc.add(ts2, d)
+            
             # calculate 'p'
-            df['p'] = (df['ask'] + df['bid']) / 2
+            p_value = pc.divide(
+                            pc.add_checked(df['ask'], df['bid']),
+                            2 
+                        )
+       
+            # aggregate in a new table
+            df = Table.from_arrays(
+                    [
+                        timecol,
+                        df[BASE_DATA_COLUMN_NAME.ASK],
+                        df[BASE_DATA_COLUMN_NAME.BID],
+                        df[BASE_DATA_COLUMN_NAME.VOL],
+                        p_value
+                    ],
+                    schema = schema(PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy().items())
+            )
             
         elif engine == 'polars':
             
@@ -626,17 +706,15 @@ class historical_manager:
             
             # read file
             # set schema for columns but avoid timestamp columns
-            df = polars_read_csv(temp_filepath,
-                                 separator  = ',',
-                                 has_header = False,
-                                 new_columns = DATA_COLUMN_NAMES.TICK_DATA,
-                                 schema      = raw_file_dtypes,
-                                 use_pyarrow = True
+            df = read_csv(
+                        'polars',
+                        temp_filepath,
+                        separator   = ',',
+                        has_header  = False,
+                        new_columns = DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
+                        schema      = raw_file_dtypes,
+                        use_pyarrow = True
             )
-            
-            # check schema, recall cast if needed
-            if not dict(df.schema) == raw_file_dtypes:
-                df = df.cast(raw_file_dtypes)
             
             # convert timestamp column to datetime data type
             df = df.with_columns(
@@ -650,11 +728,15 @@ class historical_manager:
             df = df.with_columns(
                     ( (col('ask') + col('bid')) / 2).alias('p') 
                  ) 
+            
+            # final cast to standard dtypes
+            df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
         
         else:
             
             raise TypeError(f'Engine {engine} is not supported')
             
+        # return dataframe
         return df
 
 
@@ -685,7 +767,8 @@ class historical_manager:
 
         # alternative: get year by referenced key
         year_tf_key = self._db_key(self.ticker, year, tf, 'df')
-        assert isinstance(self._db_dict.get(year_tf_key), self._dataframe_type), \
+        assert isinstance(self._db_dict.get(year_tf_key), 
+                          type(self._dataframe_type([]))), \
             'key %s is no valid DataFrame' % (year_tf_key)
         year_data = self._db_dict.get(year_tf_key)
 
@@ -697,22 +780,13 @@ class historical_manager:
 
         if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
             
-            # csv data files
-            
-            # IMPORTANT 
-            # pandas dataframe case
-            # avoid date_format parameter since it is reported that
-            # it makes to_csv to be excessively long with column data
-            # being datetime data type
-            # see: https://github.com/pandas-dev/pandas/issues/37484
-            #      https://stackoverflow.com/questions/65903287/pandas-1-2-1-to-csv-performance-with-datetime-as-the-index-and-setting-date-form
-            
+            # csv data file
             write_csv(year_data, filepath)
             
             
         elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
             
-            # parquet data files
+            # parquet data file
             write_parquet(year_data, str(filepath.absolute()))
             
 
@@ -768,7 +842,7 @@ class historical_manager:
                 # and if valid dataframe is currently loaded in database
                 if tf_filename not in local_files_name \
                    and isinstance(self._db_dict.get(tf_key),
-                                  self._dataframe_type):
+                                  type(self._dataframe_type([]))):
 
                     self._year_data_to_file(year,
                                             tf=tf,
@@ -777,7 +851,7 @@ class historical_manager:
 
     def _download_year(self, year):
 
-        year_tick_df = self._dataframe_type()        
+        year_tick_df = self._dataframe_type([])        
 
         for month in MONTHS:
 
@@ -798,7 +872,15 @@ class historical_manager:
                                                      engine = self.engine
                 )
                  
-                year_tick_df = concat_data([year_tick_df, month_data])
+                # if first iteration, assign isntead of concat
+                if is_empty_dataframe(year_tick_df):
+                    
+                    year_tick_df = month_data
+                    
+                else:
+                    
+                    year_tick_df = concat_data([year_tick_df, month_data])
+                    
                 
                     
         (self.data_path / TEMP_FOLDER / TEMP_CSV_FILE).unlink(missing_ok=True)
@@ -927,71 +1009,146 @@ class historical_manager:
                                           file_tf,
                                           'df')
 
-                # check if year is needed to be loaded
-                if file_ticker == self.ticker \
-                        and (int(file_year) in years_list):
+                if self._db_dict.get(year_tf_key) is None:
+                    
+                    # check if year is needed to be loaded
+                    if file_ticker == self.ticker \
+                            and (int(file_year) in years_list):
 
-                    if file_tf == TICK_TIMEFRAME:
-                        years_tick_files_found.append(file_year)
-
-                    if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
-                        
-                        if engine == 'pandas':
+                        if file_tf == TICK_TIMEFRAME:
+                            years_tick_files_found.append(file_year)
+    
+                        if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
                             
-                            # year requested: upload tick file if not already present
-                            if file_tf == TICK_TIMEFRAME \
-                                    and self._db_dict.get(year_tf_key) is None:
-        
-                                # perform tick file upload
-        
-                                # use dask library as tick csv files can be very large
-                                # time gain is significative even compared to using
-                                # pandas read_csv with chunksize tuning
-                                dask_df = dd.read_csv(file,
-                                                      sep=',',
-                                                      header=0,
-                                                      dtype=DTYPE_DICT.TICK_DTYPE,
-                                                      parse_dates=['timestamp'],
-                                                      date_format=DATE_FORMAT_ISO8601)
-        
-                                self._db_dict[year_tf_key] = \
-                                    dask_df.compute().set_index('timestamp')
-        
-                            # year requested: upload tf file if not already present
-                            #                 and tf is requested
-                            elif self._db_dict.get(year_tf_key) is None \
-                                    and file_tf in self._tf_list:
-        
-                                self._db_dict[year_tf_key] = \
-                                    read_csv(
-                                    file,
-                                    sep=',',
-                                    header=0,
-                                    dtype=DTYPE_DICT.TF_DTYPE,
-                                    index_col='timestamp',
-                                    parse_dates=[
-                                        'timestamp'],
-                                    date_format=DATE_FORMAT_ISO8601)
+                            if engine == 'pandas':
                                 
-                        elif engine == 'pyarrow':
+                                # tick data file 
+                                if file_tf == TICK_TIMEFRAME:
+            
+                                    # perform tick file upload
+            
+                                    # use dask library as tick csv files can be very large
+                                    # time gain is significative even compared to using
+                                    # pandas read_csv with chunksize tuning
+                                    dask_df = dd.read_csv(
+                                                file,
+                                                header=0,
+                                                names=DATA_COLUMN_NAMES.TICK_DATA,
+                                                dtype=DTYPE_DICT.TICK_DTYPE,
+                                                parse_dates=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                                date_format=DATE_FORMAT_ISO8601
+                                    )
+            
+                                    self._db_dict[year_tf_key] = \
+                                        dask_df.compute()
+            
+                                # year standard data file
+                                elif file_tf in self._tf_list:
+            
+                                    self._db_dict[year_tf_key] = \
+                                        read_csv(
+                                            'pandas',
+                                            file,
+                                            header=0,
+                                            names=DATA_COLUMN_NAMES.TF_DATA,
+                                            dtype=DTYPE_DICT.TF_DTYPE,
+                                            parse_dates=[
+                                                BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                            date_format=DATE_FORMAT_ISO8601,
+                                            engine='c'
+                                    )
+                                    
+                            elif engine == 'pyarrow':
+                                
+                                
+                                # use panda read_csv an its options with 
+                                # engine = 'pyarrow'
+                                # dtype_backend = 'pyarrow'
+                                # self._db_dict[year_tf_key] = \
+                                #     read_csv(  
+                                #        engine = 'pyarrow',
+                                #        dtype_backend = 'pyarrow'
+                                # )
+                                
+                                # use pyarrow native options
+                                read_opts = arrow_csv.ReadOptions(
+                                            use_threads  = True,
+                                            autogenerate_column_names = False
+                                            
+                                    )
+                                
+                                parse_opts = arrow_csv.ParseOptions(
+                                            delimiter = ','
+                                    )
+                                
+                                # tick data file 
+                                if file_tf == TICK_TIMEFRAME:
+                                    
+                                    convert_opts = arrow_csv.ConvertOptions(
+                                                column_types = PYARROW_DTYPE_DICT.TIME_TICK_DTYPE,
+                                                timestamp_parsers = [arrow_csv.ISO8601]
+                                        )
+                                 
+                                    
+                                elif file_tf in self._tf_list:
+                                    
+                                    convert_opts = arrow_csv.ConvertOptions(
+                                                column_types = PYARROW_DTYPE_DICT.TIME_TF_DTYPE,
+                                                timestamp_parsers = [arrow_csv.ISO8601]
+                                        )
+                                    
+                                
+                                self._db_dict[year_tf_key] = \
+                                    read_csv(  
+                                            'pyarrow',
+                                            file,
+                                            read_options    = read_opts,
+                                            parse_options   = parse_opts,
+                                            convert_options = convert_opts
+                                )
                             
-                            read_csv('pyarrow', file, separator=',')
-                            
-                        elif engine == 'polars':
-                            
-                            read_csv('polars', file)
+                            # year standard data file    
+                            elif engine == 'polars':
+                                
+                                # tick data file 
+                                if file_tf == TICK_TIMEFRAME:
+                                    
+                                    self._db_dict[year_tf_key] = \
+                                            read_csv('polars', 
+                                                     file,
+                                                     new_columns=DATA_COLUMN_NAMES.TICK_DATA,
+                                                     schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE,
+                                                     try_parse_dates=True
+                                            )
+                                                     
+                                elif file_tf in self._tf_list:
+                                    
+                                    self._db_dict[year_tf_key] = \
+                                            read_csv('polars', 
+                                                     file,
+                                                     new_columns=DATA_COLUMN_NAMES.TF_DATA,
+                                                     schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE,
+                                                     try_parse_dates=True
+                                            )
                             
                         else:
                             
-                            raise TypeError('')
+                            raise TypeError(f'Engine {engine}'
+                                            ' is not supported')
                     
                     elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
                     
                         self._db_dict[year_tf_key] = read_parquet(engine,
                                                                   file)
+                        
+                else:
+                    
+                    # continue as data is already present
+                    continue
                             
                         
-        # return list of years which tick file has been found and loaded
+        # return list of years which tick file 
+        # has been found and loaded
         return years_tick_files_found
     
 
@@ -1158,7 +1315,9 @@ class historical_manager:
                               and get_dotty_key_field(key, DATA_KEY.TF_INDEX) \
                                   == timeframe]
             
-        data_df = self._dataframe_type()
+        data_df = self._dataframe_type([])
+        
+        # TODO: do I have to return explicit copies of date sliced results?
         
         if len(interval_keys) == 1: 
 
@@ -1173,6 +1332,18 @@ class historical_manager:
                                   (data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP]
                                    <= end)].copy()
             
+            elif self.engine == 'pyarrow':
+                
+                mask = pc.and_(
+                            pc.greater(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                       start),
+                            pc.less(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                       end)
+                            )
+                
+                data_df = Table.from_arrays(data_df.filter(mask).columns,
+                                            schema=data_df.schema)
+                
             elif self.engine == 'polars':
                 
                 data_df = \
@@ -1215,6 +1386,18 @@ class historical_manager:
                             for key in interval_keys]
                 )
                 
+            elif self.engine == 'pyarrow':
+                
+                mask = pc.and_(
+                            pc.greater(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                       start),
+                            pc.less(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                       end)
+                            )
+                
+                data_df = Table.from_arrays(data_df.filter(mask).columns,
+                                            schema=data_df.schema)
+                 
             elif self.engine == 'polars':
             
                 # slice data using polars sintax:

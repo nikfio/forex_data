@@ -10,19 +10,24 @@ import yaml
 from pathlib import Path
 
 
-appconfig_folder = Path(__file__).parent / 'appconfig'
+appconfig_folder = Path(__file__).parent.parent.parent / 'appconfig'
 
 # search for config file
 
-appconfig_filepath = list(appconfig_folder.glob('appconfig.yaml'))
+appconfig_filepath = list(appconfig_folder.glob('*appconfig.yaml'))
 
 if ( 
     bool(appconfig_filepath)
     and
-    len(appconfig_filepath)
+    len(appconfig_filepath) == 1
     ):
     
-    APPCONFIG_YAML = str(appconfig_filepath.absolute())
+    APPCONFIG_YAML = str(appconfig_filepath[0])
+    
+else:
+    
+    APPCONFIG_YAML = ''
+
 
 def read_config_file(config_file):
     

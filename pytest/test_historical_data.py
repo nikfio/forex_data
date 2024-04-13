@@ -44,7 +44,8 @@ class TestHistData(unittest.TestCase):
             config_file=config_file_yaml
         )
         
-        self.assertEqual('EURUSD', histmanager.ticker,
+        self.assertEqual('EURUSD', 
+                         histmanager.ticker,
                          'Ticker parameter assignment from config file is invalid')
         
         
@@ -61,6 +62,8 @@ class TestHistData(unittest.TestCase):
         
         # historical manager instantiation                            
         histmanager = historical_manager(
+            ticker='USDJPY',
+            engine='pandas',
             config_file=config_file_yaml
         )
     
@@ -118,6 +121,12 @@ class TestHistData(unittest.TestCase):
         pass
         
         
-
+if __name__ == '__main__':
+    
+    histtest = TestHistData()
+    
+    histtest.test_with_config_file()
+    
+    histtest.test_instance_call_mod_from_config()
         
         

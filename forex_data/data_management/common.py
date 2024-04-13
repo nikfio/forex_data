@@ -5,9 +5,9 @@ Created on Sat Apr 30 09:23:19 2022
 @author: fiora
 """
 
-__all__ = [
-            'BASE_DATA_COLUMN_NAME'
-    ]
+# __all__ = [
+#             'BASE_DATA_COLUMN_NAME'
+#     ]
 
 
 from platform import platform
@@ -15,7 +15,8 @@ from platform import platform
 from re import ( 
                 fullmatch,
                 findall,
-                search
+                search,
+                IGNORECASE
     )
 
 # PANDAS
@@ -57,7 +58,8 @@ from polars import (
                 read_csv as polars_read_csv,
                 concat as polars_concat,
                 col,
-                read_parquet as polars_read_parquet
+                read_parquet as polars_read_parquet,
+                from_arrow
     )
 
 from polars.dataframe import ( 
@@ -150,20 +152,11 @@ class FILENAME_TEMPLATE:
     TF_INDEX                = 2
     FILETYPE_INDEX          = 3
 
-# default path to store data in locally
-if search('windows', platform()):
     
-    class DEFAULT_PATHS:
-        
-        HIST_DATA_PATH     = "~/.Database/Historical"
-        REALTIME_DATA_PATH = "~/.Database/RealTime"
-        
-else:
+class DEFAULT_PATHS:
     
-    class DEFAULT_PATHS:
-        
-        HIST_DATA_PATH     = "~/.Database/Historical"
-        REALTIME_DATA_PATH = "~/.Database/RealTime"
+    HIST_DATA_PATH     = str(Path.home() / '.database'/ 'Historical')
+    REALTIME_DATA_PATH = str(Path.home() / '.database'/ 'Realtime')
     
     
 class DATA_FILE_TYPE:
@@ -185,6 +178,7 @@ SUPPORTED_DATA_FILES = [
 # reframe_data() on pyarrow Table
 SUPPORTED_DATA_ENGINES = [
                             'pandas',
+                            'pyarrow',
                             'polars'
     ]
 
@@ -194,7 +188,8 @@ SUPPORTED_DATA_ENGINES = [
 # OHLC and related column names
 class DATA_COLUMN_NAMES:
     
-    TICK_DATA               = ['timestamp','ask','bid','vol']
+    TICK_DATA_NO_PVALUE     = ['timestamp','ask','bid','vol']
+    TICK_DATA               = ['timestamp','ask','bid','vol','p']
     TF_DATA                 = ['timestamp','open','high','low', 'close']
     TICK_DATA_TIME_INDEX    = ['ask','bid','vol','p']
     TF_DATA_TIME_INDEX      = ['open','high','low', 'close']             ## SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE          
@@ -228,6 +223,10 @@ class BASE_DATA_COLUMN_NAME:
     HIGH      = 'high'
     LOW       = 'low'
     CLOSE     = 'close'
+    ASK       = 'ask'
+    BID       = 'bid'
+    VOL       = 'vol'
+    P_VALUE   = 'p'
 
 class CANONICAL_INDEX:
 
@@ -480,7 +479,7 @@ def get_date_interval(start=None,
 ### depending on dataframe engine support
 ### for supported engines see var SUPPORTED_DATA_ENGINES
 
-# DATA TYPES DICTIONARY   
+# DATA ENGINES TYPES DICTIONARY   
 class DTYPE_DICT:
     
     TICK_DTYPE = {'ask': 'float32', 
@@ -544,18 +543,38 @@ class POLARS_DTYPE_DICT:
                        'low'        : polars_float32,
                        'close'      : polars_float32}
 
+# DATA ENGINES FUNCTIONS
 
+def empty_dataframe(dataframe_type):
+    
+    # TODO: based on input return an aempty instance of dataframe
+    pass
+
+
+def is_empty_dataframe(dataframe):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe.empty
+    
+    elif isinstance(dataframe, Table):
+        
+        return (not bool(dataframe)) 
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe.is_empty()
+    
+    else:
+        
+        raise ValueError('function is_empty_dataframe not available'
+                         ' for instance of type'
+                         f' {type(dataframe)}') 
+    
+    
 def dtype_dict_to_pyarrow_schema(dtype_dict):
     
-    schema_list = []
-    
-    for item in dtype_dict.items():
-    
-        schema_list.append(item)
-    
-    
-    return pyarrow_schema(schema_list)
-
+    return pyarrow_schema(dtype_dict.items())
 
     
 def astype(dataframe, dtype_dict):
@@ -638,24 +657,24 @@ def write_parquet(dataframe, filepath):
                          f' {type(dataframe)}')
 
 
-def read_csv(engine, file, **kwargs):
+def read_csv(data_engine, file, **kwargs):
     
-    if engine == 'pandas':
+    if data_engine == 'pandas':
         
         return pandas_read_csv(file, **kwargs)
     
-    elif engine == 'pyarrow':
+    elif data_engine == 'pyarrow':
         
         return arrow_csv.read_csv(file, **kwargs)
     
-    elif engine == 'polars':
+    elif data_engine == 'polars':
     
         return polars_read_csv(file, **kwargs)
     
     else:
         
         raise ValueError('function read_csv not available'
-                         f' for engine {engine}')
+                         f' for engine {data_engine}')
         
 
 def write_csv(dataframe, file, **kwargs):
@@ -663,6 +682,14 @@ def write_csv(dataframe, file, **kwargs):
     if isinstance(dataframe, pandas_dataframe):
         
         try:
+            
+            # IMPORTANT 
+            # pandas dataframe case
+            # avoid date_format parameter since it is reported that
+            # it makes to_csv to be excessively long with column data
+            # being datetime data type
+            # see: https://github.com/pandas-dev/pandas/issues/37484
+            #      https://stackoverflow.com/questions/65903287/pandas-1-2-1-to-csv-performance-with-datetime-as-the-index-and-setting-date-form
             
             dataframe.to_csv(file, 
                              header=True,
@@ -851,10 +878,42 @@ def reframe_data(dataframe, tf):
             
     elif isinstance(dataframe, Table):
         
-        # use pyarrow functions to reframe data on pyarrow Table
-        # could not find easy way to filter an arrow table
-        # based on time interval
-        pass
+        '''
+        
+            use pyarrow functions to reframe data on pyarrow Table
+            could not find easy way to filter an arrow table
+            based on time interval
+            
+            opened an enhancement issue on github
+          
+            https://github.com/apache/arrow/issues/41049
+            
+            As a temporary alternative, convert arrow Table to polars 
+            and perform reframe with polars engine
+          
+        '''
+        
+        if all([col in DATA_COLUMN_NAMES.TICK_DATA
+                for col in dataframe.column_names]):
+            
+            # convert to polars dataframe
+            df = from_arrow(dataframe, 
+                            schema = POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            
+            
+        
+        elif all([col in DATA_COLUMN_NAMES.TF_DATA
+                for col in dataframe.column_names]):
+            
+            # convert to polars dataframe
+            df = from_arrow(dataframe, 
+                            schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+            
+        
+        # perform operation
+        # convert to arrow Table and return
+        return reframe_data(df, tf).to_arrow()
+       
     
     elif isinstance(dataframe, polars_dataframe):
         
@@ -1016,15 +1075,25 @@ def get_dotty_key_parent(key):
 
 ## ADDED VALIDATORS
 
-def validator_dir_path(instance, attribute, value):
+def validator_dir_path(create_if_missing=False):
     
-    if not (
-        Path(value).exists()
-        and 
-        Path(value).is_dir()
-    ):
-        
-        raise ValueError('Required a valid directory path')
+    def validate_or_create_dir(instance, attribute, value):
+    
+        if create_if_missing:
+            
+            Path(value).mkdir(parents=True, exist_ok=True)
+            
+        else:
+            
+            if not (
+                Path(value).exists()
+                and 
+                Path(value).is_dir()
+            ):
+                
+                raise ValueError('Required a valid directory path')
+                
+    return validate_or_create_dir
         
               
 def validator_list_timeframe(instance, attribute, value):

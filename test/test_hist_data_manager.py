@@ -20,8 +20,9 @@ Description:
     
 """
 
-from forex_prediction import (
-                            historical_manager
+from forex_data import (
+                            historical_manager,
+                            APPCONFIG_YAML
                         )
 
 # TODO: add logging options via input FLAGS
@@ -32,22 +33,22 @@ def main():
     
     # historical manager instantiation                            
     histmanager = historical_manager(
-                    ticker='AUDUSD',
-                    config_file=r'C:/Projects/forex_prediction_project/appconfig/config.yaml'
+                    ticker='NZDUSD',
+                    config_file=APPCONFIG_YAML
     )
     
-    # example dates 
-    ex_start_date = '2008-10-03 10:00:00'
-    ex_end_date   = '2008-12-03 10:00:00'
+    # # example dates 
+    ex_start_date = '2009-10-03 10:00:00'
+    ex_end_date   = '2009-12-03 10:00:00'
     
-    # get data
+    # # get data
     yeardata = histmanager.get_data(timeframe = '1h',
                                     start     = ex_start_date,
                                     end       = ex_end_date
     )
                                         
     # add new timeframe
-    histmanager.add_timeframe('1W')
+    histmanager.add_timeframe('1W', update_data=True)
     
     # plot data 
     histmanager.plot( timeframe   = '1D',
