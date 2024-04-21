@@ -1501,8 +1501,11 @@ class historical_manager:
         # candlestick chart type
         # use mplfinance
         chart_kwargs = dict(style    = 'charles',
+                            title    = self.ticker,
+                            ylabel   = 'Quotation',
+                            xlabel   = 'Timestamp',
                             volume   = False,
-                            figratio = (10,8),
+                            figratio = (12,8),
                             figscale = 1
         )
         

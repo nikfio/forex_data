@@ -35,7 +35,6 @@ def main():
     # input test request definition
     test_day_start   = '2024-03-10'
     test_day_end     = '2024-03-26'
-    test_timeframe   = '1H'
     test_n_days      = 10
     
     # get last close on daily basis
@@ -59,6 +58,12 @@ def main():
           f'window data: {window_limits_daily_ohlc}')
     
     # test time window data function with timeframe resolution
+    
+    # input test request definition
+    test_day_start   = '2024-04-10'
+    test_day_end     = '2024-04-15'
+    test_timeframe   = '1h'
+    
     window_data_ohlc = \
         realtimedata_manager.get_data(  start     = test_day_start,
                                         end       = test_day_end,
@@ -67,8 +72,8 @@ def main():
     print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     
     # test time window data function with timeframe resolution: intraday case
-    test_day_start = Timestamp.now() - Timedelta('10h')
-    test_day_end   = Timestamp.now() - Timedelta('1h')
+    test_day_start = Timestamp.now() - Timedelta('5D')
+    test_day_end   = Timestamp.now() - Timedelta('2D')
     
     window_data_ohlc = \
         realtimedata_manager.get_data(  start     = test_day_start,

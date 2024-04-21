@@ -41,11 +41,13 @@ def main():
     ex_start_date = '2009-10-03 10:00:00'
     ex_end_date   = '2009-12-03 10:00:00'
     
-    # # get data
+    # get data
     yeardata = histmanager.get_data(timeframe = '1h',
                                     start     = ex_start_date,
                                     end       = ex_end_date
     )
+    
+    print(yeardata)
                                         
     # add new timeframe
     histmanager.add_timeframe('1W', update_data=True)
