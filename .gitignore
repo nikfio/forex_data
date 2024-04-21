@@ -4,5 +4,5 @@ saved_workspaces/
 issues/
 .vscode/
 notes/
-*.yaml
+appconfig.yaml
 test/test_dynamodb.py

@@ -2,63 +2,61 @@
 import logging
 
 from attrs import ( 
-                    define,
-                    field,
-                    validate,
-                    validators
+                define,
+                field,
+                validate,
+                validators
     )
 
 # PANDAS
 from pandas import (
-                    DataFrame as pandas_dataframe,
-                    to_datetime
+                DataFrame as pandas_dataframe,
+                to_datetime
     )
 
 # PYARROW
 from pyarrow import (
-                    int64 as pyarrow_int64,
-                    string as pyarrow_string,
-                    timestamp as pyarrow_timestamp,
-                    BufferReader,
-                    csv as arrow_csv,
-                    compute as pc,
-                    array as pyarrow_array,
-                    schema,
-                    Table,
-                    table as pyarrow_table,
-                    duration
+                int64 as pyarrow_int64,
+                string as pyarrow_string,
+                BufferReader,
+                csv as arrow_csv,
+                compute as pc,
+                schema,
+                Table,
+                table as pyarrow_table,
+                duration
     )
 
 # POLARS
 from polars import (
-                    String as polars_string,
-                    col
+                String as polars_string,
+                col
     )
 
 from polars.dataframe import ( 
-                    DataFrame as polars_dataframe
+                DataFrame as polars_dataframe
     )
 
 from zipfile import (
-                    ZipFile,
-                    BadZipFile
-                )
+                ZipFile,
+                BadZipFile
+    )
 
 from re import (
-                search
-            )
+                search,
+                match
+    )
 
 from mplfinance import (
-                        plot as mpf_plot,
-                        show as mpf_show
-                    )
+                plot as mpf_plot,
+                show as mpf_show
+    )
 
 from numpy import array
 
 from pathlib import Path
 from requests import Session
 from io import BytesIO
-from dask import dataframe as dd
 
 from dotty_dict import (
                         Dotty, 
@@ -67,7 +65,10 @@ from dotty_dict import (
 
 # internally defined
 from .common import *
-from ..config import read_config_file
+from ..config import ( 
+            read_config_file,
+            read_config_string
+        )
 
 
 __all__ = ['historical_manager']
@@ -96,7 +97,8 @@ class historical_manager:
     _tf_list = field(factory=list, validator=validators.instance_of(list))
     _dataframe_type = field(default=pandas_dataframe)
     
-    # if a valid config file is passed
+    # if a valid config file or string
+    # is passed
     # arguments contained are assigned here 
     # if instantiation passed values are present
     # they will override the related argument
@@ -105,7 +107,7 @@ class historical_manager:
     # if neither by instantation or config file
     # an argument value is set, the argument
     # will be set by asociated defined default 
-    # or factory
+    # or factory generator
         
     def __init__(self, **kwargs):
             
@@ -114,8 +116,9 @@ class historical_manager:
         
         if kwargs['config_file']:
             
-            self.config_file = kwargs['config_file']
+            
             config_path = Path(kwargs['config_file'])
+            config_args = {}
             if config_path.exists() \
                 and  \
                 config_path.is_file() \
@@ -127,87 +130,107 @@ class historical_manager:
                 config_args = {key.lower(): val for key, val in 
                                read_config_file(config_path.absolute()).items()
                                }
+            
+            elif isinstance(kwargs['config_file'], str):
                 
-                # set args from config file
-                attrs_keys_configfile = \
-                        set(_class_attributes_name).intersection(config_args.keys())
-                
-                for attr_key in attrs_keys_configfile:
-                    
-                    self.__setattr__(attr_key, 
-                                     config_args[attr_key])
-                    
-                    _not_assigned_attrs_index_mask[ 
-                           _class_attributes_name.index(attr_key)  
-                    ] = False
-                    
-                # set args from instantiation 
-                # override if attr already has a value from config
-                attrs_keys_input = \
-                        set(_class_attributes_name).intersection(kwargs.keys())
-                
-                for attr_key in attrs_keys_input:
-                    
-                    self.__setattr__(attr_key, 
-                                     kwargs[attr_key])
-                    
-                    _not_assigned_attrs_index_mask[ 
-                           _class_attributes_name.index(attr_key)  
-                    ] = False
-                
-                # attrs not present in config file or instance inputs
-                # --> self.attr leads to KeyError
-                # are manually assigned to default value derived
-                # from __attrs_attrs__
-                
-                for attr_key in array(_class_attributes_name)[
-                        _not_assigned_attrs_index_mask
-                ]:
-                    
-                    try:
-                        
-                        attr = [attr 
-                                for attr in self.__attrs_attrs__
-                                if attr.name == attr_key][0]
-                        
-                    except KeyError:
-                        
-                        logging.warning('KeyError: initializing object has no '
-                                        f'attribute {attr.name}')
-                        
-                    except IndexError:
-                        
-                        logging.warning('IndexError: initializing object has no '
-                                        f'attribute {attr.name}')
-                    
-                    else:
-                        
-                        # assign default value
-                        # try default and factory sabsequently
-                        # if neither are present
-                        # assign None
-                        if hasattr(attr, 'default'):
-                            
-                            if hasattr(attr.default, 'factory'): 
-                    
-                                self.__setattr__(attr.name, 
-                                                 attr.default.factory())
-                                
-                            else:
-                                
-                                self.__setattr__(attr.name, 
-                                                 attr.default)
-                            
-                        else:
-                                
-                            self.__setattr__(attr.name, 
-                                             None)
-                
+                # read parameters from config file 
+                # and force keys to lower case
+                config_args = {key.lower(): val for key, val in 
+                               read_config_string(kwargs['config_file']).items()
+                               }
                 
             else:
-                
-                raise ValueError('invalid config_file')
+            
+                raise TypeError('invalid config_file type '
+                                '{kwargs["config_file"]}')
                         
+            # check consistency of config_args
+            if  (
+                    not isinstance(config_args, dict)
+                    or
+                    not bool(config_args)
+                ):
+                
+                raise ValueError(f'config_file {kwargs["config_file"]} '
+                                 'has no valid yaml formatted data')
+            
+            self.config_file = kwargs['config_file']
+            
+            # set args from config file
+            attrs_keys_configfile = \
+                    set(_class_attributes_name).intersection(config_args.keys())
+            
+            for attr_key in attrs_keys_configfile:
+                
+                self.__setattr__(attr_key, 
+                                 config_args[attr_key])
+                
+                _not_assigned_attrs_index_mask[ 
+                       _class_attributes_name.index(attr_key)  
+                ] = False
+                
+            # set args from instantiation 
+            # override if attr already has a value from config
+            attrs_keys_input = \
+                    set(_class_attributes_name).intersection(kwargs.keys())
+            
+            for attr_key in attrs_keys_input:
+                
+                self.__setattr__(attr_key, 
+                                 kwargs[attr_key])
+                
+                _not_assigned_attrs_index_mask[ 
+                       _class_attributes_name.index(attr_key)  
+                ] = False
+            
+            # attrs not present in config file or instance inputs
+            # --> self.attr leads to KeyError
+            # are manually assigned to default value derived
+            # from __attrs_attrs__
+            
+            for attr_key in array(_class_attributes_name)[
+                    _not_assigned_attrs_index_mask
+            ]:
+                
+                try:
+                    
+                    attr = [attr 
+                            for attr in self.__attrs_attrs__
+                            if attr.name == attr_key][0]
+                    
+                except KeyError:
+                    
+                    logging.warning('KeyError: initializing object has no '
+                                    f'attribute {attr.name}')
+                    
+                except IndexError:
+                    
+                    logging.warning('IndexError: initializing object has no '
+                                    f'attribute {attr.name}')
+                
+                else:
+                    
+                    # assign default value
+                    # try default and factory sabsequently
+                    # if neither are present
+                    # assign None
+                    if hasattr(attr, 'default'):
+                        
+                        if hasattr(attr.default, 'factory'): 
+                
+                            self.__setattr__(attr.name, 
+                                             attr.default.factory())
+                            
+                        else:
+                            
+                            self.__setattr__(attr.name, 
+                                             attr.default)
+                        
+                    else:
+                            
+                        self.__setattr__(attr.name, 
+                                         None)
+            
         else:
             
             # no config file is defined
@@ -947,10 +970,13 @@ class historical_manager:
         else:
             
             # list all specifed ticker data files in folder path and subdirs
-            local_files = list(tickerfolder_path.glob(
-                f'**/{self.ticker}_*.{self.data_filetype}'
-                )
-            )
+            # list for all data filetypes supported
+            
+            local_files = [file for file in list(tickerfolder_path.glob(
+                                            f'**/{self.ticker}_*.*'))
+                            if match('.(\w+)$', file.suffix).groups()[0]
+                            in SUPPORTED_DATA_FILES]
+            
             local_files_name = [file.name for file in local_files]
 
             # check compliance of files to convention (see notes)
@@ -1026,7 +1052,7 @@ class historical_manager:
                                 if file_tf == TICK_TIMEFRAME:
             
                                     # perform tick file upload
-            
+                                    '''
                                     # use dask library as tick csv files can be very large
                                     # time gain is significative even compared to using
                                     # pandas read_csv with chunksize tuning
@@ -1041,7 +1067,20 @@ class historical_manager:
             
                                     self._db_dict[year_tf_key] = \
                                         dask_df.compute()
-            
+                                    '''
+                                    self._db_dict[year_tf_key] = \
+                                        read_csv(  
+                                            'pandas',
+                                            file,
+                                            sep=',',
+                                            header=0,
+                                            names=DATA_COLUMN_NAMES.TICK_DATA,
+                                            dtype=DTYPE_DICT.TICK_DTYPE,
+                                            parse_dates=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                            date_format=DATE_FORMAT_ISO8601,
+                                            engine = 'c'
+                                    )
+                                    
                                 # year standard data file
                                 elif file_tf in self._tf_list:
             
@@ -1131,15 +1170,22 @@ class historical_manager:
                                                      try_parse_dates=True
                                             )
                             
+                            else:
+                                
+                                raise TypeError(f'Engine {engine}'
+                                                ' is not supported')
+                    
+                        elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
+                        
+                            self._db_dict[year_tf_key] = read_parquet(engine,
+                                                                      file)
+                            
                         else:
                             
-                            raise TypeError(f'Engine {engine}'
+                            raise TypeError(f'file {file} extension '
                                             ' is not supported')
-                    
-                    elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
-                    
-                        self._db_dict[year_tf_key] = read_parquet(engine,
-                                                                  file)
+                            
+                            
                         
                 else:
                     
@@ -1226,7 +1272,7 @@ class historical_manager:
             start = any_date_to_datetime64(start,
                                            to_pydatetime=True)
             
-            end = any_date_to_datetime64(end, 
+            end = any_date_to_datetime64(end,
                                          to_pydatetime=True)
             
         else:
