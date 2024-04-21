@@ -413,10 +413,9 @@ def get_date_interval(start=None,
         # 'now' - end of date interval is timestamp now
         if interval_end_mode == 'now':
             
-            end_date = Timestamp.utcnow()
+            end_date = Timestamp.now()
             start_date = end_date - timewindow_str_to_timedelta(interval_timespan)
             
-        
         if bdays:
             
             components  = findall(TIME_WINDOW_COMPONENTS_PATTERN_STR,
@@ -426,22 +425,22 @@ def get_date_interval(start=None,
             if components[1] == 'd':
                 
                 days_list = list(
-                                    rrule(freq=DAILY, 
-                                          dtstart=start_date,
-                                          until  =end_date,
-                                          byweekday=(MO,TU,WE,TH,FR))
-                                )
+                            rrule(freq=DAILY, 
+                                  dtstart=start_date,
+                                  until  =end_date,
+                                  byweekday=(MO,TU,WE,TH,FR))
+                )
                 
                 while len(days_list) < int(components[0]):
                     
                     start_date = start_date - Timedelta(days=1)
                     
                     days_list = list(
-                                        rrule(freq=DAILY, 
-                                        dtstart=start_date,
-                                        until  =end_date,
-                                        byweekday=(MO,TU,WE,TH,FR))
-                                    )
+                            rrule(freq=DAILY, 
+                            dtstart=start_date,
+                            until  =end_date,
+                            byweekday=(MO,TU,WE,TH,FR))
+                    )
                 
     assert isinstance(start_date, Timestamp) \
            and isinstance(end_date, Timestamp), \
@@ -463,11 +462,12 @@ def get_date_interval(start=None,
     if freq:
         
         bdate_dtindex = bdate_range(start = start_date,
-                                       end   = end_date,
-                                       freq  = freq,
-                                       tz    = 'UTC',
-                                       normalize = normalize,
-                                       name  = 'timestamp')
+                                    end   = end_date,
+                                    freq  = freq,
+                                    tz    = None,
+                                    normalize = normalize,
+                                    name  = 'timestamp'
+        )
         
         return start_date, end_date, bdate_dtindex
         

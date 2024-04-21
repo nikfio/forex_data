@@ -483,7 +483,7 @@ class realtime_manager:
                         (df[BASE_DATA_COLUMN_NAME.TIMESTAMP] >= day_start) \
                         & 
                         (df[BASE_DATA_COLUMN_NAME.TIMESTAMP]  <= day_end)
-                    ] 
+                ] 
                             
         elif self.engine == 'pyarrow':
             
@@ -672,7 +672,6 @@ class realtime_manager:
                 
                 print(e)
                 return self._dataframe_type([])
-        
             
         data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO
         
