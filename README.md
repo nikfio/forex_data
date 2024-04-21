@@ -309,7 +309,7 @@ Especially working with csv files and performing in-dataframe operations like th
 Here is a list of elements that could power or make the package more solid:
 
 * scout for open source databases to have a persistent storage instead of simple local files in a folder
-    1. by performance evaluations predilige components that fits with polars and pyarrow, and so components or databases tightened to [Apache Arrow](https://arrow.apache.org/docs/index.html) as much as possible
+    1. by performance evaluations prefer components that fits with polars and pyarrow, and so components or databases tightened to [Apache Arrow](https://arrow.apache.org/docs/index.html) as much as possible
     2. use connectorx or ADBC for database driver
     3. for databases, 
         * here is a nice repo example by voltrondata [Arrow Flight SQL server - DuckDB / SQLite](https://github.com/voltrondata/flight-sql-server-example)
