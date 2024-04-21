@@ -63,7 +63,7 @@ poetry run pytest
 ## CONFIGURATION FILE
 
 A configuration file can be passed in order to group fixed parameters values.
-In repository folder clone, look for `\appconfig` folder to see the [example template file](appconfig\appconfig_template.yaml).
+In repository folder clone, look for `\appconfig` folder to see the [example template file](appconfig/appconfig_template.yaml).
 
 At any run, the package looks for a file called `appconfig.yaml` and associates it to a variable called `APPCONFIG_YAML` so that it is simpler to use a default config file in package modules calls.
 
@@ -176,7 +176,7 @@ Let's walk through the [example for historical data source](test\test_hist_data_
 
 #### Real-Time data
 
-Let's walk through the [example for real-time data source](test\test_realtime_data_manager.py), outputs are with `polars` as DATA_ENGINE:
+Let's walk through the [example for real-time data source](test/test_realtime_data_manager.py), outputs are with `polars` as DATA_ENGINE:
 
 1. **data manager instance**
     ```
