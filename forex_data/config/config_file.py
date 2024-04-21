@@ -47,6 +47,14 @@ def read_config_file(config_file):
     
     return data
 
+
+def read_config_string(config_string):
+    
+    # open and read .yaml configuration file
+    data = yaml.load(config_string, Loader=yaml.FullLoader)
+        
+    return data
+
     
 def dump_config_file(filepath, data):
     

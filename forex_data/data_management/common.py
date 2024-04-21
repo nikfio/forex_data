@@ -158,7 +158,6 @@ class DEFAULT_PATHS:
     HIST_DATA_PATH     = str(Path.home() / '.database'/ 'Historical')
     REALTIME_DATA_PATH = str(Path.home() / '.database'/ 'Realtime')
     
-    
 class DATA_FILE_TYPE:
     
     CSV_FILETYPE            = 'csv'
@@ -174,7 +173,9 @@ SUPPORTED_DATA_FILES = [
                     ]
 
 # supported dataframe engines
-# pyarrow not inserted because it is not yet found a way to implement
+# pyarrow is inserted but reframe operation all in pyarrow 
+# is not yet available, now it is masked 
+# to a refame call with polars
 # reframe_data() on pyarrow Table
 SUPPORTED_DATA_ENGINES = [
                             'pandas',
@@ -230,13 +231,13 @@ class BASE_DATA_COLUMN_NAME:
 
 class CANONICAL_INDEX:
 
-    LATEST_DATA_INDEX       = 0
+    AV_LATEST_DATA_INDEX    = 0
     AV_DF_DATA_INDEX        = 0
     AV_DICT_INFO_INDEX      = 1    
 
 
     
-### auxiliary fast functions
+### auxiliary functions
 
 # parse argument to get datetime object with date format as input
 def infer_date_from_format_dt(s, date_format='ISO8601', unit=None, utc=False):
@@ -839,11 +840,6 @@ def reframe_data(dataframe, tf):
                                         'Failed conversion of timestamp columns '
                                         'to DatetimeIndex')
                         
-                        
-                dataframe.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                                    inplace=True,
-                                    drop=True)
-                
             else:
                 
                 raise ValueError(
@@ -853,20 +849,25 @@ def reframe_data(dataframe, tf):
         
         ## use pandas functions to reframe data on pandas Dataframe
         
+        df = dataframe.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                 inplace=False,
+                                 drop=True
+        )
+        
         # resample based on p value
         if all([col in DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX
-                for col in dataframe.columns]):
+                for col in df.columns]):
             
             # resample along 'p' column, data in ask, bid, p format
-            df =  dataframe.p.resample(tf).ohlc().interpolate(method=
-                                                              'nearest')
+            df =  df.p.resample(tf).ohlc().interpolate(method=
+'nearest')
             
         elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
-                  for col in dataframe.columns]): 
+                  for col in df.columns]): 
             
             # resample along given data already in ohlc format
-            df = dataframe.resample(tf).interpolate(method=
-                                                    'nearest')
+            df = df.resample(tf).interpolate(method=
+                                             'nearest')
             
         else:
             

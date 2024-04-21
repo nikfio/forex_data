@@ -10,57 +10,57 @@ import logging
 from attrs import ( 
                     define,
                     field,
-                    Factory,
                     validate,
                     validators
-                )
+    )
 
 # PANDAS
 from pandas import (
-                    DataFrame as pandas_dataframe,
-                    read_csv as pandas_read_csv
+                    DataFrame as pandas_dataframe
     )
 
 # PYARROW
 from pyarrow import (
-                    BufferReader
+                    table as pyarrow_table,
     )
 
 # POLARS
 from polars import (
-                    String as polars_string,
-                    read_csv as polars_read_csv,
                     col,
-                    from_epoch 
+                    from_epoch,
+                    from_dict as polars_fromdict
     )
 
 from polars.dataframe import ( 
                     DataFrame as polars_dataframe
     )
 
-from datetime import datetime
 
 from numpy import array
 
 # python base 
-from time import sleep 
-from requests import Session
 from dotty_dict import dotty
 from io import StringIO
-from typing import Union, Optional
+from typing import Optional
 
 from dotty_dict import Dotty
 
 # external 
 
 # polygon-io source
-from polygon import RESTClient as polygonio_client
+from polygon import (
+        RESTClient as polygonio_client,
+        BadResponse
+    )
 
 # alpha-vantage source
 from alpha_vantage.foreignexchange import ForeignExchange as av_forex_client
  
 from .common import *
-from ..config import read_config_file 
+from ..config import ( 
+            read_config_file,
+            read_config_string
+    )
 
 # constants
 READ_RETRY_COUNT = 2 
@@ -88,7 +88,7 @@ class realtime_manager:
     data_filetype   : str = field(default='parquet',
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
     data_path       : str = field(default=Path(DEFAULT_PATHS.REALTIME_DATA_PATH),
-                              validator=validator_dir_path)
+                              validator=validator_dir_path(create_if_missing=True))
     engine          : str = field(default='pandas',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
     
@@ -100,8 +100,13 @@ class realtime_manager:
                                  validator=validators.instance_of(str))
     _ticker_alphavantage = field(default='',
                                  validator=validators.instance_of(str))
+    _to_symbol = field(default='',
+                       validator=validators.instance_of(str))
+    _from_symbol = field(default='',
+                         validator=validators.instance_of(str))
   
-    # if a valid config file is passed
+    # if a valid config file or string
+    # is passed
     # arguments contained are assigned here 
     # if instantiation passed values are present
     # they will override the related argument
@@ -117,10 +122,13 @@ class realtime_manager:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
         
+        _class_attributes_name = get_attrs_names(self, **kwargs)
+        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
+        
         if kwargs['config_file']:
             
-            self.config_file = kwargs['config_file']
             config_path = Path(kwargs['config_file'])
+            config_args = {}
             if config_path.exists() \
                 and  \
                 config_path.is_file() \
@@ -132,87 +140,107 @@ class realtime_manager:
                 config_args = {key.lower(): val for key, val in 
                                read_config_file(config_path.absolute()).items()
                                }
+            
+            elif isinstance(kwargs['config_file'], str):
                 
-                # set args from config file
-                attrs_keys_configfile = \
-                        set(_class_attributes_name).intersection(config_args.keys())
-                
-                for attr_key in attrs_keys_configfile:
-                    
-                    self.__setattr__(attr_key, 
-                                     config_args[attr_key])
-                    
-                    _not_assigned_attrs_index_mask[ 
-                           _class_attributes_name.index(attr_key)  
-                    ] = False
-                    
-                # set args from instantiation 
-                # override if attr already has a value from config
-                attrs_keys_input = \
-                        set(_class_attributes_name).intersection(kwargs.keys())
-                
-                for attr_key in attrs_keys_input:
-                    
-                    self.__setattr__(attr_key, 
-                                     kwargs[attr_key])
-                    
-                    _not_assigned_attrs_index_mask[ 
-                           _class_attributes_name.index(attr_key)  
-                    ] = False
-                
-                # attrs not present in config file or instance inputs
-                # --> self.attr leads to KeyError
-                # are manually assigned to default value derived
-                # from __attrs_attrs__
-                
-                for attr_key in array(_class_attributes_name)[
-                        _not_assigned_attrs_index_mask
-                ]:
-                    
-                    try:
-                        
-                        attr = [attr 
-                                for attr in self.__attrs_attrs__
-                                if attr.name == attr_key][0]
-                        
-                    except KeyError:
-                        
-                        logging.warning('KeyError: initializing object has no '
-                                        f'attribute {attr.name}')
-                        
-                    except IndexError:
-                        
-                        logging.warning('IndexError: initializing object has no '
-                                        f'attribute {attr.name}')
-                    
-                    else:
-                        
-                        # assign default value
-                        # try default and factory sabsequently
-                        # if neither are present
-                        # assign None
-                        if hasattr(attr, 'default'):
-                            
-                            if hasattr(attr.default, 'factory'): 
-                    
-                                self.__setattr__(attr.name, 
-                                                 attr.default.factory())
-                                
-                            else:
-                                
-                                self.__setattr__(attr.name, 
-                                                 attr.default)
-                            
-                        else:
-                                
-                            self.__setattr__(attr.name, 
-                                             None)
-                
+                # read parameters from config file 
+                # and force keys to lower case
+                config_args = {key.lower(): val for key, val in 
+                               read_config_string(kwargs['config_file']).items()
+                               }
                 
             else:
-                
-                raise ValueError('invalid config_file')
+            
+                raise TypeError('invalid config_file type '
+                                '{kwargs["config_file"]}')
                         
+            # check consistency of config_args
+            if  (
+                    not isinstance(config_args, dict)
+                    or
+                    not bool(config_args)
+                ):
+                
+                raise ValueError(f'config_file {kwargs["config_file"]} '
+                                 'has no valid yaml formatted data')
+            
+            self.config_file = kwargs['config_file']
+            
+            # set args from config file
+            attrs_keys_configfile = \
+                    set(_class_attributes_name).intersection(config_args.keys())
+            
+            for attr_key in attrs_keys_configfile:
+                
+                self.__setattr__(attr_key, 
+                                 config_args[attr_key])
+                
+                _not_assigned_attrs_index_mask[ 
+                       _class_attributes_name.index(attr_key)  
+                ] = False
+                
+            # set args from instantiation 
+            # override if attr already has a value from config
+            attrs_keys_input = \
+                    set(_class_attributes_name).intersection(kwargs.keys())
+            
+            for attr_key in attrs_keys_input:
+                
+                self.__setattr__(attr_key, 
+                                 kwargs[attr_key])
+                
+                _not_assigned_attrs_index_mask[ 
+                       _class_attributes_name.index(attr_key)  
+                ] = False
+            
+            # attrs not present in config file or instance inputs
+            # --> self.attr leads to KeyError
+            # are manually assigned to default value derived
+            # from __attrs_attrs__
+            
+            for attr_key in array(_class_attributes_name)[
+                    _not_assigned_attrs_index_mask
+            ]:
+                
+                try:
+                    
+                    attr = [attr 
+                            for attr in self.__attrs_attrs__
+                            if attr.name == attr_key][0]
+                    
+                except KeyError:
+                    
+                    logging.warning('KeyError: initializing object has no '
+                                    f'attribute {attr.name}')
+                    
+                except IndexError:
+                    
+                    logging.warning('IndexError: initializing object has no '
+                                    f'attribute {attr.name}')
+                
+                else:
+                    
+                    # assign default value
+                    # try default and factory sabsequently
+                    # if neither are present
+                    # assign None
+                    if hasattr(attr, 'default'):
+                        
+                        if hasattr(attr.default, 'factory'): 
+                
+                            self.__setattr__(attr.name, 
+                                             attr.default.factory())
+                            
+                        else:
+                            
+                            self.__setattr__(attr.name, 
+                                             attr.default)
+                        
+                    else:
+                            
+                        self.__setattr__(attr.name, 
+                                         None)
+            
         else:
             
             # no config file is defined
@@ -228,6 +256,9 @@ class realtime_manager:
         
         # Fundamentals parameters initialization
         self.ticker = self.ticker.upper()
+        
+        self._to_symbol, self._from_symbol = \
+            get_pair_symbols(self.ticker)
         
         # files details variable initialization
         self.data_path = Path(self.data_path)    
@@ -246,11 +277,12 @@ class realtime_manager:
                 REALTIME_DATA_PROVIDER.POLYGON_IO
         )
     
-    def _getClient(self, provider, **kwargs):
+    def _getClient(self, provider):
         
         if provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
             
-            pass
+            return av_forex_client(key = 
+                                    self.providers_key[ALPHA_VANTAGE_KEY_ENV])
             
         elif provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
             
@@ -319,11 +351,15 @@ class realtime_manager:
         
     def get_realtime_quote(self):
         
-        poly_resp = self._poly_reader.get_last_forex_quote(self._from_symbol,
-                                                           self._to_symbol)
         
-        return av_resp 
+        with self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO) as client:
+            
+            poly_resp = client.get_last_forex_quote(self._from_symbol,
+                                                    self._to_symbol)
+        
+        return poly_resp 
                  
+    
     def get_daily_close(self,
                         last_close=False,
                         recent_days_window=None, 
@@ -331,36 +367,51 @@ class realtime_manager:
                         day_end=None):
         
         
-        if last_close:
-        
-            av_daily_data_resp = self._av_reader.get_currency_exchange_daily(self._to_symbol,
-                                                                             self._from_symbol,
-                                                                             outputsize='compact')
+        try:
             
-            # parse response and return
-            return self._parse_av_daily_data(av_daily_data_resp,
-                                             last_close=True)
             
-        else:
+            client = self._getClient(REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
             
-            if not day_start or not day_end:
-                assert isinstance(recent_days_window, int), 'recent_days_window must be integer'
+            if last_close:
             
-            # careful that option "outputsize='full'" does not have constant day start
-            # so it is not possible to guarantee a consistent meeting of the 
-            # function input 'day_start' and 'recent_days_window' when
-            # they imply a large interval outside of the 
-            # "outputsize='full'" option
-            av_daily_data_resp = self._av_reader.get_currency_exchange_daily(self._from_symbol,
-                                                                             self._to_symbol,
-                                                                             outputsize='full')
+                
+                res = client.get_currency_exchange_daily(
+                                    self._to_symbol,
+                                    self._from_symbol,
+                                    outputsize='compact'
+                )
+                
+                # parse response and return
+                return self._parse_av_daily_data(res,
+                                                 last_close=True)
+                
+            else:
+                
+                if not day_start or not day_end:
+                    assert isinstance(recent_days_window, int), \
+                            'recent_days_window must be integer'
+                
+                # careful that option "outputsize='full'" does not have constant day start
+                # so it is not possible to guarantee a consistent meeting of the 
+                # function input 'day_start' and 'recent_days_window' when
+                # they imply a large interval outside of the 
+                # "outputsize='full'" option
+                res = client.get_currency_exchange_daily(self._from_symbol,
+                                                                        self._to_symbol,
+                                                                        outputsize='full')
+                
+                # parse response and return
+                return self._parse_av_daily_data(res,
+                                                 last_close=False,
+                                                 recent_days_window=recent_days_window, 
+                                                 day_start=day_start, 
+                                                 day_end=day_end) 
             
-            # parse response and return
-            return self._parse_av_daily_data(av_daily_data_resp,
-                                             last_close=False,
-                                             recent_days_window=recent_days_window, 
-                                             day_start=day_start, 
-                                             day_end=day_end) 
+        except BadResponse as e:
+            
+            print(e)
+            return self._dataframe_type([])
+            
             
         
     def _parse_av_daily_data(self, 
@@ -370,30 +421,7 @@ class realtime_manager:
                              day_start=None, 
                              day_end=None):
     
-        # TODO: post download redundancy check using dict info
-        resp_info_dict = daily_data[CANONICAL_INDEX.AV_DICT_INFO_INDEX]
-        
-        daily_df = daily_data[CANONICAL_INDEX.AV_DF_DATA_INDEX]
-        # assign canonical column names
-        daily_df.columns = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
-        
-        # set timestamp index as datetime64 type
-        if not pd.api.types.is_datetime64_any_dtype(daily_df.index) \
-            or \
-            not daily_df.index.tzinfo:
-            daily_df.index = any_date_to_datetime64(daily_df.index)
-        
-        daily_df.index.name = BASE_DATA_COLUMN_NAME.TIMESTAMP
-        
-        if last_close:
-            
-            # timestamp as column to include it in return data
-            daily_df.reset_index(inplace=True)
-            
-            # get most recent line --> lowest num index
-            return daily_df.iloc[CANONICAL_INDEX.LATEST_DATA_INDEX].to_dict()
-        
-        else:
+        if not last_close:
             
             if isinstance(recent_days_window, int):
                 # set window as DateOffset str with num and days
@@ -408,13 +436,101 @@ class realtime_manager:
                 
                 day_start = any_date_to_datetime64(day_start)
                 day_end   = any_date_to_datetime64(day_end)
+                
+            # try to convert to datetime data type if not already is
+            if self.engine == 'polars':
+                 
+                day_start =  day_start.to_pydatetime()
+                day_end = day_end.to_pydatetime()
             
-            # TODO: implement try-except if req data is outside
-            #       response data time interval
+        # parse alpha vantage response from daily api request
+        resp_data_dict = daily_data[CANONICAL_INDEX.AV_DF_DATA_INDEX]
+        
+        # raw response data to dictionary
+        timestamp  = list(resp_data_dict.keys())
+        data_values = resp_data_dict.values()
+        open_data  = [item['1. open']  for item in data_values]
+        high_data  = [item['2. high']  for item in data_values]
+        low_data   = [item['3. low']   for item in data_values]
+        close_data = [item['4. close'] for item in data_values]
+        
+        if self.engine == 'pandas':
+        
+            df = pandas_dataframe(
+                    {
+                        BASE_DATA_COLUMN_NAME.TIMESTAMP : timestamp,
+                        BASE_DATA_COLUMN_NAME.OPEN      : open_data,
+                        BASE_DATA_COLUMN_NAME.HIGH      : high_data,
+                        BASE_DATA_COLUMN_NAME.LOW       : low_data,
+                        BASE_DATA_COLUMN_NAME.CLOSE     : close_data
+                    }
+            )
             
-            # return data based on filter output
-            return daily_df[(daily_df.index >= day_start) \
-                            & (daily_df.index <= day_end)].astype(DTYPE_DICT.TF_DTYPE)
+            df = astype(df, DTYPE_DICT.TIME_TF_DTYPE)
+            
+            # timestamp as column to include it in return data
+            daily_df.reset_index(inplace=True)
+            
+            if last_close:
+               
+                # get most recent line --> lowest num index
+                df = df.iloc[CANONICAL_INDEX.AV_LATEST_DATA_INDEX]
+        
+            else:
+                
+                # return data based on filter output
+                df = df[
+                        (df[BASE_DATA_COLUMN_NAME.TIMESTAMP] >= day_start) \
+                        & 
+                        (df[BASE_DATA_COLUMN_NAME.TIMESTAMP]  <= day_end)
+                    ] 
+                            
+        elif self.engine == 'pyarrow':
+            
+            pass
+        
+        elif self.engine == 'polars':
+        
+            df = polars_fromdict(
+                {
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP : timestamp,
+                    BASE_DATA_COLUMN_NAME.OPEN      : open_data,
+                    BASE_DATA_COLUMN_NAME.HIGH      : high_data,
+                    BASE_DATA_COLUMN_NAME.LOW       : low_data,
+                    BASE_DATA_COLUMN_NAME.CLOSE     : close_data
+                }
+            )
+            
+            # convert timestamp column to datetime data type
+            df = \
+                df.with_columns(
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        polars_datetime('ms'), 
+                        format=DATE_NO_HOUR_FORMAT
+                    )
+                )
+            
+            # final cast to standard dtypes
+            df = df.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+            
+            if last_close:
+                
+                df = df[CANONICAL_INDEX.AV_LATEST_DATA_INDEX]
+                
+            else:
+                
+                # filter on date
+                df = \
+                (
+                    df
+                    .filter(
+                        col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_between(day_start,
+                                                                        day_end   
+                        )
+                    ).clone()
+                )
+            
+        return df
 
 
     def _parse_aggs_data(self, 
@@ -422,47 +538,52 @@ class realtime_manager:
                          data_provider,
                          engine='polars'):
         
-        if engine == 'pandas':
+        if data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+            
+            pass
         
-            # parse data and format data as common defined 
-            df = pandas_dataframe(data)
+        elif data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
+        
+            if engine == 'pandas':
             
-            # keep base data columns
-            extra_columns = list(set(data_df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
-            data_df.drop(extra_columns, axis=1, inplace=True)
-            
-            if data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
+                # parse data and format data as common defined 
+                df = pandas_dataframe(data)
                 
-                data_df.index = any_date_to_datetime64(
-                    data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                # keep base data columns
+                extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
+                df.drop(extra_columns, axis=1, inplace=True)
+                
+                df.index = any_date_to_datetime64(
+                    df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
                     unit='ms'
                 )
+                    
+                # convert to conventional dtype
+                df = astype(df, DTYPE_DICT.TIME_TF_DTYPE)
+            
+            elif engine == 'pyarrow':
                 
-            elif data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
-                
-                # TODO
                 pass
+            
+            elif engine == 'polars':
+                
+                df = polars_dataframe(data)
+                
+                extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA))
+                
+                df = df.drop(extra_columns)
+                
+                # convert timestamp column to datetime data type
+                df = df.with_columns(
+                        from_epoch(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                   time_unit='ms').alias(BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                    )
+            
+                # convert to conventional dtype
+                df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+                
+            return df
         
-        elif engine == 'polars':
-            
-            df = polars_dataframe(data)
-            
-            extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA))
-            
-            df = df.drop(extra_columns)
-            
-            # convert timestamp column to datetime data type
-            df = df.with_columns(
-                    from_epoch(BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                               time_unit='ms').alias(BASE_DATA_COLUMN_NAME.TIMESTAMP)
-                )
-        
-        
-        # convert to conventional dtype
-        df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
-            
-        return df
-    
     
     def get_data(self, 
                  start=None, 
@@ -527,23 +648,30 @@ class realtime_manager:
         
         if not avdata_valid:
             
-            client = self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO)
-            
-            poly_aggs = []
-            
-            # TODO: set up try-except with BadResponse to manage provider 
-            # subcription limitation
-            
-            # using Polygon-io client
-            for a in client.list_aggs(  ticker      = self._ticker_polygonio, 
-                                        multiplier  = 1, 
-                                        timespan    = 'minute', 
-                                        from_       = start,
-                                        to          = end,
-                                        adjusted    = True,
-                                        sort        = 'asc' ):
+            try:
                 
-                poly_aggs.append(a)
+                client = self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO)
+                
+                poly_aggs = []
+                
+                # TODO: set up try-except with BadResponse to manage provider 
+                # subcription limitation
+                
+                # using Polygon-io client
+                for a in client.list_aggs(  ticker      = self._ticker_polygonio, 
+                                            multiplier  = 1, 
+                                            timespan    = 'minute', 
+                                            from_       = start,
+                                            to          = end,
+                                            adjusted    = True,
+                                            sort        = 'asc' ):
+                    
+                    poly_aggs.append(a)
+                    
+            except BadResponse as e:
+                
+                print(e)
+                return self._dataframe_type([])
         
             
         data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO

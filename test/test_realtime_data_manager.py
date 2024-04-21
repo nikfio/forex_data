@@ -17,56 +17,47 @@ test data_manager object realtime feature:
 from pandas import (
                     Timestamp,
                     Timedelta
-                    )
+                )
 # custom lib
 from forex_data import (
-                              realtime_manager,
-                              read_config_file
-                          )
+                    realtime_manager,
+                    APPCONFIG_YAML
+                )
 
 
 def main():
     
     realtimedata_manager = realtime_manager(
                             ticker = 'NZDUSD',
-                            config_file = r'C:/Projects/forex_data/appconfig/config.yaml'
+                            config_file = APPCONFIG_YAML
     )
     
     # input test request definition
-    test_day_end     = '2022-03-26'
-    test_day_start   = '2022-03-10'
+    test_day_start   = '2024-03-10'
+    test_day_end     = '2024-03-26'
     test_timeframe   = '1H'
     test_n_days      = 10
     
-    ## test list tickers - listing function no expected results
-    #av_tickers_list    = test_rt_data_manager.get_realtime_tickers_list(source='ALPHA_VANTAGE')
-    #poly_tickers_list  = test_rt_data_manager.get_realtime_tickers_list(source='POLYGON-IO')
-    
-    # test current quote value function
-    # required subscription
-    # current_quote = test_rt_data_manager.get_realtime_quote() 
-    # print(f'Realtime current quote: {current_quote}')
-    '''
     # get last close on daily basis
     dayclose_quote = \
-        realtimedata_manager.get_realtime_daily_close(last_close=True)
+        realtimedata_manager.get_daily_close(last_close=True)
     
     print(f'Real time daily close quote {dayclose_quote}')
     
     # test time window data function with daily resolution
     window_daily_ohlc = \
-        realtimedata_manager.get_realtime_daily_close(recent_days_window=test_n_days)
+        realtimedata_manager.get_daily_close(recent_days_window=test_n_days)
     
     print(f'Last {test_n_days} window data: {window_daily_ohlc}')
                                                                        
     # test start-end window data function with daily resolution
     window_limits_daily_ohlc = \
-        realtimedata_manager.get_realtime_daily_close(day_start=test_day_start,
-                                                      day_end=test_day_end)
+        realtimedata_manager.get_daily_close(day_start=test_day_start,
+                                             day_end=test_day_end)
      
     print(f'From {test_day_start} to {test_day_end} ' 
           f'window data: {window_limits_daily_ohlc}')
-    '''
+    
     # test time window data function with timeframe resolution
     window_data_ohlc = \
         realtimedata_manager.get_data(  start     = test_day_start,

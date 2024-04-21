@@ -1,0 +1,54 @@
+# Python CircleCI 2.1 configuration file
+version: 2.1
+
+defaults:
+  &defaults
+  working_directory: ~/repo
+
+read_cache:
+  &read_cache
+  keys:
+    - v1-dependencies-{{ checksum "poetry.lock" }}
+    - v1-dependencies-
+
+store_cache:
+  &store_cache
+  paths:
+    - ./repo
+  key: v1-dependencies-{{ checksum "poetry.lock" }}
+
+install_poetry:
+  &install_poetry
+  name: install poetry
+  command: pip install poetry
+
+install_deps:
+  &install_deps
+  name: install dependencies
+  command: poetry install --no-root
+
+run_tests:
+  &run_tests
+  name: run tests
+  command: poetry run pytest
+  
+jobs:
+  py310:
+    <<: *defaults
+    docker:
+      - image: cimg/python:3.10.13
+    steps:
+      - checkout
+      - run: *install_poetry
+      - restore_cache: *read_cache
+      - run: *install_deps
+      - save_cache: *store_cache
+      - run: *run_tests
+  
+workflows:
+  version: 1
+  linters:
+  unit-tests:
+    jobs:
+      - py310
+  release-dry-run:
