@@ -101,7 +101,7 @@ Look here to register and create a key from Polygon-IO provider
 
 ## EXAMPLES
 
-in [test folder](\test) you can find working examples showing the various modules or functionalities the package offers.
+in [test folder](test) you can find working examples showing the various modules or functionalities the package offers.
 
 #### Historical data 
 
@@ -116,6 +116,7 @@ Let's walk through the [example for historical data source](test\test_hist_data_
     ```
     as mentioned in section [configuration](#configuration-file), you can see the feature of overriding the parameter `ticker` by direct assignment in object instantiation, meanwhile the remaining parameters value are assigned by the configuration file.
 <br>
+
 2. **get data**
     ```
     yeardata = histmanager.get_data(timeframe = '1h',
