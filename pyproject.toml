@@ -3,7 +3,7 @@ name = "forex_data"
 version = "0.1.0"
 description = "Data aggregation for forex market data"
 authors = ["Nicola Fiorato <fiorato.nicola@gmail.com>"]
-license = "GPL"
+license = "MIT"
 readme = "README.md"
 packages = [{include = "forex_data"}]
 
@@ -24,7 +24,6 @@ scipy = "^1.11.4"
 pyarrow = "^14.0.2"
 dotty-dict = {git = "https://github.com/nikfio/dotty_dict.git"}
 polars = "^0.20.7"
-awswrangler = {extras = ["redshift"], version = "^3.6.0"}
 pytest = "^8.1.1"
 
 [build-system]
