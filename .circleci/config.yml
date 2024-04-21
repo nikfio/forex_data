@@ -47,8 +47,6 @@ jobs:
   
 workflows:
   version: 1
-  linters:
   unit-tests:
     jobs:
       - py310
-  release-dry-run:
