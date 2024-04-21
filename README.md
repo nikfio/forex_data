@@ -169,7 +169,7 @@ Let's walk through the [example for historical data source](test\test_hist_data_
 
 <br>
 
-![output chart](\doc\imgs\histdata_test_nzdusd.png)
+![output chart](doc/imgs/histdata_test_nzdusd.png)
 
 <br>
 
