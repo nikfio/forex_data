@@ -9,7 +9,7 @@ The forex_data package offers ways to aggregate data from the Forex market into 
 * close
 
 The first purpose is to aggregate data in OHLC format and allow to have data in any timeframe specified in the most simple and efficient way.
-The second purpose is to manage one or multiple sources, an interface layer will have primary functions with predefined name, inputs and ouput results.
+The second purpose is to manage one or multiple sources, an interface layer will have primary functions with predefined name, inputs and ouput results: in order to ease the access and usage of multiple data sources.
 
 At the moment, sources are divided in **historical sources** and **real-time sources**.
 
@@ -17,7 +17,8 @@ At the moment, sources are divided in **historical sources** and **real-time sou
 
 ### HISTORICAL SOURCE
 
-A historical source is a source of data which makes data available but does not have a defined update policy for design reasons, but does have stored a ton of history data, tipically from the first years of 2000s and the free tier is fine for the purposes of the package.
+A historical source is a source of data which makes data available but does not have a defined update policy for design reasons
+On the contrary, it can provide a ton of history data, tipically from the first years of 2000s and the free tier is fine for the purposes of the package.
 
 A perfect data source of this type is [histdata.com](http://www.histdata.com/), which work is really genuine and a lot appreciated.
 
@@ -39,16 +40,33 @@ As of now, just [alpha-vantage](https://www.alphavantage.co/documentation/) and 
 
 Even if free subscription is limitated for these providers, the reasons to include them in the package are to have closer real-time update than any historical source and also the module is designed to ease the work of studying a new provider API calls: a real time data manager uses at the same time all the remote sources available and provides access to their API through easier interface.
 
+### Considerations
+
+*What is the trade-off between historical and real-time source? And why a simultaneous usage of both is powerful?*
+
+This question is the primary key of usefulness of the package.
+An historical source like the one manged by the package, tipically updates data every month so you would have a delay of a month in retrieving the latest data, but on the upside you can have data from like 20 or more years ago to last month with a under a minute resolution.
+
+A real-time source usually lets you get data limiting the number of candles of the output.
+Also, tipically the source free subscription does not let to get data older than a month o few time more: especially if it requested with low resolution like 1-minute timeframe.
+
+Summarizing, the real time source fills the gap of the month delay explained for the historical source.
+And it is widely agreed that latest data have more influence on next trading positions to be set.
+
+
+Concluding, the combination of historical and real-time source gives a 1-minute or lower resolution for data starting over 20 years ago approximately until yesterday or today data.
+
+
 ## INSTALLATION
 
-The package is managed via Poetry, which is required to install the package.
-Follow here for installing Poetry: [Poetry documentation](https://python-poetry.org/docs/).
+The package is managed with Poetry, which is required to install the package.
+Follow here for [installing Poetry](https://python-poetry.org/docs/).
 
-With poetry installed, these steps should lead you to run the examples or any other package usage:
+Now, these steps should lead you to run the examples or any other package usage:
 
 1. Open a shell (on Windows use [powershell7](https://learn.microsoft.com/it-it/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.4#msi)), clone the repository in a folder called `forex-data` (for example):
 ```
-git clone -b master forex-data
+git clone https://github.com/nikfio/forex_data.git -b master forex-data
 cd forex-data
 ```
 2. Run poetry for package installation
@@ -68,7 +86,7 @@ In repository folder clone, look for `\appconfig` folder to see the [example tem
 At any run, the package looks for a file called `appconfig.yaml` and associates it to a variable called `APPCONFIG_YAML` so that it is simpler to use a default config file in package modules calls.
 
 In data managers instantiation, you can pass the configuration file but any parameter value can be overridden by explicit assignment in object instantion.
-The feature will be more clear following the [examples section](#examples)
+The feature will be more clear following the [examples section](#examples).
 
 #### ENGINE
 
@@ -85,9 +103,19 @@ Available options:
 * csv
 * parquet
 
+*parquet* filetype is strongly suggested for read/write speed and disk space occupation.
+Meanwhile, if you have any analysis application outside the Python environment, it would more likely accept csv files over parquet: so *csv* filetype could be a better choice for its broader acceptance.
+
 #### DATA_PATH
 
+The location where data downloaded or data reframed are cached.
 Here you can pass a absolute folder path where the package will dump data downloaded with files type as assigned by the `DATA_FILETYPE` parameter.
+
+The default locations used are:
+* Historical source data cache path : `~/.database/Historical`
+* Real-time source data cache path : `~/.database/Realtime`
+
+Beware that data caching is implemented for historical sources, next developments will cover also real-time sources data.
 
 #### PROVIDERS_KEY
 
@@ -101,11 +129,11 @@ Look here to register and create a key from Polygon-IO provider
 
 ## EXAMPLES
 
-in [test folder](test) you can find working examples showing the various modules or functionalities the package offers.
+in [test folder](test) you can find examples showing the various modules or functionalities the package offers.
 
 #### Historical data 
 
-Let's walk through the [example for historical data source](test\test_hist_data_manager.py):
+Let's walk through the [example for historical data source](test/test_hist_data_manager.py):
 
 1. **data manager instance** 
     ```                            
@@ -303,6 +331,13 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
 Pandas is way too slow compared to PyArrow and Polars, by far.
 Especially working with csv files and performing in-dataframe operations like the groupby on along timestamp column.
 
+*Soon time based benchmarks will be provided to explictly show how much polars and pyarrow overcome pandas*
+
+The battle between polars and pyarrow is still on.
+Any suggestion on why one should choose pyarrow over polars or viceversa is welcome.
+
+Or, a further data engine suggested could be taken into consideration to be integrated in the package.
+
 
 ## Future developments
 
@@ -313,7 +348,7 @@ Here is a list of elements that could power or make the package more solid:
     2. use connectorx or ADBC for database driver
     3. for databases, 
         * here is a nice repo example by voltrondata [Arrow Flight SQL server - DuckDB / SQLite](https://github.com/voltrondata/flight-sql-server-example)
-        * PostgreSQL, quite mentioned in both in polars and pyarrow API, [Polars read database](https://docs.pola.rs/py-polars/html/reference/api/polars.read_database.html) and [Pyarrow PostgreSQL Recipes](https://arrow.apache.org/adbc/0.5.1/python/recipe/postgresql.html) 
+        * PostgreSQL, quite mentioned both in polars and pyarrow API, [Polars read database](https://docs.pola.rs/py-polars/html/reference/api/polars.read_database.html) and [Pyarrow PostgreSQL Recipes](https://arrow.apache.org/adbc/0.5.1/python/recipe/postgresql.html) 
 
 * enhance charting part of the package
 
