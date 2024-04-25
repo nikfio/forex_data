@@ -45,14 +45,12 @@ Even if free subscription is limitated for these providers, the reasons to inclu
 *What is the trade-off between historical and real-time source? And why a simultaneous usage of both is powerful?*
 
 This question is the primary key of usefulness of the package.
-An historical source like the one manged by the package, tipically updates data every month so you would have a delay of a month in retrieving the latest data, but on the upside you can have data from like 20 or more years ago to last month with a under a minute resolution.
+An historical source like the one managed by the package, tipically updates data every month so you would have a delay of a month in retrieving the latest data, but on the upside you can have data from like 20 or more years ago to last month with a under a minute resolution.
 
 A real-time source usually lets you get data limiting the number of candles of the output.
 Also, tipically the source free subscription does not let to get data older than a month o few time more: especially if it requested with low resolution like 1-minute timeframe.
-
-Summarizing, the real time source fills the gap of the month delay explained for the historical source.
+The real time source fills the gap of the month delay explained for the historical source.
 And it is widely agreed that latest data have more influence on next trading positions to be set.
-
 
 Concluding, the combination of historical and real-time source gives a 1-minute or lower resolution for data starting over 20 years ago approximately until yesterday or today data.
 
@@ -81,7 +79,7 @@ poetry run pytest
 ## CONFIGURATION FILE
 
 A configuration file can be passed in order to group fixed parameters values.
-In repository folder clone, look for `\appconfig` folder to see the [example template file](appconfig/appconfig_template.yaml).
+In repository folder clone, look for [appconfig folder](appconfig) to see the [example template file](appconfig/appconfig_template.yaml).
 
 At any run, the package looks for a file called `appconfig.yaml` and associates it to a variable called `APPCONFIG_YAML` so that it is simpler to use a default config file in package modules calls.
 
