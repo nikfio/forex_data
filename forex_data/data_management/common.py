@@ -859,8 +859,7 @@ def reframe_data(dataframe, tf):
                 for col in df.columns]):
             
             # resample along 'p' column, data in ask, bid, p format
-            df =  df.p.resample(tf).ohlc().interpolate(method=
-'nearest')
+            df =  df.p.resample(tf).ohlc().interpolate(method='nearest')
             
         elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
                   for col in df.columns]): 
@@ -954,6 +953,23 @@ def reframe_data(dataframe, tf):
                              f'required {DATA_COLUMN_NAMES.TICK_DATA} '
                              f'or {DATA_COLUMN_NAMES.TF_DATA}')
 
+
+# TODO: function to return filter data with inputs:
+        # column to filter on
+        # start interval value
+        # end interval value
+        # option to return specific row index
+        
+def filter_data(
+        dataframe, 
+        tf,
+        filter_column=None,
+        start=None,
+        end=None,
+        index=None
+    ):
+    
+    pass
 
 ### UTILS FOR DOTTY DICTIONARY
 

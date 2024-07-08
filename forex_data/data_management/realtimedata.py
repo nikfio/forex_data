@@ -414,12 +414,14 @@ class realtime_manager:
             
             
         
-    def _parse_av_daily_data(self, 
-                             daily_data,
-                             last_close=False,
-                             recent_days_window=None, 
-                             day_start=None, 
-                             day_end=None):
+    def _parse_data_daily_alphavantage(
+            self, 
+            daily_data,
+            last_close=False,
+            recent_days_window=None, 
+            day_start=None, 
+            day_end=None
+        ):
     
         if not last_close:
             
@@ -487,7 +489,34 @@ class realtime_manager:
                             
         elif self.engine == 'pyarrow':
             
-            pass
+            df = pyarrow_table(
+                    {
+                        BASE_DATA_COLUMN_NAME.TIMESTAMP : timestamp,
+                        BASE_DATA_COLUMN_NAME.OPEN      : open_data,
+                        BASE_DATA_COLUMN_NAME.HIGH      : high_data,
+                        BASE_DATA_COLUMN_NAME.LOW       : low_data,
+                        BASE_DATA_COLUMN_NAME.CLOSE     : close_data
+                    }
+            )
+            
+            # final cast to standard dtypes
+            df = astype(df, PYARROW_DTYPE_DICT.TIME_TF_DTYPE)
+            
+            if last_close:
+                
+                df = df[CANONICAL_INDEX.AV_LATEST_DATA_INDEX]
+                
+            else:
+                
+                mask = pc.and_(
+                            pc.greater(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                       day_start),
+                            pc.less(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                                       day_end)
+                            )
+                
+                data_df = Table.from_arrays(data_df.filter(mask).columns,
+                                            schema=data_df.schema)
         
         elif self.engine == 'polars':
         
@@ -511,7 +540,7 @@ class realtime_manager:
                 )
             
             # final cast to standard dtypes
-            df = df.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+            df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
             
             if last_close:
                 
@@ -533,57 +562,60 @@ class realtime_manager:
         return df
 
 
-    def _parse_aggs_data(self, 
-                         data,
-                         data_provider,
-                         engine='polars'):
+    def _parse_data_aggs_polygonio(
+            self, 
+            data,
+            engine='polars'
+        ):
         
-        if data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+        
+        if engine == 'pandas':
+        
+            # parse data and format data as common defined 
+            df = pandas_dataframe(data)
             
-            pass
-        
-        elif data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
-        
-            if engine == 'pandas':
+            # keep base data columns
+            extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
+            df.drop(extra_columns, axis=1, inplace=True)
             
-                # parse data and format data as common defined 
-                df = pandas_dataframe(data)
+            df.index = any_date_to_datetime64(
+                df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                unit='ms'
+            )
                 
-                # keep base data columns
-                extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA)) 
-                df.drop(extra_columns, axis=1, inplace=True)
-                
-                df.index = any_date_to_datetime64(
-                    df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
-                    unit='ms'
+            # convert to conventional dtype
+            df = astype(df, DTYPE_DICT.TIME_TF_DTYPE)
+        
+        elif engine == 'pyarrow':
+            
+            df = pyarrow_table(data)
+            
+            extra_columns = list(set(df.column_names).difference(DATA_COLUMN_NAMES.TF_DATA))
+            
+            df = df.drop_columns(extra_columns)
+        
+            # convert to conventional dtype
+            df = astype(df, PYARROW_DTYPE_DICT.TIME_TF_DTYPE)
+            
+        elif engine == 'polars':
+            
+            df = polars_dataframe(data)
+            
+            extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA))
+            
+            df = df.drop(extra_columns)
+            
+            # convert timestamp column to datetime data type
+            df = df.with_columns(
+                    from_epoch(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                               time_unit='ms').alias(BASE_DATA_COLUMN_NAME.TIMESTAMP)
                 )
-                    
-                # convert to conventional dtype
-                df = astype(df, DTYPE_DICT.TIME_TF_DTYPE)
-            
-            elif engine == 'pyarrow':
-                
-                pass
-            
-            elif engine == 'polars':
-                
-                df = polars_dataframe(data)
-                
-                extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA))
-                
-                df = df.drop(extra_columns)
-                
-                # convert timestamp column to datetime data type
-                df = df.with_columns(
-                        from_epoch(BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                                   time_unit='ms').alias(BASE_DATA_COLUMN_NAME.TIMESTAMP)
-                    )
-            
-                # convert to conventional dtype
-                df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
-                
-            return df
         
+            # convert to conventional dtype
+            df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+            
+        return df
+    
     
     def get_data(self, 
                  start=None, 
@@ -594,9 +626,6 @@ class realtime_manager:
         
         Parameters
         ----------
-        recent_time_window : TYPE, string, template '<value><unit>'
-        DESCRIPTION. The default is None. Follows pandas timedelta unit specification
-        https://pandas.pydata.org/docs/reference/api/pandas.Timedelta.html
         start : TYPE, optional
         DESCRIPTION. The default is None.
         end : TYPE, optional
