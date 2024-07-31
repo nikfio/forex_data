@@ -648,7 +648,7 @@ class realtime_manager:
         start = any_date_to_datetime64(start)
         end = any_date_to_datetime64(end)
             
-        data_provider = ''
+        data_df = self._dataframe_type()
         
         # try to get data with alpha_vantage if available
         # alpha vantage provides intraday data with high resolution
@@ -699,10 +699,11 @@ class realtime_manager:
                     
             except BadResponse as e:
                 
+                # to log
                 print(e)
                 return self._dataframe_type([])
             
-        data_provider = REALTIME_DATA_PROVIDER.POLYGON_IO
+        
         
         data_df = self._parse_aggs_data(poly_aggs,
                                         data_provider,
