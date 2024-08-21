@@ -16,6 +16,6 @@ phases:
     commands:
       - poetry lock --no-update
       - poetry install
-  post-build:
+  post_build:
     commands:
       - poetry run pytest
