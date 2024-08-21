@@ -1,0 +1,17 @@
+version: 0.2
+
+env:
+  shell: bash
+  git-credential-helper: yes
+
+phases:
+  install:
+    commands:
+      - git describe all
+      - git status
+      - git log --oneline -10
+    finally:
+      - echo "INSTALL phase commands terminated"
+  build:
+    commands:
+      - poetry install
