@@ -21,15 +21,21 @@ from pandas import (
 # custom lib
 from forex_data import (
                     realtime_manager,
-                    APPCONFIG_YAML
+                    APPCONFIG_FILE_YAML
                 )
 
 
 def main():
     
+    # reset logging handlers
+    logger.remove()
+    
+    # add logging to stderr 
+    logger.add(stderr, level="TRACE")
+    
     realtimedata_manager = realtime_manager(
                             ticker = 'NZDUSD',
-                            config_file = APPCONFIG_YAML
+                            config_file = APPCONFIG_FILE_YAML
     )
     
     # input test request definition

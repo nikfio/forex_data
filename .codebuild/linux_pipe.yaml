@@ -7,15 +7,11 @@ env:
 phases:
   install:
     commands:
-      - whoami
-      - git status
       - git log --oneline -10
+      - poetry lock --no-update
+      - poetry install
     finally:
       - echo "INSTALL phase commands terminated"
   build:
-    commands:
-      - poetry lock --no-update
-      - poetry install
-  post_build:
     commands:
       - poetry run pytest

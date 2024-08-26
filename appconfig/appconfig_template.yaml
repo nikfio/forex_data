@@ -12,4 +12,6 @@ PROVIDERS_KEY:
     POLYGON_IO_KEY    : <POLYGON-IO-API-KEY>
     
 # uncomment row below and modify path to set custom data location 
-# DATA_PATH: 'C:\forex_data\database'    
+# DATA_PATH: 'C:\forex_data\database'  
+
+LOGGING_FILE_PATH: 'PATH TO A FILE .log'  
