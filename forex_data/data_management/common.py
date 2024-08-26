@@ -5,18 +5,53 @@ Created on Sat Apr 30 09:23:19 2022
 @author: fiora
 """
 
-# __all__ = [
-#             'BASE_DATA_COLUMN_NAME'
-#     ]
-
-
-from platform import platform
+__all__ = [
+            'YEARS',
+            'MONTHS',
+            'DATE_FORMAT_HISTDATA_CSV',
+            'HISTDATA_URL_TICKDATA_TEMPLATE',
+            'HISTDATA_BASE_DOWNLOAD_METHOD',
+            'HISTDATA_BASE_DOWNLOAD_URL',
+            'DEFAULT_PATHS',
+            'BASE_DATA_COLUMN_NAME',
+            'SUPPORTED_DATA_FILES',
+            'SUPPORTED_DATA_ENGINES',
+            'ASSET_TYPE',
+            'TEMP_FOLDER',
+            'TEMP_CSV_FILE',
+            'POLARS_DTYPE_DICT',
+            'DATA_COLUMN_NAMES',
+            'FILENAME_TEMPLATE',
+            'DATA_KEY',
+            'TICK_TIMEFRAME',
+            'FILENAME_STR',
+            'DATA_FILE_TYPE',
+            
+            'validator_dir_path',
+            'get_attrs_names',
+            'check_time_offset_str',
+            'check_timeframe_str',
+            'any_date_to_datetime64',
+            'is_empty_dataframe',
+            'get_dotty_leafs',
+            'read_csv',
+            'polars_datetime',
+            'concat_data',
+            'list_remove_duplicates',
+            'get_dotty_key_field',
+            'reframe_data',
+            'write_csv',
+            'write_parquet',
+            'read_csv',
+            'read_parquet',
+            'to_pandas_dataframe'
+            
+    ]
 
 from re import ( 
                 fullmatch,
                 findall,
-                search,
-                IGNORECASE
+                search
     )
 
 # PANDAS
@@ -155,8 +190,9 @@ class FILENAME_TEMPLATE:
     
 class DEFAULT_PATHS:
     
-    HIST_DATA_PATH     = str(Path.home() / '.database'/ 'Historical')
-    REALTIME_DATA_PATH = str(Path.home() / '.database'/ 'Realtime')
+    BASE_PATH               = str(Path.home() / '.database') 
+    HIST_DATA_FOLDER        = 'HistoricalData'
+    REALTIME_DATA_FOLDER    = 'RealtimeData'
     
 class DATA_FILE_TYPE:
     
@@ -204,6 +240,11 @@ class REALTIME_DATA_PROVIDER:
     
     ALPHA_VANTAGE           = 'ALPHA_VANTAGE'
     POLYGON_IO              = 'POLYGON-IO'
+
+
+REALTIME_DATA_PROVIDER_LIST = [REALTIME_DATA_PROVIDER.ALPHA_VANTAGE,
+                               REALTIME_DATA_PROVIDER.POLYGON_IO]
+
 
 class DB_MODE:
     
@@ -548,7 +589,12 @@ class POLARS_DTYPE_DICT:
 
 def empty_dataframe(dataframe_type):
     
-    # TODO: based on input return an aempty instance of dataframe
+    # TODO: based on input return an empty instance of dataframe
+    pass
+
+
+def check_if_empty_dataframe(dataframe):
+    
     pass
 
 
@@ -1183,5 +1229,8 @@ def get_attrs_names(instance_object, **kwargs):
 def list_remove_duplicates(list_in):
     
     return list(dict.fromkeys(list_in))
+
+
+# EXIT CODES
 
     

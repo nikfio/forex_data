@@ -21,20 +21,30 @@ Description:
 """
 
 from forex_data import (
-                            historical_manager,
-                            APPCONFIG_YAML
-                        )
+                        historical_manager,
+                        APPCONFIG_FILE_YAML,
+                        BASE_DATA_COLUMN_NAME,
+                        is_empty_dataframe
+                )
+
+from loguru import logger
+
+from sys import stderr
 
 # TODO: add logging options via input FLAGS
 
 def main():
     
-    # TODO: get logging handler
+    # reset logging handlers
+    logger.remove()
+    
+    # add logging to stderr 
+    logger.add(stderr, level="TRACE")
     
     # historical manager instantiation                            
     histmanager = historical_manager(
                     ticker='NZDUSD',
-                    config_file=APPCONFIG_YAML
+                    config_file=APPCONFIG_FILE_YAML
     )
     
     # # example dates 
@@ -47,7 +57,23 @@ def main():
                                     end       = ex_end_date
     )
     
-    print(yeardata)
+    if not is_empty_dataframe(yeardata):
+        
+        logger.trace(f"""get_data: 
+                     rows {yeardata.shape[0]}
+                     start {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][0]}, 
+                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][-1]}
+                     """
+        )
+        
+    else:
+        
+        logger.trace("""get_data: no data found, "
+                     requested pair {histmanager.ticker}
+                     start {ex_start_date}, "
+                     end {ex_start_date}
+                     """
+        )
                                         
     # add new timeframe
     histmanager.add_timeframe('1W', update_data=True)

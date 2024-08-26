@@ -1,5 +1,5 @@
 
-import logging
+from loguru import logger
 
 from attrs import ( 
                 define,
@@ -57,18 +57,20 @@ from numpy import array
 from pathlib import Path
 from requests import Session
 from io import BytesIO
+from shutil import rmtree
+from sys import stderr
 
 from dotty_dict import (
-                        Dotty, 
-                        dotty
-                    )
+                Dotty, 
+                dotty
+    )
 
 # internally defined
 from .common import *
 from ..config import ( 
-            read_config_file,
-            read_config_string
-        )
+                read_config_file,
+                read_config_string
+    )
 
 
 __all__ = ['historical_manager']
@@ -85,8 +87,6 @@ class historical_manager:
                                   validator=validators.instance_of(str))
     data_filetype   : str = field(default='parquet',
                                   validator=validators.in_(SUPPORTED_DATA_FILES))
-    data_path       : str = field(default=Path(DEFAULT_PATHS.HIST_DATA_PATH),
-                              validator=validator_dir_path(create_if_missing=True))
     engine          : str = field(default='pandas',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
     
@@ -96,6 +96,12 @@ class historical_manager:
     _years   = field(factory=list, validator=validators.instance_of(list))
     _tf_list = field(factory=list, validator=validators.instance_of(list))
     _dataframe_type = field(default=pandas_dataframe)
+    _data_path = field(default= Path(DEFAULT_PATHS.BASE_PATH), 
+                           validator=validator_dir_path(create_if_missing=True))
+    _histdata_path = field(
+                        default = Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.HIST_DATA_FOLDER, 
+                        validator=validator_dir_path(create_if_missing=True)
+                     )
     
     # if a valid config file or string
     # is passed
@@ -116,7 +122,6 @@ class historical_manager:
         
         if kwargs['config_file']:
             
-            
             config_path = Path(kwargs['config_file'])
             config_args = {}
             if config_path.exists() \
@@ -128,21 +133,22 @@ class historical_manager:
                 # read parameters from config file 
                 # and force keys to lower case
                 config_args = {key.lower(): val for key, val in 
-                               read_config_file(config_path.absolute()).items()
-                               }
+                               read_config_file(str(config_path)).items()}
             
             elif isinstance(kwargs['config_file'], str):
                 
                 # read parameters from config file 
                 # and force keys to lower case
                 config_args = {key.lower(): val for key, val in 
-                               read_config_string(kwargs['config_file']).items()
-                               }
+                               read_config_string(kwargs['config_file']).items()}
                 
             else:
             
-                raise TypeError('invalid config_file type '
-                                '{kwargs["config_file"]}')
+                logger.critical('invalid config_file type '
+                                f'{kwargs["config_file"]}: '
+                                'required str or Path, got '
+                                f'{type(kwargs["config_file"])}')
+                raise TypeError
                         
             # check consistency of config_args
             if  (
@@ -151,8 +157,9 @@ class historical_manager:
                     not bool(config_args)
                 ):
                 
-                raise ValueError(f'config_file {kwargs["config_file"]} '
+                logger.critical(f'config_file {kwargs["config_file"]} '
                                  'has no valid yaml formatted data')
+                raise TypeError
             
             self.config_file = kwargs['config_file']
             
@@ -247,18 +254,23 @@ class historical_manager:
         # Fundamentals parameters initialization
         self.ticker = self.ticker.upper()
         
-        # files details variable initialization
-        self.data_path = Path(self.data_path)
-        
+        # checks on data folder path
         if ( 
-            not self.data_path.is_dir() 
+            not self._histdata_path.is_dir() 
             or
-            not self.data_path.exists()
+            not self._histdata_path.exists()
             ):
                     
-            self.data_path.mkdir(parents=True,
-                                 exist_ok=True)
+            self._histdata_path.mkdir(parents=True,
+                                     exist_ok=True)
+            
+        # add logging file handle
+        logger.add(self._data_path / 'forexdata.log', 
+                   level="TRACE",
+                   rotation="5 MB"
+        )
         
+        # set up dataframe engine internal var based on config selection
         if self.engine == 'pandas':
             
             self._dataframe_type = pandas_dataframe 
@@ -306,32 +318,23 @@ class historical_manager:
         # so the original db is not modified
         db_copy = self._db_dict.copy()
 
-        # get keys at year level
-        years_filter_keys = '{ticker}'.format(ticker=self.ticker)
-
-        # pop at year level in data copy
-        year_db = db_copy.pop(years_filter_keys)
-
-        if year_db:
-
-            try:
-                years_keys = year_db.keys()
-            except KeyError:
-                # no active year found --> return empty list
-                return []
-            else:
-
-                # get year value from data keys
-                years_list = [key[FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:]
-                              for key in years_keys]
-                
-                # remove duplicates
-                years_list = list_remove_duplicates(years_list)
-
+        try:
+            # pop at year level in data copy
+            year_db = db_copy.pop(self.ticker)
+            years_keys = year_db.keys()
+        except KeyError:
+            
+            logger.info('no years data in instance in memory database')    
+            return []
+        
         else:
 
-            # empty db --> return empty list
-            return []
+            # get year value from data keys
+            years_list = [key[FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:]
+                          for key in years_keys]
+            
+            # remove duplicates
+            years_list = list_remove_duplicates(years_list)
 
         # sort to have oldest year first
         years_list.sort(key=int)
@@ -446,20 +449,13 @@ class historical_manager:
                             data=data,
                             headers=headers,
                             stream=True
-                        )
+        )
         
         bio = BytesIO()
-    
-        logging.warning("Starting to download: %s - %d - %s" 
-                         % (self.ticker,
-                            year,
-                            MONTHS[month_num-1])
-        )
-            
+          
         # write content to stream
         bio.write(r.content)
         
-        print(flush=True)
         try:
             
             zf = ZipFile(bio)
@@ -467,12 +463,9 @@ class historical_manager:
         except BadZipFile:
 
             # here will be a warning log
-            logging.error('%s - %d - %s not found or invalid download'
-                            %  (self.ticker,
-                                year,
-                                MONTHS[month_num-1])
-            )
-            
+            logger.error('{self.ticker} - {year} - {MONTHS[month_num-1]}: '
+                         'not found or invalid download')
+                            
             return None
 
         else:
@@ -505,9 +498,9 @@ class historical_manager:
             except KeyError:
 
                 # to logging
-                logging.error(f'Requested to reframe {self.ticker} '
-                              f'{year} in timeframe {tf} '
-                              f'but tick data was not found')
+                logger.error(f'Requested to reframe {self.ticker} '
+                             f'{year} in timeframe {tf} '
+                             'but tick data was not found')
 
             else:
 
@@ -549,10 +542,16 @@ class historical_manager:
 
                 self._add_tf_data_key(year, tf)
 
-        # assert no incomplete years found after operation
-        assert self._get_years_list(self.ticker, 'int') \
-            == self._get_tf_complete_years(), \
-            'timeframe completing operation NOT OK'
+        # check consistency, exit if fail
+        if not (
+            self._get_years_list(self.ticker, 'int') 
+            == self._get_tf_complete_years()
+            ):
+            
+            logger.critical('timeframe completing operation FAILED')
+            
+            raise KeyError
+            
 
 
     def _raw_zipfile_to_df(self, 
@@ -695,7 +694,7 @@ class historical_manager:
             p_value = pc.divide(
                             pc.add_checked(df['ask'], df['bid']),
                             2 
-                        )
+            )
        
             # aggregate in a new table
             df = Table.from_arrays(
@@ -708,6 +707,16 @@ class historical_manager:
                     ],
                     schema = schema(PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy().items())
             )
+            
+            # delete temp path
+            try:
+                
+                rmtree(str(tempdir_path))
+                
+            except Exception as e:
+                
+                logger.warning('Deleting temporary data folder '
+                               f'{str(temp_filepath)} not successfull: {e}')
             
         elif engine == 'polars':
             
@@ -754,10 +763,21 @@ class historical_manager:
             
             # final cast to standard dtypes
             df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            
+            # delete temp path
+            try:
+                
+                rmtree(str(tempdir_path))
+                
+            except Exception as e:
+                
+                logger.warning('Deleting temporary data folder '
+                               f'{str(temp_filepath)} not successfull: {e}')
         
         else:
             
-            raise TypeError(f'Engine {engine} is not supported')
+            logger.error(f'Engine {engine} is not supported')
+            raise TypeError
             
         # return dataframe
         return df
@@ -780,7 +800,7 @@ class historical_manager:
 
         """
 
-        ticker_path = self.data_path / self.ticker
+        ticker_path = self._histdata_path / self.ticker
         if not ticker_path.is_dir() or not ticker_path.exists():
             ticker_path.mkdir(parents=True, exist_ok=False)
 
@@ -790,17 +810,25 @@ class historical_manager:
 
         # alternative: get year by referenced key
         year_tf_key = self._db_key(self.ticker, year, tf, 'df')
-        assert isinstance(self._db_dict.get(year_tf_key), 
-                          type(self._dataframe_type([]))), \
-            'key %s is no valid DataFrame' % (year_tf_key)
+        
+        if not (
+            isinstance(self._db_dict.get(year_tf_key), 
+                       type(self._dataframe_type([])))
+            ):
+            
+            logger.error(f'dat with key {year_tf_key} is no valid DataFrame')
+            raise KeyError
+            
         year_data = self._db_dict.get(year_tf_key)
 
         filepath = year_path / self._get_filename(self.ticker, year, tf)
 
         if filepath.exists() and filepath.is_file():
-            logging.info("File {} already exists".format(filepath))
+            
+            logger.info('File {filepath} already exists, skip dump to file')
             return
 
+        # dump data to file
         if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
             
             # csv data file
@@ -815,7 +843,11 @@ class historical_manager:
 
     def _get_file_details(self, filename):
 
-        assert isinstance(filename, str), 'filename type must be str'
+        if not (
+                isinstance(filename, str)
+        ):
+            
+            logger.error('filename {filename} invalid type: required str')
 
         # get years available in offline data (local disk)
         filename_details = filename.replace('_', '.').split(sep='.')
@@ -884,18 +916,21 @@ class historical_manager:
                                         year=year,
                                         month_num=month_num)
             
+            logger.info(f'To download: {self.ticker} - {year} - '
+                        f'{MONTHS[month_num-1]}') 
+            
             file = self._download_month_raw(url, year, month_num)
             
             if file:
                 
                 month_data = self._raw_zipfile_to_df(file,
-                                                     str(self.data_path 
+                                                     str(self._histdata_path 
                                                          / TEMP_FOLDER
                                                          / TEMP_CSV_FILE),
                                                      engine = self.engine
                 )
                  
-                # if first iteration, assign isntead of concat
+                # if first iteration, assign instead of concat
                 if is_empty_dataframe(year_tick_df):
                     
                     year_tick_df = month_data
@@ -906,7 +941,7 @@ class historical_manager:
                     
                 
                     
-        (self.data_path / TEMP_FOLDER / TEMP_CSV_FILE).unlink(missing_ok=True)
+        (self._histdata_path / TEMP_FOLDER / TEMP_CSV_FILE).unlink(missing_ok=True)
             
         return year_tick_df
 
@@ -916,12 +951,21 @@ class historical_manager:
                  search_local=False):
 
         # assert on years req
-        assert isinstance(years, list), \
-            'years {} invalid, must be list type'.format(years)
+        if not(
+                isinstance(years, list)
+            ):
+            
+            logger.error('years {years} invalid, must be list type')
+            raise TypeError
 
-        assert set(years).issubset(YEARS), \
-            'YEARS requested must contained in available years'
-
+        if not(
+                set(years).issubset(YEARS)
+            ):
+            
+            logger.error('requestedyears{years} not available. '
+                        'Years must be limited to: {YEARS}')
+            raise ValueError
+            
         # convert to list of int
         if not all(isinstance(year, int) for year in years):
             years = [int(year) for year in years]
@@ -957,7 +1001,7 @@ class historical_manager:
         local_files_name = []
         
         # prepare predefined path and check if exists
-        tickerfolder_path = Path(self.data_path) / self.ticker
+        tickerfolder_path = Path(self._histdata_path) / self.ticker
         if not (
             tickerfolder_path.exists() \
             and 
@@ -1051,23 +1095,6 @@ class historical_manager:
                                 # tick data file 
                                 if file_tf == TICK_TIMEFRAME:
             
-                                    # perform tick file upload
-                                    '''
-                                    # use dask library as tick csv files can be very large
-                                    # time gain is significative even compared to using
-                                    # pandas read_csv with chunksize tuning
-                                    dask_df = dd.read_csv(
-                                                file,
-                                                header=0,
-                                                names=DATA_COLUMN_NAMES.TICK_DATA,
-                                                dtype=DTYPE_DICT.TICK_DTYPE,
-                                                parse_dates=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
-                                                date_format=DATE_FORMAT_ISO8601
-                                    )
-            
-                                    self._db_dict[year_tf_key] = \
-                                        dask_df.compute()
-                                    '''
                                     self._db_dict[year_tf_key] = \
                                         read_csv(  
                                             'pandas',
@@ -1172,8 +1199,9 @@ class historical_manager:
                             
                             else:
                                 
-                                raise TypeError(f'Engine {engine}'
-                                                ' is not supported')
+                                logger.error(f'Engine {engine} not supported '
+                                             f'available: {SUPPORTED_DATA_ENGINES}')
+                                raise TypeError
                     
                         elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
                         
@@ -1182,8 +1210,9 @@ class historical_manager:
                             
                         else:
                             
-                            raise TypeError(f'file {file} extension '
-                                            ' is not supported')
+                            logger.error(f'file type {self.data_filetype} not supported '
+                                         f'available: {SUPPORTED_DATA_FILES}')
+                            raise TypeError
                             
                             
                         
@@ -1263,8 +1292,10 @@ class historical_manager:
 
         """
 
-        assert check_time_offset_str(timeframe), \
-            f'timeframe request {timeframe} invalid'
+        if not check_time_offset_str(timeframe):
+            
+            logger.error(f'timeframe request {timeframe} invalid')
+            raise ValueError
             
         # try to convert to datetime data type if not already is
         if self.engine == 'polars':
@@ -1280,8 +1311,11 @@ class historical_manager:
             start = any_date_to_datetime64(start)
             end = any_date_to_datetime64(end)
 
-        assert end > start, \
-            'date interval not coherent, start must be older than end'
+        if end < start:
+            
+            logger.error('date interval not coherent, '
+                         'start must be older than end')
+            return self._dataframe_type([])
 
         if not timeframe in self._tf_list \
             and add_timeframe:
@@ -1347,9 +1381,11 @@ class historical_manager:
                                                             DATA_KEY.TF_INDEX) \
                                         == timeframe]
             
-            assert years_interval_req == interval_keys_years, \
-                    f'processing year data completion for {years_interval_req} ' \
-                    'not ok'
+            if not( years_interval_req == interval_keys_years ):
+            
+                logger.critical(f'processing year data completion for '
+                                f'{years_interval_req} not ok')
+                raise ValueError
                     
         # at this point data keys necessary are completed
         
@@ -1405,8 +1441,9 @@ class historical_manager:
             
             else:
                 
-                raise TypeError(f'engine {self.engine} not supported'
-                                ' for get_data function')
+                logger.error(f'engine {self.engine} not supported'
+                             ' for get_data function')
+                raise TypeError
             
         else:
 
@@ -1466,8 +1503,9 @@ class historical_manager:
                     
             else:
                 
-                raise TypeError(f'engine {self.engine} not supported'
-                                ' for get_data function')
+                logger.error(f'engine {self.engine} not supported'
+                             ' for get_data function')
+                raise TypeError
             
     
         return data_df
@@ -1481,8 +1519,8 @@ class historical_manager:
         :return: void
         """
 
-        logging.info(f'Chart request: from {start_date} '
-                     f'to {end_date} with timeframe {timeframe}')
+        logger.info(f'Chart request: from {start_date} '
+                    f'to {end_date} with timeframe {timeframe}')
         
         chart_data = self.get_data(timeframe     = timeframe,
                                    start         = start_date,

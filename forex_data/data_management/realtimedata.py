@@ -5,7 +5,9 @@ Created on Mon Apr 25 18:07:21 2022
 @author: fiora
 """
 
-import logging
+from loguru import logger
+
+from pathlib import Path
 
 from attrs import ( 
                     define,
@@ -87,8 +89,6 @@ class realtime_manager:
                               validator=validators.instance_of(str))
     data_filetype   : str = field(default='parquet',
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
-    data_path       : str = field(default=Path(DEFAULT_PATHS.REALTIME_DATA_PATH),
-                              validator=validator_dir_path(create_if_missing=True))
     engine          : str = field(default='pandas',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
     
@@ -96,6 +96,8 @@ class realtime_manager:
     _db_dict        = field(factory=dotty,
                             validator=validators.instance_of(Dotty))
     _dataframe_type = field(default=pandas_dataframe)
+    _data_path = field(default = Path(DEFAULT_PATHS.BASE_PATH), 
+                       validator=validator_dir_path(create_if_missing=True))
     _ticker_polygonio    = field(default='',
                                  validator=validators.instance_of(str))
     _ticker_alphavantage = field(default='',
@@ -260,13 +262,33 @@ class realtime_manager:
         self._to_symbol, self._from_symbol = \
             get_pair_symbols(self.ticker)
         
-        # files details variable initialization
-        self.data_path = Path(self.data_path)    
+        # set realtime data folder
+        self._realtimedata_path = field(
+            default = self._data_path / DEFAULT_PATHS.REALTIME_DATA_FOLDER, 
+            validator=validator_dir_path(create_if_missing=True)
+        )
+        
+        # checks on data folder path
+        if ( 
+            not self._realtimedata_path.is_dir() 
+            or
+            not self._realtimedata_path.exists()
+            ):
+                    
+            self._realtimedata_path.mkdir(parents=True,
+                                          exist_ok=True)
+        
+        # add logging file handle
+        logger.add(self.data_path / 'forexdata.log', level="TRACE")
         
         if self.engine == 'pandas':
             
             self._dataframe_type = pandas_dataframe 
 
+        elif self.engine == 'pyarrow':
+            
+            self._dataframe_type = pyarrow_table 
+            
         elif self.engine == 'polars':
             
             self._dataframe_type = polars_dataframe
@@ -276,6 +298,7 @@ class realtime_manager:
                 self.ticker,
                 REALTIME_DATA_PROVIDER.POLYGON_IO
         )
+        
     
     def _getClient(self, provider):
         
@@ -288,7 +311,6 @@ class realtime_manager:
             
             return polygonio_client(api_key =
                                     self.providers_key[POLY_IO_KEY_ENV])
-        
         
     
     def tickers_list(self, 
@@ -382,8 +404,10 @@ class realtime_manager:
                 )
                 
                 # parse response and return
-                return self._parse_av_daily_data(res,
-                                                 last_close=True)
+                return self._parse_data_daily_alphavantage(
+                                    res,
+                                    last_close=True
+                )
                 
             else:
                 
@@ -401,7 +425,7 @@ class realtime_manager:
                                                                         outputsize='full')
                 
                 # parse response and return
-                return self._parse_av_daily_data(res,
+                return self._parse_data_daily_alphavantage(res,
                                                  last_close=False,
                                                  recent_days_window=recent_days_window, 
                                                  day_start=day_start, 
@@ -413,7 +437,25 @@ class realtime_manager:
             return self._dataframe_type([])
             
             
+    def _parse_aggs_data(self, data_provider, **kwargs):
         
+        if data_provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+            
+            return self._parse_data_daily_alphavantage(**kwargs)
+        
+        elif data_provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
+        
+            return self._parse_data_aggs_polygonio(**kwargs)
+        
+        else:
+            
+            # to log
+            print(f'data provider {data_provider} is invalid '
+                  '- supported providers: {REALTIME_DATA_PROVIDER_LIST}')
+            
+            return self._dataframe_type()
+            
+            
     def _parse_data_daily_alphavantage(
             self, 
             daily_data,
@@ -648,68 +690,44 @@ class realtime_manager:
         start = any_date_to_datetime64(start)
         end = any_date_to_datetime64(end)
             
-        data_df = self._dataframe_type()
+        # forward request only to polygon-io
         
-        # try to get data with alpha_vantage if available
-        # alpha vantage provides intraday data with high resolution
-        
-        # TODO: add check if alpha vantage key relates to
-        #       premium subscription
-        # if pd.Timestamp(start).tz_convert('utc')  \
-        #     > pd.Timestamp.utcnow().normalize():
-        
-        #     # using alpha vantage wrapper
-        #     # use alpha vantage intraday option if start date is later than last midnight
-        #     # intraday from alpha vantage needs premium subscription
-        #     data, meta_data = self._av_reader.get_currency_exchange_intraday(self._to_symbol,
-        #                                                                      self._from_symbol,
-        #                                                                      interval='1min',
-        #                                                                      outputsize='full')
+        try:
+                
+            client = self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO)
             
-        #     # parse response
-        #     data_df = pd.DataFrame(data)
-        #     data_provider = REALTIME_DATA_PROVIDER.ALPHA_VANTAGE
-        
-        # if alpha vantage fails or it is not available 
-        # --> polygon-ai is the backup provider
-        
-        avdata_valid = False
-        
-        if not avdata_valid:
+            poly_aggs = []
             
-            try:
+            # TODO: set up try-except with BadResponse to manage provider 
+            # subcription limitation
+            
+            # using Polygon-io client
+            for a in client.list_aggs(  ticker      = self._ticker_polygonio, 
+                                        multiplier  = 1, 
+                                        timespan    = 'minute', 
+                                        from_       = start,
+                                        to          = end,
+                                        adjusted    = True,
+                                        sort        = 'asc' ):
                 
-                client = self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO)
-                
-                poly_aggs = []
-                
-                # TODO: set up try-except with BadResponse to manage provider 
-                # subcription limitation
-                
-                # using Polygon-io client
-                for a in client.list_aggs(  ticker      = self._ticker_polygonio, 
-                                            multiplier  = 1, 
-                                            timespan    = 'minute', 
-                                            from_       = start,
-                                            to          = end,
-                                            adjusted    = True,
-                                            sort        = 'asc' ):
+                poly_aggs.append(a)
                     
-                    poly_aggs.append(a)
-                    
-            except BadResponse as e:
-                
-                # to log
-                print(e)
-                return self._dataframe_type([])
+        except BadResponse as e:
             
-        
+            # to log
+            print(e)
+            return self._dataframe_type([])
+            
         
         data_df = self._parse_aggs_data(poly_aggs,
-                                        data_provider,
+                                        REALTIME_DATA_PROVIDER.POLYGON_IO,
                                         engine=self.engine)
         
-        if check_timeframe_str(timeframe):
+        if (  
+            check_timeframe_str(timeframe)
+            and
+            data_df != self._dataframe_type()
+            ):
         
             return reframe_data(data_df, timeframe)
         

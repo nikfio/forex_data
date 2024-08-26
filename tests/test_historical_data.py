@@ -129,14 +129,17 @@ class TestHistData(unittest.TestCase):
                              + f'{check[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP]}')
         )
         
+        
     def test_data_filetypes(self):
         
         pass
+    
     
     def test_engines(self):
         
         pass
         
+    
     def test_add_timeframe(self):
         
         pass

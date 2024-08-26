@@ -9,6 +9,8 @@ import yaml
 
 from pathlib import Path
 
+from loguru import logger 
+
 
 appconfig_folder = Path(__file__).parent.parent.parent / 'appconfig'
 
@@ -22,11 +24,13 @@ if (
     len(appconfig_filepath) == 1
     ):
     
-    APPCONFIG_YAML = str(appconfig_filepath[0])
+    APPCONFIG_FILE_YAML = str(appconfig_filepath[0])
     
 else:
     
-    APPCONFIG_YAML = ''
+     APPCONFIG_FILE_YAML = ''
+     
+     logger.warning('no config file present')
 
 
 def read_config_file(config_file):
@@ -34,28 +38,52 @@ def read_config_file(config_file):
     # assert compliant filepath 
     filepath = Path(config_file)
     
-    assert filepath.exists()  \
-           and filepath.is_file() \
-           and filepath.suffix == '.yaml', \
-           'invalid setting .yaml file: {}'.format(filepath.resolve())
+    if not(
+           filepath.exists()
+           and 
+           filepath.is_file() 
+           and 
+           filepath.suffix == '.yaml'
+    ):
+            
+        logger.error(f'invalid config .yaml file: {config_file}')
+        exit(0)
     
-    # open and read .yaml configuration file
-    with open(filepath) as settings_file:
+    with open(filepath) as stream:
         
-        data = yaml.load(settings_file, Loader=yaml.FullLoader)
-    
-    
+        try:
+            
+            data = yaml.safe_load(stream)
+            
+        except yaml.YAMLError as e:
+            
+            logger.error('error loading yaml config data from '
+                         f'{str(filepath)}: {e}')
+            raise
+            
     return data
 
 
-def read_config_string(config_string):
+def read_config_string(config_str):
     
-    # open and read .yaml configuration file
-    data = yaml.load(config_string, Loader=yaml.FullLoader)
+    if not(
+           isinstance(config_str, str)
+    ):
+            
+        logger.error('invalid config .yaml string: required type str')
+        exit(0)
+        
+    # open and read .yaml configuration file as a string
+    try:
+        
+        data = yaml.safe_load(config_str)
+      
+    except yaml.YAMLError as e:
+        
+        logger.error('error loading yaml config data from '
+                     f'{config_str}: {e}')
+        raise
+    
         
     return data
 
-    
-def dump_config_file(filepath, data):
-    
-    pass

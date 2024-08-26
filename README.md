@@ -81,7 +81,7 @@ poetry run pytest
 A configuration file can be passed in order to group fixed parameters values.
 In repository folder clone, look for [appconfig folder](appconfig) to see the [example template file](appconfig/appconfig_template.yaml).
 
-At any run, the package looks for a file called `appconfig.yaml` and associates it to a variable called `APPCONFIG_YAML` so that it is simpler to use a default config file in package modules calls.
+At any run, the package looks for a file called `appconfig.yaml` and associates it to a variable called `APPCONFIG_FILE_YAML` so that it is simpler to use a default config file in package modules calls.
 
 In data managers instantiation, you can pass the configuration file but any parameter value can be overridden by explicit assignment in object instantion.
 The feature will be more clear following the [examples section](#examples).
@@ -137,7 +137,7 @@ Let's walk through the [example for historical data source](test/test_hist_data_
     ```                            
     histmanager = historical_manager(
                     ticker='NZDUSD',
-                    config_file=APPCONFIG_YAML
+                    config_file=APPCONFIG_FILE_YAML
     )
     ```
     as mentioned in section [configuration](#configuration-file), you can see the feature of overriding the parameter `ticker` by direct assignment in object instantiation, meanwhile the remaining parameters value are assigned by the configuration file.
@@ -208,7 +208,7 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
     ```
     realtimedata_manager = realtime_manager(
                             ticker = 'NZDUSD',
-                            config_file = APPCONFIG_YAML
+                            config_file = APPCONFIG_FILE_YAML
     )
     ```
 2. **get last daily close**
