@@ -25,7 +25,11 @@ __all__ = [
             'DATA_KEY',
             'TICK_TIMEFRAME',
             'FILENAME_STR',
-            'DATA_FILE_TYPE',
+            'REALTIME_DATA_PROVIDER',
+            'ALPHA_VANTAGE_KEY_ENV',
+            'CANONICAL_INDEX',
+            'DATE_NO_HOUR_FORMAT',
+            'POLY_IO_KEY_ENV',
             
             'validator_dir_path',
             'get_attrs_names',
@@ -34,6 +38,7 @@ __all__ = [
             'any_date_to_datetime64',
             'is_empty_dataframe',
             'get_dotty_leafs',
+            'astype',
             'read_csv',
             'polars_datetime',
             'concat_data',
@@ -44,9 +49,14 @@ __all__ = [
             'write_parquet',
             'read_csv',
             'read_parquet',
-            'to_pandas_dataframe'
+            'to_pandas_dataframe',
+            'get_pair_symbols',
+            'to_source_symbol',
+            'get_date_interval'
             
     ]
+
+from loguru import logger
 
 from re import ( 
                 fullmatch,
@@ -309,9 +319,14 @@ def check_timeframe_str(tf):
     else:
     
         try:
+            
             to_offset(tf) 
+            
         except ValueError:
-            raise ValueError("Invalid timeframe: %s" % (tf))
+            
+            logger.critical(f"Invalid date offset: {tf}")
+            raise 
+        
         else: 
             return tf
 
@@ -399,7 +414,9 @@ def timewindow_str_to_timedelta(time_window_str):
     
     else:
         
-        raise ValueError('time window pattern not match: "<integer_multiplier><unit>" str')
+        logger.error('time window pattern not match: '
+                     '"<integer_multiplier><unit>" str')
+        raise ValueError
         
         
 def any_date_to_datetime64(any_date, 
@@ -419,10 +436,10 @@ def any_date_to_datetime64(any_date,
             
     except Exception as e:
         
-        #TODO: to log
-        raise ValueError(f'date {any_date} conversion failed, '
-                         f'faile conversion to {date_format} '
-                         'date format')
+        logger.error(f'date {any_date} conversion failed, '
+                     f'failed conversion to {date_format} '
+                     'date format')
+        raise
     
 # =============================================================================
 #   TODO: is it necessary utc timezone when source is naive? 
@@ -483,9 +500,14 @@ def get_date_interval(start=None,
                             byweekday=(MO,TU,WE,TH,FR))
                     )
                 
-    assert isinstance(start_date, Timestamp) \
-           and isinstance(end_date, Timestamp), \
-           'start or end is not a valid Timestamp instance'
+    if not (
+            isinstance(start_date, Timestamp)
+            and
+            isinstance(end_date, Timestamp)
+            ):
+        
+        logger.error('start or end is not a valid Timestamp type')
+        raise TypeError
     
     if normalize:
         
@@ -614,9 +636,10 @@ def is_empty_dataframe(dataframe):
     
     else:
         
-        raise ValueError('function is_empty_dataframe not available'
-                         ' for instance of type'
-                         f' {type(dataframe)}') 
+        logger.error('function is_empty_dataframe not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        raise ValueError 
     
     
 def dtype_dict_to_pyarrow_schema(dtype_dict):
@@ -640,9 +663,10 @@ def astype(dataframe, dtype_dict):
     
     else:
         
-        raise ValueError('function astype not available'
-                         ' for instance of type'
-                         f' {type(dataframe)}')
+        logger.error('function astype not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        raise ValueError
 
 
 def read_parquet(engine, filepath):
@@ -661,8 +685,9 @@ def read_parquet(engine, filepath):
     
     else:
         
-        raise ValueError('function read_parquet not available'
-                         f' for engine {engine}')
+        logger.error('function read_parquet not available'
+                     f' for engine {engine}')
+        raise ValueError
                          
     
 def write_parquet(dataframe, filepath):
@@ -675,7 +700,8 @@ def write_parquet(dataframe, filepath):
         
         except Exception as e:
             
-            raise Exception(f'pandas write parquet failed: {e}')
+            logger.exception(f'pandas write parquet failed: {e}')
+            raise 
     
     elif isinstance(dataframe, Table):
         
@@ -685,7 +711,8 @@ def write_parquet(dataframe, filepath):
             
         except Exception as e:
             
-            raise Exception(f'pyarrow write parquet failed: {e}')
+            logger.exception(f'pyarrow write parquet failed: {e}')
+            raise 
             
     elif isinstance(dataframe, polars_dataframe):
     
@@ -695,13 +722,15 @@ def write_parquet(dataframe, filepath):
         
         except Exception as e:
             
-            raise Exception(f'polars write parquet failed: {e}')
+            logger.exception(f'polars write parquet failed: {e}')
+            raise 
     
     else:
         
-        raise ValueError('function write_parquet not available'
-                         ' for instance of type'
-                         f' {type(dataframe)}')
+        logger.error('function write_parquet not available'
+                    ' for instance of type'
+                    f' {type(dataframe)}')
+        raise ValueError
 
 
 def read_csv(data_engine, file, **kwargs):
@@ -720,8 +749,9 @@ def read_csv(data_engine, file, **kwargs):
     
     else:
         
-        raise ValueError('function read_csv not available'
-                         f' for engine {data_engine}')
+        logger.error('function read_csv not available'
+                     f' for engine {data_engine}')
+        raise ValueError
         
 
 def write_csv(dataframe, file, **kwargs):
@@ -744,8 +774,9 @@ def write_csv(dataframe, file, **kwargs):
             
         except Exception as e:
             
-            raise IOError(f'Error writing csv file {file}'
-                          f' with data type {type(dataframe)}: {e}')
+            logger.exception(f'Error writing csv file {file}'
+                             f' with data type {type(dataframe)}: {e}')
+            raise IOError
     
     elif isinstance(dataframe, Table):
         
@@ -755,8 +786,9 @@ def write_csv(dataframe, file, **kwargs):
             
         except Exception as e:
             
-            raise IOError(f'Error writing csv file {file}'
-                          f' with data type {type(dataframe)}: {e}')
+            logger.exception(f'Error writing csv file {file}'
+                             f' with data type {type(dataframe)}: {e}')
+            raise IOError
     
     elif isinstance(dataframe, polars_dataframe):
         
@@ -766,21 +798,25 @@ def write_csv(dataframe, file, **kwargs):
             
         except Exception as e:
             
-            raise IOError(f'Error writing csv file {file}'
-                          f' with data type {type(dataframe)}: {e}')
+            logger.exception(f'Error writing csv file {file}'
+                             f' with data type {type(dataframe)}: {e}')
+            raise IOError
     
     else:
         
-        raise ValueError('function write_csv not available'
-                         ' for instance of type'
-                         f' {type(dataframe)}')
+        logger.error('function write_csv not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        raise ValueError
 
 
 def concat_data(data_list = field(validator=
                                   validators.instance_of(list))):
     
     if not isinstance(data_list, list):
-        raise TypeError('required input as list')
+        
+        logger.error('required input as list')
+        raise TypeError
         
     # assume data type is unique by input
     # get type from first element
@@ -801,9 +837,10 @@ def concat_data(data_list = field(validator=
     
     else:
         
-        raise ValueError('function concat not available'
-                         ' for instance of type'
-                         f' {type(data_list[0])}')
+        logger.error('function concat not available'
+                    ' for instance of type'
+                    f' {type(data_list[0])}')
+        raise ValueError
     
 
 def to_pandas_dataframe(dataframe):
@@ -828,9 +865,10 @@ def to_pandas_dataframe(dataframe):
     
     else:
         
-        raise ValueError('function to_pandas() not available'
-                         ' for instance of type'
-                         f' {type(dataframe)}')
+        logger.error('function to_pandas() not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        raise ValueError
     
     
 def reframe_data(dataframe, tf):
@@ -856,19 +894,21 @@ def reframe_data(dataframe, tf):
 
     '''
     
+    if is_empty_dataframe(dataframe):
+        
+        return dataframe
     
     # assert timeframe input value
     tf = check_timeframe_str(tf)
 
-    assert tf != TICK_TIMEFRAME, \
-        f'reframe not possible wih target {TICK_TIMEFRAME}'
+    if tf == TICK_TIMEFRAME:
+        
+        logger.warning(f'reframe not possible wih target {TICK_TIMEFRAME}')
+    
+        return dataframe
     
     if isinstance(dataframe, pandas_dataframe):
-        
-        if dataframe.empty:
             
-            return dataframe 
-        
         if not is_datetime64_any_dtype(dataframe.index):
             
             if BASE_DATA_COLUMN_NAME.TIMESTAMP in dataframe.columns:
@@ -882,16 +922,16 @@ def reframe_data(dataframe, tf):
                             
                     except Exception as e:
                         
-                        raise TypeError('Pandas engine: '
-                                        'Failed conversion of timestamp columns '
-                                        'to DatetimeIndex')
+                        logger.exception('Pandas engine: '
+                                         'Failed conversion of timestamp columns '
+                                         'to DatetimeIndex')
+                        raise 
                         
             else:
                 
-                raise ValueError(
-                    'Pandas engine: required column with '
-                    f'name {BASE_DATA_COLUMN_NAME.TIMESTAMP}'
-                )
+                logger.error('Pandas engine: required column with '
+                             f'name {BASE_DATA_COLUMN_NAME.TIMESTAMP}')
+                raise ValueError
         
         ## use pandas functions to reframe data on pandas Dataframe
         
@@ -916,9 +956,10 @@ def reframe_data(dataframe, tf):
             
         else:
             
-            raise ValueError(f'data columns {dataframe.columns} invalid, '
-                             f'required {DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX} '
-                             f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
+            logger.error(f'data columns {dataframe.columns} invalid, '
+                        f'required {DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX} '
+                        f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
+            raise ValueError
             
         return df.reset_index(drop=False)
             
@@ -962,11 +1003,7 @@ def reframe_data(dataframe, tf):
        
     
     elif isinstance(dataframe, polars_dataframe):
-        
-        if dataframe.is_empty():
-            
-            return dataframe
-        
+          
         tf = tf.lower()
         
         dataframe = dataframe.sort('timestamp', nulls_last=True)
@@ -995,9 +1032,10 @@ def reframe_data(dataframe, tf):
         
         else:
             
-            raise ValueError(f'data columns {dataframe.columns} invalid, '
-                             f'required {DATA_COLUMN_NAMES.TICK_DATA} '
-                             f'or {DATA_COLUMN_NAMES.TF_DATA}')
+            logger.error(f'data columns {dataframe.columns} invalid, '
+                         f'required {DATA_COLUMN_NAMES.TICK_DATA} '
+                         f'or {DATA_COLUMN_NAMES.TF_DATA}')
+            raise ValueError
 
 
 # TODO: function to return filter data with inputs:
@@ -1021,8 +1059,10 @@ def filter_data(
 
 def get_dotty_key_field(key, index):
     
-    assert isinstance(key, str), \
-            f'dotty key {key} invalid type, str required'
+    if not isinstance(key, str):
+        
+        logger.error(f'dotty key {key} invalid type, str required')
+        raise TypeError
     
     try:
     
@@ -1030,7 +1070,8 @@ def get_dotty_key_field(key, index):
         
     except IndexError:
         
-        raise IndexError(f'index {index} invalid for key {key}')
+        logger.exception(f'index {index} invalid for key {key}')
+        raise 
         
     
     return field
@@ -1049,8 +1090,13 @@ def get_dotty_keys(dotty_dict,
     
     elif level:
         
-        assert isinstance(level, int) \
-               and level >= 0, 'level must be zero or positive integer'
+        if not(
+            isinstance(level, int) 
+            and
+            level >= 0):
+            
+            logger.error('level must be zero or positive integer')
+            raise ValueError
                
         # default start at root key
         level_counter = 0
@@ -1059,7 +1105,9 @@ def get_dotty_keys(dotty_dict,
         
     elif parent_key:
         
-        assert isinstance(parent_key, str), 'parent key must be str'
+        if not isinstance(parent_key, str):
+        
+            logger.error('parent key must be str')
         
         parent_dict = dotty_copy.pop(parent_key)
         
@@ -1069,9 +1117,7 @@ def get_dotty_keys(dotty_dict,
                 keys = parent_dict.keys()
             except KeyError as err:
                 
-                # TODO: error to be logged, now print
-                print( '{error} : keys not found under {parent}'.format(error=str(err),
-                                                                        parent=parent_key) )
+                logger.exception(f'{err} : keys not found under {parent_key}')
                 return []
                 
             else:
@@ -1081,7 +1127,8 @@ def get_dotty_keys(dotty_dict,
         
         else:
             
-            raise KeyError( '{parent} key not exist'.format(parent=parent_key) )
+            logger.error('{parent_key} key not exist')
+            raise KeyError
                 
                 
 def get_dotty_leafs(dotty_dict):
@@ -1120,7 +1167,10 @@ def get_dotty_leafs(dotty_dict):
 
 def get_dotty_key_parent(key):
     
-    assert isinstance(key, str), 'dotty key must be str type'
+    if isinstance(key, str):
+        
+        logger.error('dotty key must be str type')
+        raise TypeError
     
     # prune last field and rejoin with '.' separator
     # to recreate a dotty key
@@ -1154,7 +1204,8 @@ def validator_dir_path(create_if_missing=False):
                 Path(value).is_dir()
             ):
                 
-                raise ValueError('Required a valid directory path')
+                logger.error(f'Directory {value} not valid')
+                raise TypeError()
                 
     return validate_or_create_dir
         
@@ -1163,7 +1214,8 @@ def validator_list_timeframe(instance, attribute, value):
     
     if not isinstance(value, list):
         
-        raise TypeError(f'Required type list for argument {attribute}')
+        logger.error(f'Required type list for argument {attribute}')
+        raise TypeError
         
     if not all([
                 check_time_offset_str(val) 
@@ -1192,8 +1244,9 @@ def validator_list_ge(min_value):
                      for val in value])
         ):
             
-            raise TypeError('Required list of int type for argument '
-                            f'{attribute}')
+            logger.error('Required list of int type for argument '
+                         f'{attribute}')
+            raise TypeError
             
         if any([ 
                 val < min_value
@@ -1207,8 +1260,9 @@ def validator_list_ge(min_value):
                 ]
             ]
             
-            raise ValueError(f'Values in {attribute}: {fails} '
-                             f'are not greater than {min_value}')
+            logger.error(f'Values in {attribute}: {fails} '
+                         f'are not greater than {min_value}')
+            raise ValueError
     
 ## ATTRIBUTES
 
@@ -1221,8 +1275,9 @@ def get_attrs_names(instance_object, **kwargs):
         
     else:
         
-        raise KeyError('attribute "__attrs__attrs__" not found in '
-                       f'object {instance_object}')
+        logger.error('attribute "__attrs__attrs__" not found in '
+                     f'object {instance_object}')
+        raise KeyError
         
 # GENERIC UTILITIES
 

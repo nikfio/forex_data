@@ -100,8 +100,7 @@ class historical_manager:
                            validator=validator_dir_path(create_if_missing=True))
     _histdata_path = field(
                         default = Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.HIST_DATA_FOLDER, 
-                        validator=validator_dir_path(create_if_missing=True)
-                     )
+                        validator=validator_dir_path(create_if_missing=True))
     
     # if a valid config file or string
     # is passed
@@ -251,6 +250,9 @@ class historical_manager:
             
     def __attrs_post_init__(self):
         
+        # reset logging handlers
+        logger.remove()
+        
         # Fundamentals parameters initialization
         self.ticker = self.ticker.upper()
         
@@ -262,7 +264,7 @@ class historical_manager:
             ):
                     
             self._histdata_path.mkdir(parents=True,
-                                     exist_ok=True)
+                                      exist_ok=True)
             
         # add logging file handle
         logger.add(self._data_path / 'forexdata.log', 
@@ -950,7 +952,6 @@ class historical_manager:
                  years,
                  search_local=False):
 
-        # assert on years req
         if not(
                 isinstance(years, list)
             ):
@@ -1245,9 +1246,14 @@ class historical_manager:
 
             timeframe = [timeframe]
 
-        assert isinstance(timeframe, list) \
-            and all([isinstance(tf, str) for tf in timeframe]), \
-            'timeframe invalid: str or list required'
+        if not(
+            isinstance(timeframe, list) \
+            and 
+            all([isinstance(tf, str) for tf in timeframe])
+            ):
+            
+            logger.error('timeframe invalid: str or list required')
+            raise TypeError
 
         tf_list = [check_timeframe_str(tf) for tf in timeframe]
 

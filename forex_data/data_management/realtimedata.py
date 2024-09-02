@@ -23,7 +23,7 @@ from pandas import (
 
 # PYARROW
 from pyarrow import (
-                    table as pyarrow_table,
+                    table as pyarrow_table
     )
 
 # POLARS
@@ -98,6 +98,10 @@ class realtime_manager:
     _dataframe_type = field(default=pandas_dataframe)
     _data_path = field(default = Path(DEFAULT_PATHS.BASE_PATH), 
                        validator=validator_dir_path(create_if_missing=True))
+    _realtimedata_path = field(
+                        default = Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.REALTIME_DATA_FOLDER, 
+                        validator=validator_dir_path(create_if_missing=True)
+                     )
     _ticker_polygonio    = field(default='',
                                  validator=validators.instance_of(str))
     _ticker_alphavantage = field(default='',
@@ -140,8 +144,7 @@ class realtime_manager:
                 # read parameters from config file 
                 # and force keys to lower case
                 config_args = {key.lower(): val for key, val in 
-                               read_config_file(config_path.absolute()).items()
-                               }
+                               read_config_file(str(config_path)).items()}
             
             elif isinstance(kwargs['config_file'], str):
                 
@@ -153,8 +156,9 @@ class realtime_manager:
                 
             else:
             
-                raise TypeError('invalid config_file type '
-                                '{kwargs["config_file"]}')
+                logger.error('invalid config_file type '
+                             '{kwargs["config_file"]}')
+                raise TypeError
                         
             # check consistency of config_args
             if  (
@@ -163,8 +167,9 @@ class realtime_manager:
                     not bool(config_args)
                 ):
                 
-                raise ValueError(f'config_file {kwargs["config_file"]} '
-                                 'has no valid yaml formatted data')
+                logger.error(f'config_file {kwargs["config_file"]} '
+                             'has no valid yaml formatted data')
+                raise ValueError
             
             self.config_file = kwargs['config_file']
             
@@ -256,17 +261,15 @@ class realtime_manager:
             
     def __attrs_post_init__(self):
         
+        # reset logging handlers
+        logger.remove()
+        
         # Fundamentals parameters initialization
         self.ticker = self.ticker.upper()
         
         self._to_symbol, self._from_symbol = \
             get_pair_symbols(self.ticker)
         
-        # set realtime data folder
-        self._realtimedata_path = field(
-            default = self._data_path / DEFAULT_PATHS.REALTIME_DATA_FOLDER, 
-            validator=validator_dir_path(create_if_missing=True)
-        )
         
         # checks on data folder path
         if ( 
@@ -279,7 +282,10 @@ class realtime_manager:
                                           exist_ok=True)
         
         # add logging file handle
-        logger.add(self.data_path / 'forexdata.log', level="TRACE")
+        logger.add(self._data_path / 'forexdata.log',
+                   level="TRACE",
+                   rotation="5 MB"
+        )
         
         if self.engine == 'pandas':
             
@@ -334,7 +340,8 @@ class realtime_manager:
                 
                 if asset_class == ASSET_TYPE.FOREX:
                     
-                    raise ValueError('alpha vantage listing not including forex tickers') 
+                    logger.error('alpha vantage listing not including forex tickers')
+                    raise ValueError 
                     
                 elif asset_class == ASSET_TYPE.ETF:
                     
@@ -433,7 +440,7 @@ class realtime_manager:
             
         except BadResponse as e:
             
-            print(e)
+            logger.warning(e)
             return self._dataframe_type([])
             
             
@@ -449,9 +456,8 @@ class realtime_manager:
         
         else:
             
-            # to log
-            print(f'data provider {data_provider} is invalid '
-                  '- supported providers: {REALTIME_DATA_PROVIDER_LIST}')
+            logger.error(f'data provider {data_provider} is invalid '
+                         '- supported providers: {REALTIME_DATA_PROVIDER_LIST}')
             
             return self._dataframe_type()
             
@@ -606,7 +612,7 @@ class realtime_manager:
 
     def _parse_data_aggs_polygonio(
             self, 
-            data,
+            data=None,
             engine='polars'
         ):
         
@@ -715,24 +721,13 @@ class realtime_manager:
         except BadResponse as e:
             
             # to log
-            print(e)
+            logger.warning(e)
             return self._dataframe_type([])
             
         
-        data_df = self._parse_aggs_data(poly_aggs,
-                                        REALTIME_DATA_PROVIDER.POLYGON_IO,
+        data_df = self._parse_aggs_data(REALTIME_DATA_PROVIDER.POLYGON_IO,
+                                        data=poly_aggs,
                                         engine=self.engine)
         
-        if (  
-            check_timeframe_str(timeframe)
-            and
-            data_df != self._dataframe_type()
-            ):
-        
-            return reframe_data(data_df, timeframe)
-        
-        else:
-        
-            return data_df
-    
+        return reframe_data(data_df, timeframe)
     

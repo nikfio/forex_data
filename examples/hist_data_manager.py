@@ -31,21 +31,17 @@ from loguru import logger
 
 from sys import stderr
 
-# TODO: add logging options via input FLAGS
 
 def main():
     
-    # reset logging handlers
-    logger.remove()
-    
-    # add logging to stderr 
-    logger.add(stderr, level="TRACE")
-    
-    # historical manager instantiation                            
+    # instance data manager                          
     histmanager = historical_manager(
                     ticker='NZDUSD',
                     config_file=APPCONFIG_FILE_YAML
     )
+    
+    # add logging to stderr 
+    logger.add(stderr, level="TRACE")
     
     # # example dates 
     ex_start_date = '2009-10-03 10:00:00'

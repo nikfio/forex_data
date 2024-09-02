@@ -110,9 +110,10 @@ The location where data downloaded or data reframed are cached.
 Here you can pass a absolute folder path where the package will dump data downloaded with files type as assigned by the `DATA_FILETYPE` parameter.
 
 The default locations used are:
-* Historical source data cache path : `~/.database/Historical`
-* Real-time source data cache path : `~/.database/Realtime`
+* Historical source data cache path : `~/.database/HistoricalData`
+* Real-time source data cache path : `~/.database/RealtimeData`
 
+where `~` stands for the current user home folder location.
 Beware that data caching is implemented for historical sources, next developments will cover also real-time sources data.
 
 #### PROVIDERS_KEY
@@ -124,6 +125,16 @@ Look here to register and create a key from Alpha-Vantage provider
 
 Look here to register and create a key from Polygon-IO provider
 [Polygon-IO home page](https://polygon.io/)
+
+## LOGGING
+
+Logging feature is added via loguru library.
+By construction log is dumped in a file which location is determined by pathlib.
+A generic usage folder for the package named `.database` is created at the current user home folder.
+Here log is dumped in a file called `forexdata.log`, the complete location of the log file will be:
+
+`~/.database/forexdata.log`
+
 
 ## EXAMPLES
 
@@ -153,7 +164,7 @@ Let's walk through the [example for historical data source](test/test_hist_data_
     the call returns a dataframe with data having timeframe, start and end specified by inputs assignment.
     The output data type is of type related to the engine selected.
 
-    With `polars` as DATA_ENGINE option, the output dataframe prints
+    With `polars` as DATA_ENGINE option, the output dataframe logs
     ```
     ┌─────────────────────┬─────────┬─────────┬─────────┬─────────┐
     │ timestamp           ┆ open    ┆ high    ┆ low     ┆ close   │
@@ -219,7 +230,7 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
     test_n_days      = 10
     dayclose_quote = realtimedata_manager.get_daily_close(last_close=True)
 
-    print(f'Real time daily close quote {dayclose_quote}')
+    logger.trace(f'Real time daily close quote {dayclose_quote}')
     ```
     
     Output:
@@ -237,7 +248,7 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
     ```
     window_daily_ohlc = realtimedata_manager.get_daily_close(recent_days_window=test_n_days)
 
-    print(f'Last {test_n_days} window data: {window_daily_ohlc}')
+    logger.trace(f'Last {test_n_days} window data: {window_daily_ohlc}')
     ```
 
     Output 
@@ -265,8 +276,8 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
      window_limits_daily_ohlc = realtimedata_manager.get_daily_close(day_start=test_day_start,
       day_end=test_day_end)
 
-    print(f'From {test_day_start} to {test_day_end} ' 
-          f'window data: {window_limits_daily_ohlc}')
+    logger.trace(f'From {test_day_start} to {test_day_end} ' 
+                 f'window data: {window_limits_daily_ohlc}')
     ```
 
     Output:
@@ -299,7 +310,7 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
                                                         end       = test_day_end,
                                                         timeframe = test_timeframe)
 
-    print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
+    logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     ```
 
     Output:
@@ -323,6 +334,10 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
     │ 2024-04-15 00:00:00 ┆ 0.59438 ┆ 0.59457 ┆ 0.5941  ┆ 0.59445 │
     └─────────────────────┴─────────┴─────────┴─────────┴─────────┘
     ```
+
+## PYTEST and pipeline implementation
+
+
 
 ## Performance considerations
 
