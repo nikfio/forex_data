@@ -14,6 +14,8 @@ test data_manager object realtime feature:
 
 """
 
+from loguru import logger
+
 from pandas import (
                     Timestamp,
                     Timedelta
@@ -24,20 +26,20 @@ from forex_data import (
                     APPCONFIG_FILE_YAML
                 )
 
+from sys import stderr
+
 
 def main():
     
-    # reset logging handlers
-    logger.remove()
-    
-    # add logging to stderr 
-    logger.add(stderr, level="TRACE")
-    
+    # instance data manager
     realtimedata_manager = realtime_manager(
                             ticker = 'NZDUSD',
                             config_file = APPCONFIG_FILE_YAML
     )
     
+    # add logging to stderr 
+    logger.add(stderr, level="TRACE")
+        
     # input test request definition
     test_day_start   = '2024-03-10'
     test_day_end     = '2024-03-26'
@@ -47,21 +49,21 @@ def main():
     dayclose_quote = \
         realtimedata_manager.get_daily_close(last_close=True)
     
-    print(f'Real time daily close quote {dayclose_quote}')
+    logger.trace(f'Real time daily close quote {dayclose_quote}')
     
     # test time window data function with daily resolution
     window_daily_ohlc = \
         realtimedata_manager.get_daily_close(recent_days_window=test_n_days)
     
-    print(f'Last {test_n_days} window data: {window_daily_ohlc}')
+    logger.trace(f'Last {test_n_days} window data: {window_daily_ohlc}')
                                                                        
     # test start-end window data function with daily resolution
     window_limits_daily_ohlc = \
         realtimedata_manager.get_daily_close(day_start=test_day_start,
                                              day_end=test_day_end)
      
-    print(f'From {test_day_start} to {test_day_end} ' 
-          f'window data: {window_limits_daily_ohlc}')
+    logger.trace(f'From {test_day_start} to {test_day_end} ' 
+                 f'window data: {window_limits_daily_ohlc}')
     
     # test time window data function with timeframe resolution
     
@@ -75,7 +77,7 @@ def main():
                                         end       = test_day_end,
                                         timeframe = test_timeframe)
     
-    print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
+    logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     
     # test time window data function with timeframe resolution: intraday case
     test_day_start = Timestamp.now() - Timedelta('5D')
@@ -86,7 +88,7 @@ def main():
                                         end       = test_day_end,
                                         timeframe = test_timeframe)
     
-    print(f'Real time {test_timeframe} window data: {window_data_ohlc}')
+    logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     
     
 if __name__ == '__main__':
