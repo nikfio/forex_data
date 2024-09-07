@@ -23,7 +23,9 @@ from pandas import (
 
 # PYARROW
 from pyarrow import (
-                    table as pyarrow_table
+                    Table as pyarrow_Table,
+                    table as pyarrow_table,
+                    compute as pc
     )
 
 # POLARS
@@ -50,6 +52,7 @@ from dotty_dict import Dotty
 # external 
 
 # polygon-io source
+import polygon
 from polygon import (
         RESTClient as polygonio_client,
         BadResponse
@@ -442,6 +445,11 @@ class realtime_manager:
             
             logger.warning(e)
             return self._dataframe_type([])
+        
+        except Exception as e:
+            
+            logger.warning(f'Raised Exception: {e}')
+            return self._dataframe_type([])
             
             
     def _parse_aggs_data(self, data_provider, **kwargs):
@@ -557,14 +565,14 @@ class realtime_manager:
             else:
                 
                 mask = pc.and_(
-                            pc.greater(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                            pc.greater(df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
                                        day_start),
-                            pc.less(data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                            pc.less(df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
                                        day_end)
                             )
                 
-                data_df = Table.from_arrays(data_df.filter(mask).columns,
-                                            schema=data_df.schema)
+                data_df = pyarrow_Table.from_arrays(df.filter(mask).columns,
+                                                    schema=df.schema)
         
         elif self.engine == 'polars':
         
@@ -636,8 +644,15 @@ class realtime_manager:
         
         elif engine == 'pyarrow':
             
-            df = pyarrow_table(data)
+            # TODO: convert Agg items into dicts
+            #       call Table.from_pylist and set also 
+            #       schema appropriate
             
+            data_dict_list = [polygon_agg_to_dict(agg) 
+                              for agg in data]
+            
+            df = pyarrow_Table.from_pylist(data_dict_list)
+                                        
             extra_columns = list(set(df.column_names).difference(DATA_COLUMN_NAMES.TF_DATA))
             
             df = df.drop_columns(extra_columns)

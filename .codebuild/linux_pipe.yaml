@@ -7,7 +7,6 @@ env:
 phases:
   install:
     commands:
-      - git log --oneline -10
       - poetry lock --no-update
       - poetry install
     finally:
