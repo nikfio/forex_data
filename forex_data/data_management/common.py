@@ -19,6 +19,8 @@ __all__ = [
             'ASSET_TYPE',
             'TEMP_FOLDER',
             'TEMP_CSV_FILE',
+            'DTYPE_DICT',
+            'PYARROW_DTYPE_DICT',
             'POLARS_DTYPE_DICT',
             'DATA_COLUMN_NAMES',
             'FILENAME_TEMPLATE',
@@ -52,8 +54,8 @@ __all__ = [
             'to_pandas_dataframe',
             'get_pair_symbols',
             'to_source_symbol',
-            'get_date_interval'
-            
+            'get_date_interval',
+            'polygon_agg_to_dict'
     ]
 
 from loguru import logger
@@ -85,7 +87,7 @@ from pandas.tseries.offsets import DateOffset
 from pyarrow import (
                 float32 as pyarrow_float32,
                 timestamp as pyarrow_timestamp,
-                Schema as pyarrow_schema,
+                schema as pyarrow_schema,
                 Table,
                 concat_tables,
                 csv as arrow_csv
@@ -109,6 +111,12 @@ from polars import (
 
 from polars.dataframe import ( 
                 DataFrame as polars_dataframe
+    )
+
+
+# POLYGON real time provider
+from polygon.rest.models.aggs import (
+        Agg as polygon_agg
     )
 
 from dateutil.rrule import (
@@ -279,6 +287,9 @@ class BASE_DATA_COLUMN_NAME:
     BID       = 'bid'
     VOL       = 'vol'
     P_VALUE   = 'p'
+    TRANSACTIONS = 'transactions'
+    VWAP        = 'vwap'
+    OTC         = 'otc'
 
 class CANONICAL_INDEX:
 
@@ -1288,4 +1299,26 @@ def list_remove_duplicates(list_in):
 
 # EXIT CODES
 
+
+
+# REAL TIME PROVIDERS UTILITIES
+
+def polygon_agg_to_dict(agg):
+    
+    if not isinstance(agg, polygon_agg):
+        
+        logger.error('argument invalid type, required '
+                     'polygon.rest.models.aggs.Agg')
+        
+    return {
+        BASE_DATA_COLUMN_NAME.TIMESTAMP : agg.timestamp,
+        BASE_DATA_COLUMN_NAME.OPEN      : agg.open,
+        BASE_DATA_COLUMN_NAME.HIGH      : agg.high,
+        BASE_DATA_COLUMN_NAME.LOW       : agg.low,
+        BASE_DATA_COLUMN_NAME.CLOSE     : agg.close,
+        BASE_DATA_COLUMN_NAME.VOL       : agg.volume,
+        BASE_DATA_COLUMN_NAME.TRANSACTIONS : agg.transactions,
+        BASE_DATA_COLUMN_NAME.VWAP      : agg.vwap,
+        BASE_DATA_COLUMN_NAME.OTC       : agg.otc
+    }
     
