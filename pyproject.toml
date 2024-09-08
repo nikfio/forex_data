@@ -12,7 +12,7 @@ python = ">=3.9.*, <=3.10.14"
 spyder-kernels = ">=2.5.0"
 pyaml = "^21.10.1"
 pandas = ">=2.0.0"
-matplotlib = "^3.6.2"
+matplotlib = ">=3.9.2"
 requests = "^2.28.1"
 mplfinance = "^0.12.9b7"
 histdata = "^1.0"
@@ -27,6 +27,7 @@ polars = "^0.20.7"
 pytest = "^8.1.1"
 loguru = "^0.7.2"
 numpy  = "<2.0.0"
+debugpy = "^1.8.5"
 
 [build-system]
 requires = ["poetry-core"]
