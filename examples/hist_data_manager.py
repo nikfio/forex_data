@@ -58,7 +58,7 @@ def main():
         logger.trace(f"""get_data: 
                      rows {yeardata.shape[0]}
                      start {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][0]}, 
-                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][-1]}
+                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][yeardata.shape[0]-1]}
                      """
         )
         
