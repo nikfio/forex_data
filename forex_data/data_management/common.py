@@ -13,6 +13,7 @@ __all__ = [
             'HISTDATA_BASE_DOWNLOAD_METHOD',
             'HISTDATA_BASE_DOWNLOAD_URL',
             'DEFAULT_PATHS',
+            'DATA_FILE_TYPE',
             'BASE_DATA_COLUMN_NAME',
             'SUPPORTED_DATA_FILES',
             'SUPPORTED_DATA_ENGINES',
