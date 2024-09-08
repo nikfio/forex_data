@@ -58,11 +58,15 @@ from pathlib import Path
 from requests import Session
 from io import BytesIO
 from shutil import rmtree
-from sys import stderr
 
 from dotty_dict import (
                 Dotty, 
                 dotty
+    )
+
+from iteration_utilities import (
+                duplicates,
+                unique_everseen
     )
 
 # internally defined
@@ -1061,9 +1065,41 @@ class historical_manager:
         local_files, local_files_name = self._list_local_data()
 
         years_tick_files_found = list()
-
+        
+        # avoid to load data if there are file duplicates by name
+        # identify duplicates and remove csv type file
+        # in order increase speed if parquet file is available
+        local_files_stem = [file.stem for file in local_files]
+        
+        duplicates_unique = list(unique_everseen(duplicates(local_files_stem)))
+        
+        local_files_filtered = local_files.copy()
+        local_files_name_filtered = local_files_name.copy()
+        
+        if duplicates_unique:
+        
+            for item in duplicates_unique:
+                
+                parquet_file = item \
+                                + '.' \
+                                + DATA_FILE_TYPE.PARQUET_FILETYPE
+                                
+                csv_file = item \
+                            + '.' \
+                            + DATA_FILE_TYPE.CSV_FILETYPE
+                
+                if (
+                    parquet_file in local_files_name_filtered
+                    and
+                    csv_file in local_files_name_filtered
+                    ):
+                    
+                    index_to_remove = local_files_name_filtered.index(csv_file)
+                    local_files_name_filtered.pop(index_to_remove)
+                    local_files_filtered.pop(index_to_remove)
+                
         # parse files and fill details list
-        for file in local_files:
+        for file in local_files_filtered:
 
             # get years available in offline data (local disk)
             local_filepath_key = file.name.replace('_', '.')
@@ -1089,7 +1125,8 @@ class historical_manager:
                         if file_tf == TICK_TIMEFRAME:
                             years_tick_files_found.append(file_year)
     
-                        if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
+                        if match(f'.({DATA_FILE_TYPE.CSV_FILETYPE})$',
+                                file.suffix):
                             
                             if engine == 'pandas':
                                 
@@ -1154,15 +1191,15 @@ class historical_manager:
                                     convert_opts = arrow_csv.ConvertOptions(
                                                 column_types = PYARROW_DTYPE_DICT.TIME_TICK_DTYPE,
                                                 timestamp_parsers = [arrow_csv.ISO8601]
-                                        )
+                                    )
                                  
                                     
-                                elif file_tf in self._tf_list:
+                                else:
                                     
                                     convert_opts = arrow_csv.ConvertOptions(
                                                 column_types = PYARROW_DTYPE_DICT.TIME_TF_DTYPE,
                                                 timestamp_parsers = [arrow_csv.ISO8601]
-                                        )
+                                    )
                                     
                                 
                                 self._db_dict[year_tf_key] = \
@@ -1172,7 +1209,7 @@ class historical_manager:
                                             read_options    = read_opts,
                                             parse_options   = parse_opts,
                                             convert_options = convert_opts
-                                )
+                                    )
                             
                             # year standard data file    
                             elif engine == 'polars':
@@ -1181,30 +1218,31 @@ class historical_manager:
                                 if file_tf == TICK_TIMEFRAME:
                                     
                                     self._db_dict[year_tf_key] = \
-                                            read_csv('polars', 
-                                                     file,
-                                                     new_columns=DATA_COLUMN_NAMES.TICK_DATA,
-                                                     schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE,
-                                                     try_parse_dates=True
-                                            )
+                                        read_csv('polars', 
+                                                 file,
+                                                 new_columns=DATA_COLUMN_NAMES.TICK_DATA,
+                                                 schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE,
+                                                 try_parse_dates=True
+                                        )
                                                      
                                 elif file_tf in self._tf_list:
                                     
                                     self._db_dict[year_tf_key] = \
-                                            read_csv('polars', 
-                                                     file,
-                                                     new_columns=DATA_COLUMN_NAMES.TF_DATA,
-                                                     schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE,
-                                                     try_parse_dates=True
-                                            )
-                            
+                                        read_csv('polars', 
+                                                 file,
+                                                 new_columns=DATA_COLUMN_NAMES.TF_DATA,
+                                                 schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE,
+                                                 try_parse_dates=True
+                                        )
+                        
                             else:
                                 
                                 logger.error(f'Engine {engine} not supported '
                                              f'available: {SUPPORTED_DATA_ENGINES}')
                                 raise TypeError
                     
-                        elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
+                        elif  match(f'.({DATA_FILE_TYPE.PARQUET_FILETYPE})$',
+                                    file.suffix):
                         
                             self._db_dict[year_tf_key] = read_parquet(engine,
                                                                       file)
@@ -1419,6 +1457,9 @@ class historical_manager:
                                   & 
                                   (data_df[BASE_DATA_COLUMN_NAME.TIMESTAMP]
                                    <= end)].copy()
+                
+                # reset index
+                data_df.reset_index(drop=True, inplace=True)
             
             elif self.engine == 'pyarrow':
                 
@@ -1474,6 +1515,8 @@ class historical_manager:
                                    <= end)].copy()
                             for key in interval_keys]
                 )
+                
+                data_df.reset_index(drop=True, inplace=True)
                 
             elif self.engine == 'pyarrow':
                 
