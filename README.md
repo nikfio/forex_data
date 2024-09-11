@@ -1,3 +1,8 @@
+# <span style="color:red">Operational warning</span>
+
+As of September 2024, we are currently facing major troublese retrieving data for all GBP related pairs across the board.
+Sorry for the inconvenience, the problem is under investigation.
+
 # <span style="font-size:1.5em;">FOREX DATA</span>
 
 The forex_data package offers ways to aggregate data from the Forex market into a dataframe having the the essential OHLC information, so the ouput will always have the columns:
