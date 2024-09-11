@@ -141,7 +141,7 @@ from attrs import (
 TEMP_FOLDER                     = "Temp"
 TEMP_CSV_FILE                   = "Temp.csv"
 
-HISTDATA_URL_TICKDATA_TEMPLATE  = 'http://www.histdata.com/download-free-forex-historical-data/?/' \
+HISTDATA_URL_TICKDATA_TEMPLATE  = 'https://www.histdata.com/download-free-forex-historical-data/?/' \
                                   'ascii/tick-data-quotes/{ticker}/{year}/{month_num}'
 
 HISTDATA_URL_ONEMINDATA_TEMPLATE= 'http://www.histdata.com/download-free-forex-data/?/' \

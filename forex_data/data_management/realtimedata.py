@@ -527,7 +527,7 @@ class realtime_manager:
             df = astype(df, DTYPE_DICT.TIME_TF_DTYPE)
             
             # timestamp as column to include it in return data
-            daily_df.reset_index(inplace=True)
+            df.reset_index(inplace=True)
             
             if last_close:
                

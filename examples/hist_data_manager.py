@@ -44,8 +44,8 @@ def main():
     logger.add(stderr, level="TRACE")
     
     # # example dates 
-    ex_start_date = '2009-10-03 10:00:00'
-    ex_end_date   = '2009-12-03 10:00:00'
+    ex_start_date = '2015-10-03 10:00:00'
+    ex_end_date   = '2015-12-03 10:00:00'
     
     # get data
     yeardata = histmanager.get_data(timeframe = '1h',
@@ -55,20 +55,20 @@ def main():
     
     if not is_empty_dataframe(yeardata):
         
-        logger.trace(f"""get_data: 
+        logger.trace(f"""
+                     get_data: 
                      rows {yeardata.shape[0]}
                      start {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][0]}, 
-                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][yeardata.shape[0]-1]}
-                     """
+                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][yeardata.shape[0]-1]}"""
         )
         
     else:
         
-        logger.trace("""get_data: no data found, "
+        logger.trace("""
+                     get_data: no data found, "
                      requested pair {histmanager.ticker}
                      start {ex_start_date}, "
-                     end {ex_start_date}
-                     """
+                     end {ex_start_date}"""
         )
                                         
     # add new timeframe

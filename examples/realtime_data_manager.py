@@ -33,7 +33,7 @@ def main():
     
     # instance data manager
     realtimedata_manager = realtime_manager(
-                            ticker = 'NZDUSD',
+                            ticker = 'EURUSD',
                             config_file = APPCONFIG_FILE_YAML
     )
     

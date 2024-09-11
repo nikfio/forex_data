@@ -69,6 +69,8 @@ from iteration_utilities import (
                 unique_everseen
     )
 
+from bs4 import BeautifulSoup
+
 # internally defined
 from .common import *
 from ..config import ( 
@@ -439,7 +441,16 @@ class historical_manager:
 
         session = Session()
         r = session.get(url)
-        tk = search('id="tk" value="(.*?)"', r.text).groups()[0]
+        
+        with logger.catch(exception=AttributeError,
+                          level='CRITICAL',
+                          message=f'token value was not found scraping url {url}'):
+            
+            tk = search('id="tk" value="(.*?)"', r.text).groups()[0]
+        
+        r1 = session.get(url, allow_redirects=True)
+        soup = BeautifulSoup(r1.content, 'html.parser')
+        token = soup.find('input', {'id': 'tk'}).attrs['value']
         
         headers = {'Referer': url}
         data = {'tk': tk, 
@@ -449,7 +460,7 @@ class historical_manager:
                 'timeframe': 'T', 
                 'fxpair': self.ticker
             }
-        
+            
         r = session.request(HISTDATA_BASE_DOWNLOAD_METHOD,
                             HISTDATA_BASE_DOWNLOAD_URL,
                             data=data,
@@ -918,7 +929,7 @@ class historical_manager:
 
             month_num = MONTHS.index(month) + 1
             url = HISTDATA_URL_TICKDATA_TEMPLATE.format(
-                                        ticker=self.ticker,
+                                        ticker=self.ticker.lower(),
                                         year=year,
                                         month_num=month_num)
             
