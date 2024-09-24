@@ -36,7 +36,7 @@ def main():
     
     # instance data manager                          
     histmanager = historical_manager(
-                    ticker='NZDUSD',
+                    ticker='GBPEUR',
                     config_file=APPCONFIG_FILE_YAML
     )
     
@@ -44,8 +44,8 @@ def main():
     logger.add(stderr, level="TRACE")
     
     # # example dates 
-    ex_start_date = '2015-10-03 10:00:00'
-    ex_end_date   = '2015-12-03 10:00:00'
+    ex_start_date = '2018-10-03 10:00:00'
+    ex_end_date   = '2018-12-03 10:00:00'
     
     # get data
     yeardata = histmanager.get_data(timeframe = '1h',
@@ -76,8 +76,8 @@ def main():
     
     # plot data 
     histmanager.plot( timeframe   = '1D',
-                      start_date  = '2013-02-02 18:00:00',
-                      end_date    = '2013-06-23 23:00:00'
+                      start_date  = '2017-02-02 18:00:00',
+                      end_date    = '2017-06-23 23:00:00'
     )
     
     
