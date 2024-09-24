@@ -444,22 +444,30 @@ class historical_manager:
         
         with logger.catch(exception=AttributeError,
                           level='CRITICAL',
+                          message=f'token value was not found scraping url {url}: probably {self.ticker} is not supported by histdata.com'):
+            
+            token = search('id="tk" value="(.*?)"', r.text).groups()[0]
+
+        ''' Alternative: using BeautifulSoup parser
+        r = session.get(url, allow_redirects=True)
+        soup = BeautifulSoup(r.content, 'html.parser')
+        
+        with logger.catch(exception=AttributeError,
+                          level='CRITICAL',
                           message=f'token value was not found scraping url {url}'):
             
-            tk = search('id="tk" value="(.*?)"', r.text).groups()[0]
+            token = soup.find('input', {'id': 'tk'}).attrs['value']
         
-        r1 = session.get(url, allow_redirects=True)
-        soup = BeautifulSoup(r1.content, 'html.parser')
-        token = soup.find('input', {'id': 'tk'}).attrs['value']
+        '''
         
         headers = {'Referer': url}
-        data = {'tk': tk, 
+        data = {'tk': token, 
                 'date': year,
                 'datemonth': "%d%02d" % (year, month_num), 
                 'platform': 'ASCII',
                 'timeframe': 'T', 
                 'fxpair': self.ticker
-            }
+        }
             
         r = session.request(HISTDATA_BASE_DOWNLOAD_METHOD,
                             HISTDATA_BASE_DOWNLOAD_URL,
