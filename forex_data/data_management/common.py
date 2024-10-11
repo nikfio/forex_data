@@ -248,7 +248,7 @@ class DATA_COLUMN_NAMES:
     TICK_DATA               = ['timestamp','ask','bid','vol','p']
     TF_DATA                 = ['timestamp','open','high','low', 'close']
     TICK_DATA_TIME_INDEX    = ['ask','bid','vol','p']
-    TF_DATA_TIME_INDEX      = ['open','high','low', 'close']             ## SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE          
+    TF_DATA_TIME_INDEX      = ['open','high','low', 'close']                     
     POLYGON_IO_AGGS         = ['open','high','low', 'close', 'volume', 'vwap', \
                                'timestamp', 'transactions' ]
     
