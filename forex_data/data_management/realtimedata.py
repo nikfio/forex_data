@@ -220,12 +220,12 @@ class realtime_manager:
                     
                 except KeyError:
                     
-                    logging.warning('KeyError: initializing object has no '
+                    logger.warning('KeyError: initializing object has no '
                                     f'attribute {attr.name}')
                     
                 except IndexError:
                     
-                    logging.warning('IndexError: initializing object has no '
+                    logger.warning('IndexError: initializing object has no '
                                     f'attribute {attr.name}')
                 
                 else:

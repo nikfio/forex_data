@@ -13,7 +13,6 @@ Triggers:
     Branches:
       - master
 
-# Required - Define action configurations.
 Actions:
 
     install:
