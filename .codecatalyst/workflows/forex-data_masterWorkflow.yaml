@@ -1,0 +1,42 @@
+Name: forex-data_masterWorkflow
+SchemaVersion: "1.0"
+
+RunMode: QUEUED
+
+Compute:
+    Type: Lambda
+    Fleet: Linux.x86-64.Large
+    
+# Trig at commit push
+Triggers:
+  - Type: Push
+    Branches:
+      - master
+
+# Required - Define action configurations.
+Actions:
+
+    install:
+        Identifier: aws/build@v1
+        
+        Configuration:
+            
+            Steps:
+                - Run: pip install poetry
+                - Run: poetry install
+            
+    pytest:
+
+        Identifier: aws/managed-test@v1
+        
+        DependsOn:
+            - install
+            
+        Inputs:
+          Sources:
+            - WorkflowSource
+                
+        Configuration:
+        
+            Steps:
+                - Run: poetry run pytest
