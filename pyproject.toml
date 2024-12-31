@@ -30,6 +30,7 @@ numpy  = "<2.0.0"
 debugpy = "^1.8.5"
 iteration-utilities = "^0.12.1"
 bs4 = "^0.0.2"
+flake8 = "^7.1.1"
 
 [build-system]
 requires = ["poetry-core"]
