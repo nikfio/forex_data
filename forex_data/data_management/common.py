@@ -1171,7 +1171,7 @@ def get_dotty_leafs(dotty_dict):
     # root field is temporary to have common start in any case in all leafs
     get_leaf(dotty_dict, 'root')
     
-    # pull out root field from all paths to leafs
+    # leave out root field from all paths to leafs
     leaf_keys = [ search('(?<=root.)\S+', leaf).group(0) for leaf in leaf_keys]
     
     return leaf_keys

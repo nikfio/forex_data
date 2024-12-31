@@ -28,8 +28,6 @@ config_file_yaml = \
 ---
 # yaml document for data management configuration
 
-TICKER: 'EURUSD'
-
 DATA_FILETYPE: 'parquet'
 
 ENGINE: 'polars'
@@ -45,13 +43,11 @@ class TestHistData(unittest.TestCase):
             config_file=config_file_yaml
         )
         
-        self.assertEqual('EURUSD', 
-                         histmanager.ticker,
-                         'Ticker parameter assignment from config file is invalid')
-        
         self.assertEqual('parquet', 
                          histmanager.data_filetype,
-                         'Ticker parameter assignment from config file is invalid')
+                         'data_filetype parameter assignment from'
+                         ' config file is invalid'
+        )
         
         self.assertTrue(
             isinstance(histmanager._dataframe_type([]), 
@@ -69,15 +65,10 @@ class TestHistData(unittest.TestCase):
         # clas constructor it ovverides
         # value assigned from config file if present                           
         histmanager = historical_manager(
-            ticker='USDJPY',
             engine='pandas',
             config_file=config_file_yaml
         )
     
-        self.assertEqual('USDJPY', histmanager.ticker,
-                         'Ticker parameter assignment from object instantiaton '
-                         'is invalid'
-        )
         
         self.assertTrue(
             isinstance(histmanager._dataframe_type(), 
@@ -100,9 +91,11 @@ class TestHistData(unittest.TestCase):
         ex_end_date   = '2008-11-21 18:00:00'
         
         # get data
-        data = histmanager.get_data(timeframe = '1h',
-                                    start     = ex_start_date,
-                                    end       = ex_end_date
+        data = histmanager.get_data(
+                    ticker    = 'EURUSD',
+                    timeframe = '1h',
+                    start     = ex_start_date,
+                    end       = ex_end_date
         )        
         
         self.assertTrue(

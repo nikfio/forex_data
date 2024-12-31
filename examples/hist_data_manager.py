@@ -21,11 +21,11 @@ Description:
 """
 
 from forex_data import (
-                        historical_manager,
-                        APPCONFIG_FILE_YAML,
-                        BASE_DATA_COLUMN_NAME,
-                        is_empty_dataframe
-                )
+        historical_manager,
+        APPCONFIG_FILE_YAML,
+        BASE_DATA_COLUMN_NAME,
+        is_empty_dataframe
+    )
 
 from loguru import logger
 
@@ -36,21 +36,22 @@ def main():
     
     # instance data manager                          
     histmanager = historical_manager(
-                    ticker='GBPEUR',
                     config_file=APPCONFIG_FILE_YAML
     )
     
     # add logging to stderr 
     logger.add(stderr, level="TRACE")
     
-    # # example dates 
+    # example dates 
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date   = '2018-12-03 10:00:00'
     
     # get data
-    yeardata = histmanager.get_data(timeframe = '1h',
-                                    start     = ex_start_date,
-                                    end       = ex_end_date
+    yeardata = histmanager.get_data(
+        ticker    = 'EURUSD',
+        timeframe = '1h',
+        start     = ex_start_date,
+        end       = ex_end_date
     )
     
     if not is_empty_dataframe(yeardata):
@@ -75,10 +76,44 @@ def main():
     histmanager.add_timeframe('1W', update_data=True)
     
     # plot data 
-    histmanager.plot( timeframe   = '1D',
+    histmanager.plot( ticker      = 'EURUSD',
+                      timeframe   = '1D',
                       start_date  = '2017-02-02 18:00:00',
                       end_date    = '2017-06-23 23:00:00'
     )
+    
+    
+    ## get data from another ticker
+    
+    # example dates 
+    ex_start_date = '2018-10-03 10:00:00'
+    ex_end_date   = '2020-12-03 10:00:00'
+    
+    # get data
+    yeardata = histmanager.get_data(
+        ticker    = 'GBPJPY',
+        timeframe = '1D',
+        start     = ex_start_date,
+        end       = ex_end_date
+    )
+    
+    if not is_empty_dataframe(yeardata):
+        
+        logger.trace(f"""
+                     get_data: 
+                     rows {yeardata.shape[0]}
+                     start {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][0]}, 
+                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][yeardata.shape[0]-1]}"""
+        )
+        
+    else:
+        
+        logger.trace("""
+                     get_data: no data found, "
+                     requested pair {histmanager.ticker}
+                     start {ex_start_date}, "
+                     end {ex_start_date}"""
+        )
     
     
 if __name__ == '__main__':
