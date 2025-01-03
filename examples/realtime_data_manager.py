@@ -33,7 +33,6 @@ def main():
     
     # instance data manager
     realtimedata_manager = realtime_manager(
-                            ticker = 'EURUSD',
                             config_file = APPCONFIG_FILE_YAML
     )
     
@@ -47,20 +46,29 @@ def main():
     
     # get last close on daily basis
     dayclose_quote = \
-        realtimedata_manager.get_daily_close(last_close=True)
+        realtimedata_manager.get_daily_close(
+                            ticker = 'EURUSD',
+                            last_close=True
+        )
     
     logger.trace(f'Real time daily close quote {dayclose_quote}')
     
     # test time window data function with daily resolution
     window_daily_ohlc = \
-        realtimedata_manager.get_daily_close(recent_days_window=test_n_days)
+        realtimedata_manager.get_daily_close(
+            ticker = 'EURUSD',
+            recent_days_window=test_n_days
+        )
     
     logger.trace(f'Last {test_n_days} window data: {window_daily_ohlc}')
                                                                        
     # test start-end window data function with daily resolution
     window_limits_daily_ohlc = \
-        realtimedata_manager.get_daily_close(day_start=test_day_start,
-                                             day_end=test_day_end)
+        realtimedata_manager.get_daily_close(
+            ticker = 'EURUSD',
+            day_start=test_day_start,
+            day_end=test_day_end
+        )
      
     logger.trace(f'From {test_day_start} to {test_day_end} ' 
                  f'window data: {window_limits_daily_ohlc}')
@@ -73,20 +81,27 @@ def main():
     test_timeframe   = '1h'
     
     window_data_ohlc = \
-        realtimedata_manager.get_data(  start     = test_day_start,
-                                        end       = test_day_end,
-                                        timeframe = test_timeframe)
+        realtimedata_manager.get_data(  
+            ticker    = 'EURUSD',    
+            start     = test_day_start,
+            end       = test_day_end,
+            timeframe = test_timeframe
+        )
     
     logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     
     # test time window data function with timeframe resolution: intraday case
-    test_day_start = Timestamp.now() - Timedelta('5D')
-    test_day_end   = Timestamp.now() - Timedelta('2D')
+    test_day_start = Timestamp.now() - Timedelta('10D')
+    test_day_end   = Timestamp.now() - Timedelta('8D')
+    test_timeframe = '5m'
     
     window_data_ohlc = \
-        realtimedata_manager.get_data(  start     = test_day_start,
-                                        end       = test_day_end,
-                                        timeframe = test_timeframe)
+        realtimedata_manager.get_data(  
+            ticker    = 'EURUSD',
+            start     = test_day_start,
+            end       = test_day_end,
+            timeframe = test_timeframe
+        )
     
     logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
     

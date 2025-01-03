@@ -13,4 +13,4 @@ phases:
       - echo "INSTALL phase commands terminated"
   build:
     commands:
-      - poetry run pytest
+      - poetry run pytest --flake8 --mypy

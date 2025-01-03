@@ -910,17 +910,17 @@ def reframe_data(dataframe, tf):
         
         return dataframe
     
-    # assert timeframe input value
-    tf = check_timeframe_str(tf)
-
-    if tf == TICK_TIMEFRAME:
-        
-        logger.warning(f'reframe not possible wih target {TICK_TIMEFRAME}')
-    
-        return dataframe
-    
     if isinstance(dataframe, pandas_dataframe):
+
+        # assert timeframe input value
+        tf = check_timeframe_str(tf)
+
+        if tf == TICK_TIMEFRAME:
             
+            logger.warning(f'reframe not possible wih target {TICK_TIMEFRAME}')
+        
+            return dataframe
+        
         if not is_datetime64_any_dtype(dataframe.index):
             
             if BASE_DATA_COLUMN_NAME.TIMESTAMP in dataframe.columns:
@@ -999,8 +999,6 @@ def reframe_data(dataframe, tf):
             df = from_arrow(dataframe, 
                             schema = POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
             
-            
-        
         elif all([col in DATA_COLUMN_NAMES.TF_DATA
                 for col in dataframe.column_names]):
             

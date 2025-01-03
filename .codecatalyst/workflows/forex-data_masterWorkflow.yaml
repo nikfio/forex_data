@@ -38,4 +38,5 @@ Actions:
         Configuration:
         
             Steps:
-                - Run: poetry run pytest
+                - Run: poetry run pytest --flake8 --mypy
+                

@@ -38,7 +38,7 @@ def main():
     histmanager = historical_manager(
                     config_file=APPCONFIG_FILE_YAML
     )
-    
+     
     # add logging to stderr 
     logger.add(stderr, level="TRACE")
     
