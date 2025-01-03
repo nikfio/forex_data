@@ -291,11 +291,11 @@ class historical_manager:
             
         
     def _db_key(self, 
-                ticker    : Literal[str], 
-                year      : Literal[str],
-                timeframe : Literal[str],
-                data_type : Literal[str]
-        ) -> Literal[str]:
+                ticker    : str, 
+                year      : str,
+                timeframe : str,
+                data_type : str
+        ) -> str:
         """
 
         get a str key of dotted divided elements
@@ -319,8 +319,7 @@ class historical_manager:
 
         tf = check_timeframe_str(timeframe)
 
-        return '.'.join([str(ticker), 'Y'+str(year),
-                         str(tf), str(data_type)])
+        return '.'.join([ticker, 'Y'+year, tf, data_type])
 
     def _get_ticker_list(self):
         
@@ -330,11 +329,12 @@ class historical_manager:
     def _get_ticker_keys(self, ticker):
         
         return [
-                    key for key in get_dotty_leafs(self._db_dict)
-                    if search(f'^{ticker}',
-                              key)
-                ]
+                key for key in get_dotty_leafs(self._db_dict)
+                if search(f'^{ticker}',
+                          key)
+        ]
         
+    
     def _get_years_list(self, ticker, vartype):
 
         # work on copy as pop operation is 'inplace'

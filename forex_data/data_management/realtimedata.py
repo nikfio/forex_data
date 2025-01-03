@@ -88,8 +88,6 @@ class realtime_manager:
     # interface parameters
     config_file     : str = field(default=None,
                               validator=validators.instance_of(str))
-    ticker          : str = field(default=None,
-                              validator=validators.instance_of(str))
     data_filetype   : str = field(default='parquet',
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
     engine          : str = field(default='pandas',
@@ -105,14 +103,6 @@ class realtime_manager:
                         default = Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.REALTIME_DATA_FOLDER, 
                         validator=validator_dir_path(create_if_missing=True)
                      )
-    _ticker_polygonio    = field(default='',
-                                 validator=validators.instance_of(str))
-    _ticker_alphavantage = field(default='',
-                                 validator=validators.instance_of(str))
-    _to_symbol = field(default='',
-                       validator=validators.instance_of(str))
-    _from_symbol = field(default='',
-                         validator=validators.instance_of(str))
   
     # if a valid config file or string
     # is passed
@@ -266,14 +256,7 @@ class realtime_manager:
         
         # reset logging handlers
         logger.remove()
-        
-        # Fundamentals parameters initialization
-        self.ticker = self.ticker.upper()
-        
-        self._to_symbol, self._from_symbol = \
-            get_pair_symbols(self.ticker)
-        
-        
+    
         # checks on data folder path
         if ( 
             not self._realtimedata_path.is_dir() 
@@ -302,12 +285,6 @@ class realtime_manager:
             
             self._dataframe_type = polars_dataframe
 
-        # set ticker in polygon format
-        self._ticker_polygonio = to_source_symbol(
-                self.ticker,
-                REALTIME_DATA_PROVIDER.POLYGON_IO
-        )
-        
     
     def _getClient(self, provider):
         
@@ -386,21 +363,24 @@ class realtime_manager:
         
         with self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO) as client:
             
-            poly_resp = client.get_last_forex_quote(self._from_symbol,
-                                                    self._to_symbol)
+            to_symbol, from_symbol = get_pair_symbols(ticker.upper())
+            
+            poly_resp = client.get_last_forex_quote(from_symbol,
+                                                    to_symbol)
         
         return poly_resp 
                  
     
     def get_daily_close(self,
+                        ticker,
                         last_close=False,
                         recent_days_window=None, 
                         day_start=None, 
                         day_end=None):
         
+        to_symbol, from_symbol = get_pair_symbols(ticker.upper())
         
         try:
-            
             
             client = self._getClient(REALTIME_DATA_PROVIDER.ALPHA_VANTAGE)
             
@@ -408,15 +388,15 @@ class realtime_manager:
             
                 
                 res = client.get_currency_exchange_daily(
-                                    self._to_symbol,
-                                    self._from_symbol,
-                                    outputsize='compact'
+                        to_symbol,
+                        from_symbol,
+                        outputsize='compact'
                 )
                 
                 # parse response and return
                 return self._parse_data_daily_alphavantage(
-                                    res,
-                                    last_close=True
+                        res,
+                        last_close=True
                 )
                 
             else:
@@ -430,16 +410,19 @@ class realtime_manager:
                 # function input 'day_start' and 'recent_days_window' when
                 # they imply a large interval outside of the 
                 # "outputsize='full'" option
-                res = client.get_currency_exchange_daily(self._from_symbol,
-                                                                        self._to_symbol,
-                                                                        outputsize='full')
+                res = client.get_currency_exchange_daily(
+                                                        from_symbol,
+                                                        to_symbol,
+                                                        outputsize='full'
+                )
                 
                 # parse response and return
                 return self._parse_data_daily_alphavantage(res,
-                                                 last_close=False,
-                                                 recent_days_window=recent_days_window, 
-                                                 day_start=day_start, 
-                                                 day_end=day_end) 
+                    last_close=False,
+                    recent_days_window=recent_days_window, 
+                    day_start=day_start, 
+                    day_end=day_end
+                ) 
             
         except BadResponse as e:
             
@@ -680,7 +663,8 @@ class realtime_manager:
         return df
     
     
-    def get_data(self, 
+    def get_data(self,
+                 ticker,
                  start=None, 
                  end=None, 
                  timeframe=None):
@@ -712,6 +696,12 @@ class realtime_manager:
         end = any_date_to_datetime64(end)
             
         # forward request only to polygon-io
+        # set ticker in polygon format
+        
+        ticker_polygonio = to_source_symbol(
+                ticker.upper(),
+                REALTIME_DATA_PROVIDER.POLYGON_IO
+        )
         
         try:
                 
@@ -723,7 +713,7 @@ class realtime_manager:
             # subcription limitation
             
             # using Polygon-io client
-            for a in client.list_aggs(  ticker      = self._ticker_polygonio, 
+            for a in client.list_aggs(  ticker      = ticker_polygonio, 
                                         multiplier  = 1, 
                                         timespan    = 'minute', 
                                         from_       = start,
