@@ -16,3 +16,7 @@ DATA_FILETYPE: 'parquet'
 ENGINE: 'polars'
 
 """
+
+# TODO: find a way to insert api secret key in pipeline environment
+#       may be the particular secrets manager or environment 
+#       variables if pipeline runs on cloud services
