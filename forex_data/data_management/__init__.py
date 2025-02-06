@@ -9,13 +9,22 @@ __all__ = ['common',
            'historical_manager',
            'realtime_manager',
            'BASE_DATA_COLUMN_NAME',
-           'is_empty_dataframe']
+           'DATA_FILE_COLUMN_INDEX',
+           'is_empty_dataframe',
+           'shape_dataframe',
+           'get_dataframe_column',
+           'get_dataframe_element'
+       ]
 
 from . import common
 
 from .common import (    
     BASE_DATA_COLUMN_NAME,
-    is_empty_dataframe
+    DATA_FILE_COLUMN_INDEX,
+    is_empty_dataframe,
+    shape_dataframe,
+    get_dataframe_column,
+    get_dataframe_element
 )
 
 from .historicaldata import historical_manager

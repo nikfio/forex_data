@@ -15,6 +15,7 @@ __all__ = [
             'DEFAULT_PATHS',
             'DATA_FILE_TYPE',
             'BASE_DATA_COLUMN_NAME',
+            'DATA_FILE_COLUMN_INDEX',
             'SUPPORTED_DATA_FILES',
             'SUPPORTED_DATA_ENGINES',
             'ASSET_TYPE',
@@ -40,6 +41,9 @@ __all__ = [
             'check_timeframe_str',
             'any_date_to_datetime64',
             'is_empty_dataframe',
+            'shape_dataframe',
+            'get_dataframe_column',
+            'get_dataframe_element',
             'get_dotty_leafs',
             'astype',
             'read_csv',
@@ -90,6 +94,7 @@ from pyarrow import (
                 timestamp as pyarrow_timestamp,
                 schema as pyarrow_schema,
                 Table,
+                table as pyarrow_table,
                 concat_tables,
                 csv as arrow_csv
     )
@@ -106,14 +111,14 @@ from polars import (
                 read_csv as polars_read_csv,
                 concat as polars_concat,
                 col,
+                len as polars_len,
                 read_parquet as polars_read_parquet,
-                from_arrow
+                from_arrow,
+                DataFrame as polars_dataframe,
+                LazyFrame as polars_lazyframe,
+                scan_csv as polars_scan_csv,
+                scan_parquet as polars_scan_parquet
     )
-
-from polars.dataframe import ( 
-                DataFrame as polars_dataframe
-    )
-
 
 # POLYGON real time provider
 from polygon.rest.models.aggs import (
@@ -235,7 +240,8 @@ SUPPORTED_DATA_FILES = [
 SUPPORTED_DATA_ENGINES = [
                             'pandas',
                             'pyarrow',
-                            'polars'
+                            'polars',
+                            'polars_lazy'
     ]
 
 ### SINGLE BASE DATA COMPOSIION TEMPLATE: ['open','close','high','low']
@@ -414,6 +420,7 @@ def to_source_symbol(ticker, source):
 
 def check_time_offset_str(timeoffset_str):
 
+    # TODO: add support for polars time/date offset
     return isinstance(to_offset(timeoffset_str), DateOffset)
 
 
@@ -621,15 +628,29 @@ class POLARS_DTYPE_DICT:
 
 # DATA ENGINES FUNCTIONS
 
-def empty_dataframe(dataframe_type):
+def empty_dataframe(engine):
     
-    # TODO: based on input return an empty instance of dataframe
-    pass
-
-
-def check_if_empty_dataframe(dataframe):
+    if engine == 'pandas':
+        
+        return pandas_dataframe()
     
-    pass
+    elif engine == 'pyarrow':
+        
+        return pyarrow_table([])
+    
+    elif engine == 'polars':
+    
+        return polars_dataframe()
+    
+    elif engine == 'polars_lazy':
+        
+        return polars_lazyframe()
+    
+    else:
+        
+        logger.error('function empty_dataframe not available'
+                     f' for engine {engine}')
+        raise ValueError
 
 
 def is_empty_dataframe(dataframe):
@@ -646,6 +667,10 @@ def is_empty_dataframe(dataframe):
     
         return dataframe.is_empty()
     
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        return dataframe.collect().is_empty()
+    
     else:
         
         logger.error('function is_empty_dataframe not available'
@@ -653,6 +678,85 @@ def is_empty_dataframe(dataframe):
                      f' {type(dataframe)}')
         raise ValueError 
     
+    
+def shape_dataframe(dataframe):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe.shape
+    
+    elif isinstance(dataframe, Table):
+        
+        return dataframe.shape 
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe.shape
+    
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        return (
+                dataframe.select(polars_len()).collect().item(0,0),
+                dataframe.collect_schema().len()
+            )
+    
+    else:
+        
+        logger.error('function shape_dataframe not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        raise ValueError 
+        
+        
+def get_dataframe_column(dataframe, column):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe[column]
+    
+    elif isinstance(dataframe, Table):
+        
+        return dataframe[column]
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe[column]
+    
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        return dataframe.select(column).collect()
+    
+    else:
+        
+        logger.error('function get_dataframe_column not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        
+        
+def get_dataframe_element(dataframe, column, row):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe[column][row]
+    
+    elif isinstance(dataframe, Table):
+        
+        return dataframe[column][row]
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe[column][row]
+    
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        return dataframe.select(column).collect().item(row,0)
+    
+    else:
+        
+        logger.error('function get_dataframe_element not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        raise ValueError 
     
 def dtype_dict_to_pyarrow_schema(dtype_dict):
     
@@ -671,6 +775,10 @@ def astype(dataframe, dtype_dict):
     
     elif isinstance(dataframe, polars_dataframe):
     
+        return dataframe.cast(dtype_dict)
+    
+    elif isinstance(dataframe, polars_lazyframe):
+        
         return dataframe.cast(dtype_dict)
     
     else:
@@ -694,6 +802,10 @@ def read_parquet(engine, filepath):
     elif engine == 'polars':
     
         return polars_read_parquet(filepath)
+    
+    elif engine == 'polars_lazy':
+        
+        return polars_scan_parquet(filepath)
     
     else:
         
@@ -737,6 +849,23 @@ def write_parquet(dataframe, filepath):
             logger.exception(f'polars write parquet failed: {e}')
             raise 
     
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        try:
+            
+            # sink_parquet() methods is not supported 
+            # gives error, find alternatives
+            #dataframe.sink_parquet(filepath)
+            
+            # alternative to sink_parquet()
+            dataframe.collect(streaming=True).write_parquet(filepath)
+        
+        except Exception as e:
+            
+            logger.exception(f'polars lazyframe sink '
+                             'parquet failed: {e}')
+            raise 
+    
     else:
         
         logger.error('function write_parquet not available'
@@ -745,24 +874,28 @@ def write_parquet(dataframe, filepath):
         raise ValueError
 
 
-def read_csv(data_engine, file, **kwargs):
+def read_csv(engine, file, **kwargs):
     
-    if data_engine == 'pandas':
+    if engine == 'pandas':
         
         return pandas_read_csv(file, **kwargs)
     
-    elif data_engine == 'pyarrow':
+    elif engine == 'pyarrow':
         
         return arrow_csv.read_csv(file, **kwargs)
     
-    elif data_engine == 'polars':
+    elif engine == 'polars':
     
         return polars_read_csv(file, **kwargs)
+            
+    elif engine == 'polars_lazy':
+        
+        return polars_scan_csv(file, **kwargs)
     
     else:
         
         logger.error('function read_csv not available'
-                     f' for engine {data_engine}')
+                     f' for engine {engine}')
         raise ValueError
         
 
@@ -814,6 +947,18 @@ def write_csv(dataframe, file, **kwargs):
                              f' with data type {type(dataframe)}: {e}')
             raise IOError
     
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        try:
+            
+           dataframe.sink_csv(file, **kwargs)
+            
+        except Exception as e:
+            
+            logger.exception(f'Error writing csv file {file}'
+                             f' with data type {type(dataframe)}: {e}')
+            raise IOError
+    
     else:
         
         logger.error('function write_csv not available'
@@ -847,6 +992,10 @@ def concat_data(data_list = field(validator=
     
         return polars_concat(data_list, how='vertical')
     
+    elif isinstance(data_list[0], polars_lazyframe):
+    
+        return polars_concat(data_list, how='vertical')
+    
     else:
         
         logger.error('function concat not available'
@@ -874,6 +1023,10 @@ def to_pandas_dataframe(dataframe):
     elif isinstance(dataframe, polars_dataframe):
     
         return dataframe.to_pandas(use_pyarrow_extension_array=True)
+    
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        return dataframe.collect().to_pandas(use_pyarrow_extension_array=True)
     
     else:
         
@@ -1046,8 +1199,42 @@ def reframe_data(dataframe, tf):
                          f'required {DATA_COLUMN_NAMES.TICK_DATA} '
                          f'or {DATA_COLUMN_NAMES.TF_DATA}')
             raise ValueError
+            
+    elif isinstance(dataframe, polars_lazyframe):
 
-
+        tf = tf.lower()
+        
+        dataframe = dataframe.sort('timestamp', nulls_last=True)
+        
+        if all([col in DATA_COLUMN_NAMES.TICK_DATA
+                for col in dataframe.collect_schema().names()]):
+            
+            return dataframe.group_by_dynamic(
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    every=tf).agg(col('p').first().alias(BASE_DATA_COLUMN_NAME.OPEN),
+                                  col('p').max().alias(BASE_DATA_COLUMN_NAME.HIGH),
+                                  col('p').min().alias(BASE_DATA_COLUMN_NAME.LOW),
+                                  col('p').last().alias(BASE_DATA_COLUMN_NAME.CLOSE) 
+            )
+                                  
+        elif all([col in DATA_COLUMN_NAMES.TF_DATA
+                for col in dataframe.columns]):
+            
+            return dataframe.group_by_dynamic(
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    every=tf).agg(col(BASE_DATA_COLUMN_NAME.OPEN).first(),
+                                  col(BASE_DATA_COLUMN_NAME.HIGH).max(),
+                                  col(BASE_DATA_COLUMN_NAME.LOW).min(),
+                                  col(BASE_DATA_COLUMN_NAME.CLOSE).last()
+                  )
+        
+        else:
+            
+            logger.error(f'data columns {dataframe.columns} invalid, '
+                         f'required {DATA_COLUMN_NAMES.TICK_DATA} '
+                         f'or {DATA_COLUMN_NAMES.TF_DATA}')
+            raise ValueError        
+        
 # TODO: function to return filter data with inputs:
         # column to filter on
         # start interval value
