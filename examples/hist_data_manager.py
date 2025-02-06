@@ -17,14 +17,15 @@ Description:
     
         3) plot ticker between date interval specified
     
-    
 """
 
 from forex_data import (
         historical_manager,
         APPCONFIG_FILE_YAML,
         BASE_DATA_COLUMN_NAME,
-        is_empty_dataframe
+        is_empty_dataframe,
+        shape_dataframe,
+        get_dataframe_element
     )
 
 from loguru import logger
@@ -58,9 +59,10 @@ def main():
         
         logger.trace(f"""
                      get_data: 
-                     rows {yeardata.shape[0]}
-                     start {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][0]}, 
-                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][yeardata.shape[0]-1]}"""
+                     rows {shape_dataframe(yeardata)[0]}
+                     start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
+                     end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                                shape_dataframe(yeardata)[0]-1)}"""
         )
         
     else:
@@ -101,18 +103,20 @@ def main():
         
         logger.trace(f"""
                      get_data: 
-                     rows {yeardata.shape[0]}
-                     start {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][0]}, 
-                     end {yeardata[BASE_DATA_COLUMN_NAME.TIMESTAMP][yeardata.shape[0]-1]}"""
+                     rows {shape_dataframe(yeardata)[0]}
+                     start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
+                     end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                                shape_dataframe(yeardata)[0]-1)}"""
         )
         
     else:
         
-        logger.trace("""
-                     get_data: no data found, "
-                     requested pair {histmanager.ticker}
-                     start {ex_start_date}, "
-                     end {ex_start_date}"""
+        logger.trace(f"""
+                     get_data: 
+                     rows {shape_dataframe(yeardata)[0]}
+                     start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
+                     end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                                shape_dataframe(yeardata)[0]-1)}"""
         )
     
     

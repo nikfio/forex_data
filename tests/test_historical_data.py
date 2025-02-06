@@ -13,14 +13,22 @@ from pandas import (
                     DataFrame as pandas_dataframe
     )
 
-from polars.dataframe import ( 
-                    DataFrame as polars_dataframe
+from polars import ( 
+                    DataFrame as polars_dataframe,
+                    LazyFrame as polars_lazyframe
     )
 
 from forex_data import (
                     data_management as data_mng,
-                    historical_manager
+                    historical_manager,
+                    get_dataframe_column,
+                    is_empty_dataframe,
+                    DATA_FILE_COLUMN_INDEX
                 )
+
+__all__ = [
+        'TestHistData'
+    ]
 
 # build configuration file
 config_file_yaml = \
@@ -30,7 +38,7 @@ config_file_yaml = \
 
 DATA_FILETYPE: 'parquet'
 
-ENGINE: 'polars'
+ENGINE: 'polars_lazy'
 
 """
 
@@ -51,7 +59,7 @@ class TestHistData(unittest.TestCase):
         
         self.assertTrue(
             isinstance(histmanager._dataframe_type([]), 
-                       polars_dataframe),
+                       polars_lazyframe),
             'dataframe engine assignment from config file is invalid'
         )
         
@@ -92,23 +100,37 @@ class TestHistData(unittest.TestCase):
         
         # get data
         data = histmanager.get_data(
-                    ticker    = 'EURUSD',
+                    ticker    = 'AUDUSD',
                     timeframe = '1h',
                     start     = ex_start_date,
                     end       = ex_end_date
         )        
         
         self.assertTrue(
-            isinstance(data, polars_dataframe),
+            isinstance(data, polars_lazyframe),
             'data output type is not equal to dataframe engine assigned type'
+        )
+        
+        self.assertFalse(
+            is_empty_dataframe(data),
+            'data output is empty'
         )
         
         # TODO: after data query, cancel checks between stock
         #       closing days like weekends and canonical festivities
-        check = (
-                    data[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP] 
-                    - data[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP].shift(1)
-                ).drop_nulls().value_counts().to_dict()
+        check =(
+                    (
+                        get_dataframe_column(data,
+                                             data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP
+                        )
+                        - 
+                        get_dataframe_column(data,
+                                             data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP
+                        ).shift(1)
+                    ).drop_nulls().to_series(DATA_FILE_COLUMN_INDEX.TIMESTAMP)
+                    .value_counts()
+                    .to_dict()
+                )
 
         self.assertEqual(len(check[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP]),
                          1,
@@ -118,7 +140,7 @@ class TestHistData(unittest.TestCase):
     
         self.assertEqual(check[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP][0],
                          timedelta(hours=1),
-                         msg=('timeframe request 1h check failed, found mutiple: '  
+                         msg=('timeframe request 1h check failed, found multiple: '  
                              + f'{check[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP]}')
         )
         

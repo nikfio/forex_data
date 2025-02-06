@@ -8,10 +8,6 @@ from attrs import (
                 validators
     )
 
-from typing import (
-                Literal
-    )
-
 # PANDAS
 from pandas import (
                 DataFrame as pandas_dataframe,
@@ -34,11 +30,9 @@ from pyarrow import (
 # POLARS
 from polars import (
                 String as polars_string,
-                col
-    )
-
-from polars.dataframe import ( 
-                DataFrame as polars_dataframe
+                col,
+                DataFrame as polars_dataframe,
+                LazyFrame as polars_lazyframe
     )
 
 from zipfile import (
@@ -107,6 +101,11 @@ class historical_manager:
                            validator=validator_dir_path(create_if_missing=True))
     _histdata_path = field(
                         default = Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.HIST_DATA_FOLDER, 
+                        validator=validator_dir_path(create_if_missing=True))
+    _temporary_data_path = field(
+                        default = (Path(DEFAULT_PATHS.BASE_PATH) 
+                                    / DEFAULT_PATHS.HIST_DATA_FOLDER
+                                    / TEMP_FOLDER), 
                         validator=validator_dir_path(create_if_missing=True))
     
     # if a valid config file or string
@@ -287,9 +286,33 @@ class historical_manager:
             
         elif self.engine == 'polars':
             
-            self._dataframe_type = polars_dataframe
-            
+            self._dataframe_type = polars_dataframe 
         
+        elif self.engine == 'polars_lazy':
+
+            self._dataframe_type = polars_lazyframe  
+            
+        self._temporary_data_path = self._histdata_path \
+                                        / TEMP_FOLDER
+
+    def _clear_temporary_data_folder(self):
+        
+        # delete temporary data path
+        if (
+            self._temporary_data_path.exists()
+            and
+            self._temporary_data_path.is_dir()
+            ):
+            
+            try:
+                
+                rmtree(str(self._temporary_data_path))
+                
+            except Exception as e:
+                
+                logger.warning('Deleting temporary data folder '
+                               f'{str(self._temporary_data_path)} not successfull: {e}')
+            
     def _db_key(self, 
                 ticker    : str, 
                 year      : str,
@@ -319,7 +342,7 @@ class historical_manager:
 
         tf = check_timeframe_str(timeframe)
 
-        return '.'.join([ticker, 'Y'+year, tf, data_type])
+        return '.'.join([ticker, 'Y'+str(year), tf, data_type])
 
     def _get_ticker_list(self):
         
@@ -592,8 +615,6 @@ class historical_manager:
                                     in years_incomplete
                                     ]
     
-            aux_base_df = self._dataframe_type([])
-    
             # complete years reframing from tick/minimal timeframe data
             for year in incomplete_with_tick:
     
@@ -666,9 +687,21 @@ class historical_manager:
             
             # alternative using pyarrow
             buf = BufferReader(raw_file.read())
-            tempdir_path = Path(temp_filepath).parent
-            # create temperary files directory if not present
-            tempdir_path.mkdir(exist_ok=True)
+            
+            if (
+                Path(temp_filepath).exists()
+                and
+                Path(temp_filepath).is_file()
+                ):
+                
+                Path(temp_filepath).unlink(missing_ok=True)    
+                
+            else:
+                
+                # create temporary files directory if not present
+                tempdir_path = Path(temp_filepath).parent
+                tempdir_path.mkdir(exist_ok=True)
+                
             # download buffer to file
             buf.download(temp_filepath)
             
@@ -769,16 +802,6 @@ class historical_manager:
                 schema = schema(PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy().items())
             )
             
-            # delete temp path
-            try:
-                
-                rmtree(str(tempdir_path))
-                
-            except Exception as e:
-                
-                logger.warning('Deleting temporary data folder '
-                               f'{str(temp_filepath)} not successfull: {e}')
-            
         elif engine == 'polars':
             
             # download to temporary csv file 
@@ -786,10 +809,21 @@ class historical_manager:
             
             # alternative using pyarrow
             buf = BufferReader(raw_file.read())
-            tempdir_path = Path(temp_filepath).parent
-            # create temperary files directory if not present
-            tempdir_path.mkdir(exist_ok=True)
-            # download buffer to file
+            
+            if (
+                Path(temp_filepath).exists()
+                and
+                Path(temp_filepath).is_file()
+                ):
+                
+                Path(temp_filepath).unlink(missing_ok=True)    
+                
+            else:
+                
+                # create temporary files directory if not present
+                tempdir_path = Path(temp_filepath).parent
+                tempdir_path.mkdir(exist_ok=True)
+                
             buf.download(temp_filepath)
             
             # from histdata raw files column 'p' is not present
@@ -824,17 +858,64 @@ class historical_manager:
             
             # final cast to standard dtypes
             df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                
+        elif engine == 'polars_lazy':
             
-            # delete temp path
-            try:
+            # download to temporary csv file 
+            # for best performance with polars
+            
+            # alternative using pyarrow
+            buf = BufferReader(raw_file.read())
+            
+            if (
+                Path(temp_filepath).exists()
+                and
+                Path(temp_filepath).is_file()
+                ):
                 
-                rmtree(str(tempdir_path))
+                Path(temp_filepath).unlink(missing_ok=True)    
                 
-            except Exception as e:
+            else:
                 
-                logger.warning('Deleting temporary data folder '
-                               f'{str(temp_filepath)} not successfull: {e}')
-        
+                # create temporary files directory if not present
+                tempdir_path = Path(temp_filepath).parent
+                tempdir_path.mkdir(exist_ok=True)
+                
+            # download buffer to file
+            buf.download(temp_filepath)
+            
+            # from histdata raw files column 'p' is not present
+            raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
+            raw_file_dtypes.pop('p')
+            raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
+            
+            # read file
+            # set schema for columns but avoid timestamp columns
+            df = read_csv(
+                        'polars_lazy',
+                        temp_filepath,
+                        separator   = ',',
+                        has_header  = False,
+                        new_columns = DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
+                        schema      = raw_file_dtypes
+            )
+            
+            # convert timestamp column to datetime data type
+            df = df.with_columns(
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        polars_datetime('ms'), 
+                        format=DATE_FORMAT_HISTDATA_CSV
+                    )
+                )
+    
+            # calculate 'p'
+            df = df.with_columns(
+                    ( (col('ask') + col('bid')) / 2).alias('p') 
+                 ) 
+            
+            # final cast to standard dtypes
+            df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            
         else:
             
             logger.error(f'Engine {engine} is not supported')
@@ -1002,9 +1083,12 @@ class historical_manager:
             if file:
                 
                 month_data = self._raw_zipfile_to_df(file,
-                                                     str(self._histdata_path 
-                                                         / TEMP_FOLDER
-                                                         / TEMP_CSV_FILE),
+                                                     str(self._temporary_data_path
+                                                         / ( f'{ticker}_' +
+                                                         f'{year}_' +
+                                                         f'{month}_' +
+                                                         TEMP_CSV_FILE )
+                                                         ),
                                                      engine = self.engine
                 )
                  
@@ -1017,10 +1101,6 @@ class historical_manager:
                     
                     year_tick_df = concat_data([year_tick_df, month_data])
                     
-                
-                    
-        (self._histdata_path / TEMP_FOLDER / TEMP_CSV_FILE).unlink(missing_ok=True)
-            
         return year_tick_df
 
 
@@ -1320,6 +1400,29 @@ class historical_manager:
                                                  schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE,
                                                  try_parse_dates=True
                                         )
+                                        
+                            elif  engine == 'polars_lazy':
+                                
+                                # tick data file 
+                                if file_tf == TICK_TIMEFRAME:
+                                    
+                                    self._db_dict[year_tf_key] = \
+                                        read_csv('polars_lazy', 
+                                                 file,
+                                                 new_columns=DATA_COLUMN_NAMES.TICK_DATA,
+                                                 schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE,
+                                                 try_parse_dates=True
+                                        )
+                                                     
+                                elif file_tf in self._tf_list:
+                                    
+                                    self._db_dict[year_tf_key] = \
+                                        read_csv('polars_lazy', 
+                                                 file,
+                                                 new_columns=DATA_COLUMN_NAMES.TF_DATA,
+                                                 schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE,
+                                                 try_parse_dates=True
+                                        )
                         
                             else:
                                 
@@ -1359,6 +1462,10 @@ class historical_manager:
 
         # dump new downloaded data not already present in local data folder
         self._update_local_data_folder()
+        
+        # all data is dumped in database folder
+        # okay to clear temporary data folder
+        self._clear_temporary_data_folder()
 
 
     def add_timeframe(self, timeframe, update_data=False):
@@ -1432,7 +1539,11 @@ class historical_manager:
             raise ValueError
             
         # try to convert to datetime data type if not already is
-        if self.engine == 'polars':
+        if (
+                self.engine == 'polars'
+                or
+                self.engine == 'polars_lazy'
+            ):
             
             start = any_date_to_datetime64(start,
                                            to_pydatetime=True)
@@ -1588,6 +1699,19 @@ class historical_manager:
                         ).clone()
                     )
             
+            elif self.engine == 'polars_lazy':
+                
+                data_df = \
+                    \
+                    (
+                        data_df
+                        .filter(
+                            col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_between(start,
+                                                                            end   
+                            )
+                        ).clone()
+                    )
+                    
             else:
                 
                 logger.error(f'engine {self.engine} not supported'
@@ -1640,6 +1764,26 @@ class historical_manager:
                 )
                  
             elif self.engine == 'polars':
+            
+                # slice data using polars sintax:
+                    
+                data_df = \
+                    \
+                    concat_data(
+                        [
+                            (
+                                self._db_dict.get(key)
+                                .filter(
+                                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_between(start,
+                                                                                    end   
+                                    )
+                                ).clone()
+                            )
+                            for key in interval_keys
+                        ]
+                    )
+                    
+            elif self.engine == 'polars_lazy':
             
                 # slice data using polars sintax:
                     
