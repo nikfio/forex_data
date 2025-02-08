@@ -294,6 +294,8 @@ class historical_manager:
             
         self._temporary_data_path = self._histdata_path \
                                         / TEMP_FOLDER
+                                        
+        self._clear_temporary_data_folder()
 
     def _clear_temporary_data_folder(self):
         
@@ -1465,7 +1467,7 @@ class historical_manager:
         
         # all data is dumped in database folder
         # okay to clear temporary data folder
-        self._clear_temporary_data_folder()
+        #self._clear_temporary_data_folder()
 
 
     def add_timeframe(self, timeframe, update_data=False):
@@ -1834,8 +1836,11 @@ class historical_manager:
         :return: void
         """
 
-        logger.info(f'Chart request: from {start_date} '
-                    f'to {end_date} with timeframe {timeframe}')
+        logger.info(f'''Chart request:
+                    ticker {ticker}
+                    timeframe {timeframe}
+                    from {start_date}
+                    to {end_date}''')
         
         chart_data = self.get_data(ticker        = ticker,
                                    timeframe     = timeframe,
