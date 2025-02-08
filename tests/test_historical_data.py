@@ -95,13 +95,15 @@ class TestHistData(unittest.TestCase):
 
         # example dates, take weekdays of a single week
         # to avoid false positive check on timeframe
+        ex_ticker     = 'EURCAD'
+        ex_timefame   = '3D'
         ex_start_date = '2008-11-17 09:00:00'
-        ex_end_date   = '2008-11-21 18:00:00'
+        ex_end_date   = '2008-11-30 18:00:00'
         
         # get data
         data = histmanager.get_data(
-                    ticker    = 'AUDUSD',
-                    timeframe = '1h',
+                    ticker    = ex_ticker,
+                    timeframe = ex_timefame,
                     start     = ex_start_date,
                     end       = ex_end_date
         )        
@@ -139,7 +141,7 @@ class TestHistData(unittest.TestCase):
         )
     
         self.assertEqual(check[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP][0],
-                         timedelta(hours=1),
+                         timedelta(days=3),
                          msg=('timeframe request 1h check failed, found multiple: '  
                              + f'{check[data_mng.BASE_DATA_COLUMN_NAME.TIMESTAMP]}')
         )

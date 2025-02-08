@@ -43,14 +43,16 @@ def main():
     # add logging to stderr 
     logger.add(stderr, level="TRACE")
     
-    # example dates 
+    # example dates
+    ex_ticker     = 'EURJPY'
+    ex_timefame   = '1D'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date   = '2018-12-03 10:00:00'
     
     # get data
     yeardata = histmanager.get_data(
-        ticker    = 'EURUSD',
-        timeframe = '1h',
+        ticker    = ex_ticker,
+        timeframe = ex_timefame,
         start     = ex_start_date,
         end       = ex_end_date
     )
@@ -58,7 +60,9 @@ def main():
     if not is_empty_dataframe(yeardata):
         
         logger.trace(f"""
-                     get_data: 
+                     get_data:
+                     ticker {ex_ticker}
+                     timeframe {ex_timefame}
                      rows {shape_dataframe(yeardata)[0]}
                      start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
                      end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,
@@ -69,7 +73,7 @@ def main():
         
         logger.trace("""
                      get_data: no data found, "
-                     requested pair {histmanager.ticker}
+                     requested pair {ex_ticker}
                      start {ex_start_date}, "
                      end {ex_start_date}"""
         )
@@ -78,7 +82,7 @@ def main():
     histmanager.add_timeframe('1W', update_data=True)
     
     # plot data 
-    histmanager.plot( ticker      = 'EURUSD',
+    histmanager.plot( ticker      = ex_ticker,
                       timeframe   = '1D',
                       start_date  = '2017-02-02 18:00:00',
                       end_date    = '2017-06-23 23:00:00'
@@ -87,14 +91,16 @@ def main():
     
     ## get data from another ticker
     
-    # example dates 
+    # example dates
+    ex_ticker     = 'EURCAD'
+    ex_timefame   = '3D'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date   = '2020-12-03 10:00:00'
     
     # get data
     yeardata = histmanager.get_data(
-        ticker    = 'GBPJPY',
-        timeframe = '1D',
+        ticker    = ex_ticker,
+        timeframe = ex_timefame,
         start     = ex_start_date,
         end       = ex_end_date
     )
@@ -102,7 +108,9 @@ def main():
     if not is_empty_dataframe(yeardata):
         
         logger.trace(f"""
-                     get_data: 
+                     get_data:
+                     ticker {ex_ticker}
+                     timeframe {ex_timefame}
                      rows {shape_dataframe(yeardata)[0]}
                      start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
                      end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,
@@ -112,7 +120,8 @@ def main():
     else:
         
         logger.trace(f"""
-                     get_data: 
+                     get_data:
+                     ticker {ex_ticker}
                      rows {shape_dataframe(yeardata)[0]}
                      start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
                      end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,
