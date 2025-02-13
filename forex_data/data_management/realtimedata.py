@@ -32,13 +32,10 @@ from pyarrow import (
 from polars import (
                     col,
                     from_epoch,
-                    from_dict as polars_fromdict
+                    from_dict as polars_fromdict,
+                    DataFrame as polars_dataframe,
+                    LazyFrame as polars_lazyframe
     )
-
-from polars.dataframe import ( 
-                    DataFrame as polars_dataframe
-    )
-
 
 from numpy import array
 
@@ -103,6 +100,11 @@ class realtime_manager:
                         default = Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.REALTIME_DATA_FOLDER, 
                         validator=validator_dir_path(create_if_missing=True)
                      )
+    _temporary_data_path = field(
+                        default = (Path(DEFAULT_PATHS.BASE_PATH) 
+                                    / DEFAULT_PATHS.REALTIME_DATA_FOLDER
+                                    / TEMP_FOLDER), 
+                        validator=validator_dir_path(create_if_missing=True))
   
     # if a valid config file or string
     # is passed
@@ -284,7 +286,35 @@ class realtime_manager:
         elif self.engine == 'polars':
             
             self._dataframe_type = polars_dataframe
+            
+        elif self.engine == 'polars_lazy':
 
+            self._dataframe_type = polars_lazyframe  
+            
+        self._temporary_data_path = self._realtimedata_path \
+                                        / TEMP_FOLDER
+                                        
+        self._clear_temporary_data_folder()
+
+
+    def _clear_temporary_data_folder(self):
+        
+        # delete temporary data path
+        if (
+            self._temporary_data_path.exists()
+            and
+            self._temporary_data_path.is_dir()
+            ):
+            
+            try:
+                
+                rmtree(str(self._temporary_data_path))
+                
+            except Exception as e:
+                
+                logger.warning('Deleting temporary data folder '
+                               f'{str(self._temporary_data_path)} not successfull: {e}')
+    
     
     def _getClient(self, provider):
         
@@ -386,7 +416,6 @@ class realtime_manager:
             
             if last_close:
             
-                
                 res = client.get_currency_exchange_daily(
                         to_symbol,
                         from_symbol,
@@ -479,10 +508,10 @@ class realtime_manager:
                 day_end   = any_date_to_datetime64(day_end)
                 
             # try to convert to datetime data type if not already is
-            if self.engine == 'polars':
+            #if self.engine == 'polars':
                  
-                day_start =  day_start.to_pydatetime()
-                day_end = day_end.to_pydatetime()
+                #day_start =  day_start.to_pydatetime()
+                #day_end = day_end.to_pydatetime()
             
         # parse alpha vantage response from daily api request
         resp_data_dict = daily_data[CANONICAL_INDEX.AV_DF_DATA_INDEX]
@@ -507,7 +536,11 @@ class realtime_manager:
                     }
             )
             
+            # final cast to standard dtypes
             df = astype(df, DTYPE_DICT.TIME_TF_DTYPE)
+            
+            # sort by timestamp
+            df = sort_dataframe(df, BASE_DATA_COLUMN_NAME.TIMESTAMP)
             
             # timestamp as column to include it in return data
             df.reset_index(inplace=True)
@@ -515,7 +548,7 @@ class realtime_manager:
             if last_close:
                
                 # get most recent line --> lowest num index
-                df = df.iloc[CANONICAL_INDEX.AV_LATEST_DATA_INDEX]
+                df = get_dataframe_row(df, shape_dataframe(df)[0]-1)
         
             else:
                 
@@ -541,9 +574,12 @@ class realtime_manager:
             # final cast to standard dtypes
             df = astype(df, PYARROW_DTYPE_DICT.TIME_TF_DTYPE)
             
+            # sort by timestamp
+            df = sort_dataframe(df, BASE_DATA_COLUMN_NAME.TIMESTAMP)
+            
             if last_close:
                 
-                df = df[CANONICAL_INDEX.AV_LATEST_DATA_INDEX]
+                df = get_dataframe_row(df, shape_dataframe(df)[0]-1)
                 
             else:
                 
@@ -552,7 +588,7 @@ class realtime_manager:
                                        day_start),
                             pc.less(df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
                                        day_end)
-                            )
+                )
                 
                 data_df = pyarrow_Table.from_arrays(df.filter(mask).columns,
                                                     schema=df.schema)
@@ -577,13 +613,16 @@ class realtime_manager:
                         format=DATE_NO_HOUR_FORMAT
                     )
                 )
-            
+                
             # final cast to standard dtypes
             df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+             
+            # sort by timestamp
+            df = sort_dataframe(df, BASE_DATA_COLUMN_NAME.TIMESTAMP)
             
             if last_close:
                 
-                df = df[CANONICAL_INDEX.AV_LATEST_DATA_INDEX]
+                df = get_dataframe_row(df, shape_dataframe(df)[0]-1)
                 
             else:
                 
@@ -597,7 +636,52 @@ class realtime_manager:
                         )
                     ).clone()
                 )
+                
+        elif self.engine == 'polars_lazy':
             
+            df = polars_lazyframe(
+                {
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP : timestamp,
+                    BASE_DATA_COLUMN_NAME.OPEN      : open_data,
+                    BASE_DATA_COLUMN_NAME.HIGH      : high_data,
+                    BASE_DATA_COLUMN_NAME.LOW       : low_data,
+                    BASE_DATA_COLUMN_NAME.CLOSE     : close_data
+                }
+            )
+            
+            # convert timestamp column to datetime data type
+            df = \
+                df.with_columns(
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        polars_datetime('ms'), 
+                        format=DATE_NO_HOUR_FORMAT
+                    )
+                )
+                
+            # final cast to standard dtypes
+            df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+            
+            # sort by timestamp
+            df = sort_dataframe(df, BASE_DATA_COLUMN_NAME.TIMESTAMP)
+            
+            if last_close:
+                
+                df = get_dataframe_row(df, shape_dataframe(df)[0]-1)
+                
+            else:
+                
+                # filter on date
+                df = \
+                (
+                    df
+                    .filter(
+                        col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_between(day_start,
+                                                                        day_end   
+                        )
+                    ).clone()
+                )
+                
+        # sort by timestamp
         return df
 
 
@@ -635,7 +719,7 @@ class realtime_manager:
                               for agg in data]
             
             df = pyarrow_Table.from_pylist(data_dict_list)
-                                        
+            
             extra_columns = list(set(df.column_names).difference(DATA_COLUMN_NAMES.TF_DATA))
             
             df = df.drop_columns(extra_columns)
@@ -647,6 +731,9 @@ class realtime_manager:
             
             df = polars_dataframe(data)
             
+            # sort by timestamp
+            df = sort_dataframe(df, BASE_DATA_COLUMN_NAME.TIMESTAMP)
+            
             extra_columns = list(set(df.columns).difference(DATA_COLUMN_NAMES.TF_DATA))
             
             df = df.drop(extra_columns)
@@ -657,11 +744,36 @@ class realtime_manager:
                                time_unit='ms').alias(BASE_DATA_COLUMN_NAME.TIMESTAMP)
                 )
         
-            # convert to conventional dtype
-            df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+        elif engine == 'polars_lazy':
             
-        return df
-    
+            if data:
+                
+                df = polars_lazyframe(data)
+                
+                extra_columns = list(set(
+                                    df.collect_schema().names()).difference(
+                                        DATA_COLUMN_NAMES.TF_DATA
+                                    )
+                                )
+                
+                df = df.drop(extra_columns)
+                
+                # convert timestamp column to datetime data type
+                df = df.with_columns(
+                        from_epoch(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                   time_unit='ms').alias(BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                    )
+            
+                # convert to conventional dtype
+                df = astype(df, POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+                
+            else:
+                
+                df = empty_dataframe('polars_lazy')
+            
+        # sort by timestamp
+        return sort_dataframe(df, BASE_DATA_COLUMN_NAME.TIMESTAMP)
+        
     
     def get_data(self,
                  ticker,

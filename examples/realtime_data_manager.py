@@ -22,8 +22,12 @@ from pandas import (
                 )
 # custom lib
 from forex_data import (
+                    BASE_DATA_COLUMN_NAME,
+                    APPCONFIG_FILE_YAML,
                     realtime_manager,
-                    APPCONFIG_FILE_YAML
+                    get_dataframe_element,
+                    is_empty_dataframe,
+                    shape_dataframe
                 )
 
 from sys import stderr
@@ -39,72 +43,169 @@ def main():
     # add logging to stderr 
     logger.add(stderr, level="TRACE")
         
-    # input test request definition
-    test_day_start   = '2024-03-10'
-    test_day_end     = '2024-03-26'
-    test_n_days      = 10
+    # example parameters
+    ex_ticker     = 'EURCAD'
     
     # get last close on daily basis
     dayclose_quote = \
         realtimedata_manager.get_daily_close(
-                            ticker = 'EURUSD',
+                            ticker = ex_ticker,
                             last_close=True
         )
     
-    logger.trace(f'Real time daily close quote {dayclose_quote}')
+    if not is_empty_dataframe(dayclose_quote):
+        
+        logger.trace(f"""
+                     get_daily_close:
+                     ticker {ex_ticker}
+                     rows {shape_dataframe(dayclose_quote)[0]}
+                     date {get_dataframe_element(dayclose_quote,
+                                                 BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
+        )
+        
+    else:
+        
+        logger.trace(f"""
+                     get_daily_close: no data found 
+                     requested pair {ex_ticker}
+                     last_close = True"""
+        )
+    
+    # example parameters
+    ex_n_days = 13
     
     # test time window data function with daily resolution
     window_daily_ohlc = \
         realtimedata_manager.get_daily_close(
-            ticker = 'EURUSD',
-            recent_days_window=test_n_days
+            ticker = ex_ticker,
+            recent_days_window = ex_n_days
         )
     
-    logger.trace(f'Last {test_n_days} window data: {window_daily_ohlc}')
-                                                                       
+    if not is_empty_dataframe(window_daily_ohlc):
+        
+        logger.trace(f"""
+                     get_daily_close:
+                     ticker {ex_ticker}
+                     rows {shape_dataframe(window_daily_ohlc)[0]}
+                     date {get_dataframe_element(window_daily_ohlc,
+                                                 BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
+        )
+        
+    else:
+        
+        logger.trace(f"""
+                     get_daily_close: no data found 
+                     requested pair {ex_ticker}
+                     n_days = {ex_n_days}"""
+        )
+         
     # test start-end window data function with daily resolution
+    
+    # example parameters        
+    ex_start_date = '2025-01-15'
+    ex_end_date   = '2025-01-23'
+                                                      
     window_limits_daily_ohlc = \
         realtimedata_manager.get_daily_close(
-            ticker = 'EURUSD',
-            day_start=test_day_start,
-            day_end=test_day_end
+            ticker = ex_ticker,
+            day_start=ex_start_date,
+            day_end=ex_end_date
         )
      
-    logger.trace(f'From {test_day_start} to {test_day_end} ' 
-                 f'window data: {window_limits_daily_ohlc}')
+    if not is_empty_dataframe(window_limits_daily_ohlc):
+        
+        logger.trace(f"""
+                     get_daily_close:
+                     ticker {ex_ticker}
+                     rows {shape_dataframe(window_limits_daily_ohlc)[0]}
+                     date {get_dataframe_element(window_limits_daily_ohlc,
+                                                 BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
+        )
+        
+    else:
+        
+        logger.trace(f"""
+                     get_daily_close: no data found 
+                     requested pair {ex_ticker}
+                     start {ex_start_date}
+                     end {ex_start_date}"""
+        )
     
     # test time window data function with timeframe resolution
     
-    # input test request definition
-    test_day_start   = '2024-04-10'
-    test_day_end     = '2024-04-15'
-    test_timeframe   = '1h'
+    # test parameters
+    ex_start_date    = '2024-04-10'
+    ex_end_date      = '2024-04-15'  
+    ex_timeframe     = '1h'
     
     window_data_ohlc = \
         realtimedata_manager.get_data(  
-            ticker    = 'EURUSD',    
-            start     = test_day_start,
-            end       = test_day_end,
-            timeframe = test_timeframe
+            ticker    = ex_ticker,    
+            start     = ex_start_date,
+            end       = ex_end_date,
+            timeframe = ex_timeframe
         )
     
-    logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
-    
+    if not is_empty_dataframe(window_data_ohlc):
+        
+        logger.trace(f"""
+                     get_data:
+                     ticker {ex_ticker}
+                     timeframe {ex_timeframe}
+                     rows {shape_dataframe(window_data_ohlc)[0]}
+                     start {get_dataframe_element(window_data_ohlc,
+                                                  BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
+                     end {get_dataframe_element(window_data_ohlc,
+                                                BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                                shape_dataframe(window_data_ohlc)[0]-1)}"""
+        )
+        
+    else:
+        
+        logger.trace(f"""
+                     get_data: no data found, "
+                     requested pair {ex_ticker}
+                     start {ex_start_date}
+                     end {ex_start_date}"""
+        )
+        
     # test time window data function with timeframe resolution: intraday case
-    test_day_start = Timestamp.now() - Timedelta('10D')
-    test_day_end   = Timestamp.now() - Timedelta('8D')
-    test_timeframe = '5m'
+    
+    # example parameters
+    ex_start_date  = Timestamp.now() - Timedelta('10D')
+    ex_end_date    = Timestamp.now() - Timedelta('8D')
+    ex_timeframe   = '5m'
     
     window_data_ohlc = \
         realtimedata_manager.get_data(  
             ticker    = 'EURUSD',
-            start     = test_day_start,
-            end       = test_day_end,
-            timeframe = test_timeframe
+            start     = ex_start_date,
+            end       = ex_end_date,
+            timeframe = ex_timeframe
         )
     
-    logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
-    
+    if not is_empty_dataframe(window_data_ohlc):
+        
+        logger.trace(f"""
+                     get_daily_close:
+                     ticker {ex_ticker}
+                     timeframe {ex_timeframe}
+                     rows {shape_dataframe(window_data_ohlc)[0]}
+                     start {get_dataframe_element(window_data_ohlc,
+                                                  BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
+                     end {get_dataframe_element(window_data_ohlc,
+                                                BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                                                shape_dataframe(window_data_ohlc)[0]-1)}"""
+        )
+        
+    else:
+        
+        logger.trace(f"""
+                     get_daily_close: no data found 
+                     requested pair {ex_ticker}
+                     start {ex_start_date}
+                     end {ex_start_date}"""
+        )
     
 if __name__ == '__main__':
     main()
