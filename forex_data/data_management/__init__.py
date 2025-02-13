@@ -13,6 +13,7 @@ __all__ = ['common',
            'is_empty_dataframe',
            'shape_dataframe',
            'get_dataframe_column',
+           'get_dataframe_row',
            'get_dataframe_element'
        ]
 
@@ -24,6 +25,7 @@ from .common import (
     is_empty_dataframe,
     shape_dataframe,
     get_dataframe_column,
+    get_dataframe_row,
     get_dataframe_element
 )
 

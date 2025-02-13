@@ -43,16 +43,16 @@ def main():
     # add logging to stderr 
     logger.add(stderr, level="TRACE")
     
-    # example dates
+    # example parameters
     ex_ticker     = 'EURJPY'
-    ex_timefame   = '1D'
+    ex_timeframe  = '1D'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date   = '2018-12-03 10:00:00'
     
     # get data
     yeardata = histmanager.get_data(
         ticker    = ex_ticker,
-        timeframe = ex_timefame,
+        timeframe = ex_timeframe,
         start     = ex_start_date,
         end       = ex_end_date
     )
@@ -62,7 +62,7 @@ def main():
         logger.trace(f"""
                      get_data:
                      ticker {ex_ticker}
-                     timeframe {ex_timefame}
+                     timeframe {ex_timeframe}
                      rows {shape_dataframe(yeardata)[0]}
                      start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
                      end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,
@@ -72,7 +72,7 @@ def main():
     else:
         
         logger.trace("""
-                     get_data: no data found, "
+                     get_data: no data found
                      requested pair {ex_ticker}
                      start {ex_start_date}, "
                      end {ex_start_date}"""
@@ -91,16 +91,16 @@ def main():
     
     ## get data from another ticker
     
-    # example dates
+    # example parameters
     ex_ticker     = 'EURCAD'
-    ex_timefame   = '3D'
+    ex_timeframe   = '3D'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date   = '2020-12-03 10:00:00'
     
     # get data
     yeardata = histmanager.get_data(
         ticker    = ex_ticker,
-        timeframe = ex_timefame,
+        timeframe = ex_timeframe,
         start     = ex_start_date,
         end       = ex_end_date
     )
@@ -110,7 +110,7 @@ def main():
         logger.trace(f"""
                      get_data:
                      ticker {ex_ticker}
-                     timeframe {ex_timefame}
+                     timeframe {ex_timeframe}
                      rows {shape_dataframe(yeardata)[0]}
                      start {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
                      end {get_dataframe_element(yeardata,BASE_DATA_COLUMN_NAME.TIMESTAMP,

@@ -297,6 +297,7 @@ class historical_manager:
                                         
         self._clear_temporary_data_folder()
 
+
     def _clear_temporary_data_folder(self):
         
         # delete temporary data path
@@ -1103,7 +1104,8 @@ class historical_manager:
                     
                     year_tick_df = concat_data([year_tick_df, month_data])
                     
-        return year_tick_df
+        return sort_dataframe(year_tick_df,
+                              BASE_DATA_COLUMN_NAME.TIMESTAMP)
 
 
     def _download(self,

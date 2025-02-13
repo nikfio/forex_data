@@ -43,11 +43,13 @@ __all__ = [
             'is_empty_dataframe',
             'shape_dataframe',
             'get_dataframe_column',
+            'get_dataframe_row',
             'get_dataframe_element',
             'get_dotty_leafs',
             'astype',
             'read_csv',
             'polars_datetime',
+            'sort_dataframe',
             'concat_data',
             'list_remove_duplicates',
             'get_dotty_key_field',
@@ -305,7 +307,6 @@ class CANONICAL_INDEX:
     AV_DICT_INFO_INDEX      = 1    
 
 
-    
 ### auxiliary functions
 
 # parse argument to get datetime object with date format as input
@@ -707,6 +708,32 @@ def shape_dataframe(dataframe):
                      f' {type(dataframe)}')
         raise ValueError 
         
+
+def sort_dataframe(dataframe, column):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe.sort_values(by=[column])
+    
+    elif isinstance(dataframe, Table):
+        
+        return dataframe.sort_by(column)
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe.sort(column, nulls_last=True)
+    
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        return dataframe.sort(column, nulls_last=True)
+    
+    else:
+        
+        logger.error('function sort_dataframe not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        raise ValueError 
+        
         
 def get_dataframe_column(dataframe, column):
     
@@ -729,6 +756,30 @@ def get_dataframe_column(dataframe, column):
     else:
         
         logger.error('function get_dataframe_column not available'
+                     ' for instance of type'
+                     f' {type(dataframe)}')
+        
+def get_dataframe_row(dataframe, row):
+    
+    if isinstance(dataframe, pandas_dataframe):
+        
+        return dataframe.loc[row]
+    
+    elif isinstance(dataframe, Table):
+        
+        return dataframe.slice(row, 1)
+    
+    elif isinstance(dataframe, polars_dataframe):
+    
+        return dataframe.slice(row, 1)
+    
+    elif isinstance(dataframe, polars_lazyframe):
+        
+        return dataframe.slice(row, 1)
+    
+    else:
+        
+        logger.error('function get_dataframe_row not available'
                      ' for instance of type'
                      f' {type(dataframe)}')
         
@@ -1100,24 +1151,26 @@ def reframe_data(dataframe, tf):
         
         ## use pandas functions to reframe data on pandas Dataframe
         
-        df = dataframe.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+        dataframe = sort_dataframe(dataframe, BASE_DATA_COLUMN_NAME.TIMESTAMP)
+        
+        dataframe = dataframe.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
                                  inplace=False,
                                  drop=True
         )
         
         # resample based on p value
         if all([col in DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX
-                for col in df.columns]):
+                for col in dataframe.columns]):
             
             # resample along 'p' column, data in ask, bid, p format
-            df =  df.p.resample(tf).ohlc().interpolate(method='nearest')
+            dataframe =  dataframe.p.resample(tf).ohlc().interpolate(method='nearest')
             
         elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
-                  for col in df.columns]): 
+                  for col in dataframe.columns]): 
             
             # resample along given data already in ohlc format
-            df = df.resample(tf).interpolate(method=
-                                             'nearest')
+            dataframe = dataframe.resample(tf).interpolate(method=
+                                                           'nearest')
             
         else:
             
@@ -1126,7 +1179,7 @@ def reframe_data(dataframe, tf):
                         f'or {DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX}')
             raise ValueError
             
-        return df.reset_index(drop=False)
+        return dataframe.reset_index(drop=False)
             
     elif isinstance(dataframe, Table):
         
@@ -1149,27 +1202,26 @@ def reframe_data(dataframe, tf):
                 for col in dataframe.column_names]):
             
             # convert to polars dataframe
-            df = from_arrow(dataframe, 
+            dataframe = from_arrow(dataframe, 
                             schema = POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
             
         elif all([col in DATA_COLUMN_NAMES.TF_DATA
                 for col in dataframe.column_names]):
             
             # convert to polars dataframe
-            df = from_arrow(dataframe, 
+            dataframe = from_arrow(dataframe, 
                             schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE)
             
         
         # perform operation
         # convert to arrow Table and return
-        return reframe_data(df, tf).to_arrow()
+        return reframe_data(dataframe, tf).to_arrow()
        
-    
     elif isinstance(dataframe, polars_dataframe):
           
         tf = tf.lower()
         
-        dataframe = dataframe.sort('timestamp', nulls_last=True)
+        dataframe = sort_dataframe(dataframe, BASE_DATA_COLUMN_NAME.TIMESTAMP)
         
         if all([col in DATA_COLUMN_NAMES.TICK_DATA
                 for col in dataframe.columns]):
@@ -1218,15 +1270,15 @@ def reframe_data(dataframe, tf):
             )
                                   
         elif all([col in DATA_COLUMN_NAMES.TF_DATA
-                for col in dataframe.columns]):
+                for col in dataframe.collect_schema().names()]):
             
             return dataframe.group_by_dynamic(
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                    every=tf).agg(col(BASE_DATA_COLUMN_NAME.OPEN).first(),
-                                  col(BASE_DATA_COLUMN_NAME.HIGH).max(),
-                                  col(BASE_DATA_COLUMN_NAME.LOW).min(),
-                                  col(BASE_DATA_COLUMN_NAME.CLOSE).last()
-                  )
+                     BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                     every=tf).agg(col(BASE_DATA_COLUMN_NAME.OPEN).first(),
+                       col(BASE_DATA_COLUMN_NAME.HIGH).max(),
+                       col(BASE_DATA_COLUMN_NAME.LOW).min(),
+                       col(BASE_DATA_COLUMN_NAME.CLOSE).last()
+            )
         
         else:
             
