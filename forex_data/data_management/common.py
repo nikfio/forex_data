@@ -35,6 +35,7 @@ __all__ = [
             'DATE_NO_HOUR_FORMAT',
             'POLY_IO_KEY_ENV',
             
+            'validator_file_path',
             'validator_dir_path',
             'get_attrs_names',
             'check_time_offset_str',
@@ -496,8 +497,8 @@ def get_date_interval(start=None,
             
         if bdays:
             
-            components  = findall(TIME_WINDOW_COMPONENTS_PATTERN_STR,
-                                  interval_timespan)    
+            components = findall(TIME_WINDOW_COMPONENTS_PATTERN_STR,
+                                 interval_timespan)    
             
             # fixed days redundancy check available only with 'd' type requested timespan
             if components[1] == 'd':
@@ -1437,6 +1438,34 @@ def get_dotty_key_parent(key):
 
 ## ADDED VALIDATORS
 
+def validator_file_path(file_ext=None):
+    
+    def validate_file_path(instance, attribute, value):
+        
+        try:
+            
+            filepath = Path(value)
+            
+        except Exception as e:
+            
+            logger.error(f'File {value} Path creation error: {e}')
+            raise
+            
+        else:
+            
+            if not (
+                
+                    filepath.exists()
+                    or
+                    filepath.is_file()
+                ):
+                
+                logger.error(f'file {value} not exists')
+                raise FileExistsError
+    
+    return validate_file_path
+    
+    
 def validator_dir_path(create_if_missing=False):
     
     def validate_or_create_dir(instance, attribute, value):
@@ -1449,7 +1478,7 @@ def validator_dir_path(create_if_missing=False):
             
             if not (
                 Path(value).exists()
-                and 
+                or 
                 Path(value).is_dir()
             ):
                 

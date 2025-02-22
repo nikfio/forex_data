@@ -70,8 +70,9 @@ from iteration_utilities import (
 # internally defined
 from .common import *
 from ..config import ( 
-                read_config_file,
-                read_config_string
+        read_config_file,
+        read_config_string,
+        read_config_folder
     )
 
 
@@ -83,7 +84,7 @@ __all__ = ['historical_manager']
 class historical_manager:
     
     # interface parameters
-    config_file     : str = field(default=None,
+    config          : str = field(default=None,
                                   validator=validators.instance_of(str))
     data_filetype   : str = field(default='parquet',
                                   validator=validators.in_(SUPPORTED_DATA_FILES))
@@ -125,34 +126,43 @@ class historical_manager:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
         
-        if kwargs['config_file']:
+        if kwargs['config']:
             
-            config_path = Path(kwargs['config_file'])
+            config_path = Path(kwargs['config'])
+            
+            if (
+                config_path.exists() 
+                and  
+                config_path.is_dir() 
+                ):
+                
+                config_filepath = read_config_folder(config_path)
+                
             config_args = {}
-            if config_path.exists() \
+            if config_filepath.exists() \
                 and  \
-                config_path.is_file() \
+                config_filepath.is_file() \
                 and  \
-                config_path.suffix == '.yaml':
+                config_filepath.suffix == '.yaml':
                 
                 # read parameters from config file 
                 # and force keys to lower case
                 config_args = {key.lower(): val for key, val in 
-                               read_config_file(str(config_path)).items()}
+                               read_config_file(str(config_filepath)).items()}
             
-            elif isinstance(kwargs['config_file'], str):
+            elif isinstance(kwargs['config'], str):
                 
                 # read parameters from config file 
                 # and force keys to lower case
                 config_args = {key.lower(): val for key, val in 
-                               read_config_string(kwargs['config_file']).items()}
+                               read_config_string(kwargs['config']).items()}
                 
             else:
             
-                logger.critical('invalid config_file type '
-                                f'{kwargs["config_file"]}: '
+                logger.critical('invalid config type '
+                                f'{kwargs["config"]}: '
                                 'required str or Path, got '
-                                f'{type(kwargs["config_file"])}')
+                                f'{type(kwargs["config"])}')
                 raise TypeError
                         
             # check consistency of config_args
@@ -162,11 +172,11 @@ class historical_manager:
                     not bool(config_args)
                 ):
                 
-                logger.critical(f'config_file {kwargs["config_file"]} '
+                logger.critical(f'config {kwargs["config"]} '
                                  'has no valid yaml formatted data')
                 raise TypeError
             
-            self.config_file = kwargs['config_file']
+            self.config = kwargs['config']
             
             # set args from config file
             attrs_keys_configfile = \
@@ -1541,19 +1551,6 @@ class historical_manager:
             
             logger.error(f'timeframe request {timeframe} invalid')
             raise ValueError
-            
-        # try to convert to datetime data type if not already is
-        if (
-                self.engine == 'polars'
-                or
-                self.engine == 'polars_lazy'
-            ):
-            
-            start = any_date_to_datetime64(start,
-                                           to_pydatetime=True)
-            
-            end = any_date_to_datetime64(end,
-                                         to_pydatetime=True)
             
         else:
             
