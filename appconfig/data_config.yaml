@@ -1,0 +1,10 @@
+---
+# yaml document for data management configuration
+
+DATA_FILETYPE: 'parquet'
+
+ENGINE: 'polars_lazy'
+
+PROVIDERS_KEY: 
+    ALPHA_VANTAGE_KEY : IN4NHG0RHCBDZJ77, 
+    POLYGON_IO_KEY    : Sp4b6BXnMoxfCRAKDQ7W14cva_YSDrns

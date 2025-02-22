@@ -88,7 +88,7 @@ class historical_manager:
                                   validator=validators.instance_of(str))
     data_filetype   : str = field(default='parquet',
                                   validator=validators.in_(SUPPORTED_DATA_FILES))
-    engine          : str = field(default='polars',
+    engine          : str = field(default='polars_lazy',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
     in_memory       : bool = field(default=False,
                                   validator=validators.instance_of(bool))
@@ -136,7 +136,12 @@ class historical_manager:
                 config_path.is_dir() 
                 ):
                 
-                config_filepath = read_config_folder(config_path)
+                config_filepath = read_config_folder(config_path,
+                                                     file_pattern='_config.yaml')
+            
+            else:
+                
+                config_filepath = Path()
                 
             config_args = {}
             if config_filepath.exists() \
