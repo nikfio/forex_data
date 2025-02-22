@@ -127,7 +127,21 @@ class realtime_manager:
         
         if kwargs['config_file']:
             
-            config_path = Path(kwargs['config_file'])
+            onfig_path = Path(kwargs['config'])
+            
+            if (
+                config_path.exists() 
+                and  
+                config_path.is_dir() 
+                ):
+                
+                config_filepath = read_config_folder(config_path,
+                                                     file_pattern='_config.yaml')
+            
+            else:
+                
+                config_filepath = Path()
+                
             config_args = {}
             if config_path.exists() \
                 and  \
