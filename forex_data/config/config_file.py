@@ -87,3 +87,25 @@ def read_config_string(config_str):
         
     return data
 
+
+def read_config_folder(folder_path=None, file_pattern='appconfig.yaml'):
+
+    if (
+        Path(folder_path).exists()
+        and
+        Path(folder_path).is_dir()
+        ):
+            
+        appconfig_filepath = list(Path(folder_path).glob(file_pattern))
+        
+        if appconfig_filepath:
+            
+            return appconfig_filepath[0]
+        
+        else:
+            
+            return None
+        
+    else:
+        
+        return None

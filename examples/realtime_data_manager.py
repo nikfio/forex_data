@@ -35,9 +35,11 @@ from sys import stderr
 
 def main():
     
+    #TODO: look for config file and get reference
+    
     # instance data manager
     realtimedata_manager = realtime_manager(
-                            config_file = APPCONFIG_FILE_YAML
+        config_file = APPCONFIG_FILE_YAML
     )
     
     # add logging to stderr 
@@ -59,8 +61,9 @@ def main():
                      get_daily_close:
                      ticker {ex_ticker}
                      rows {shape_dataframe(dayclose_quote)[0]}
-                     date {get_dataframe_element(dayclose_quote,
-                                                 BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
+                     date {get_dataframe_element(
+                             dayclose_quote,
+                             BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
         )
         
     else:
@@ -87,8 +90,9 @@ def main():
                      get_daily_close:
                      ticker {ex_ticker}
                      rows {shape_dataframe(window_daily_ohlc)[0]}
-                     date {get_dataframe_element(window_daily_ohlc,
-                                                 BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
+                     date {get_dataframe_element(
+                             window_daily_ohlc,
+                             BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
         )
         
     else:
@@ -118,8 +122,9 @@ def main():
                      get_daily_close:
                      ticker {ex_ticker}
                      rows {shape_dataframe(window_limits_daily_ohlc)[0]}
-                     date {get_dataframe_element(window_limits_daily_ohlc,
-                                                 BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
+                     date {get_dataframe_element(
+                             window_limits_daily_ohlc,
+                             BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}"""
         )
         
     else:
@@ -153,11 +158,13 @@ def main():
                      ticker {ex_ticker}
                      timeframe {ex_timeframe}
                      rows {shape_dataframe(window_data_ohlc)[0]}
-                     start {get_dataframe_element(window_data_ohlc,
-                                                  BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
-                     end {get_dataframe_element(window_data_ohlc,
-                                                BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                                                shape_dataframe(window_data_ohlc)[0]-1)}"""
+                     start {get_dataframe_element(
+                             window_data_ohlc,
+                             BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
+                     end {get_dataframe_element(
+                             window_data_ohlc,
+                             BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                             shape_dataframe(window_data_ohlc)[0]-1)}"""
         )
         
     else:
@@ -191,11 +198,13 @@ def main():
                      ticker {ex_ticker}
                      timeframe {ex_timeframe}
                      rows {shape_dataframe(window_data_ohlc)[0]}
-                     start {get_dataframe_element(window_data_ohlc,
-                                                  BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
-                     end {get_dataframe_element(window_data_ohlc,
-                                                BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                                                shape_dataframe(window_data_ohlc)[0]-1)}"""
+                     start {get_dataframe_element(
+                             window_data_ohlc,
+                             BASE_DATA_COLUMN_NAME.TIMESTAMP,0)}, 
+                     end {get_dataframe_element(
+                             window_data_ohlc,
+                             BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                             shape_dataframe(window_data_ohlc)[0]-1)}"""
         )
         
     else:

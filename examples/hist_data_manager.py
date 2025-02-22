@@ -35,9 +35,11 @@ from sys import stderr
 
 def main():
     
+    #TODO: look for config file and get reference
+    
     # instance data manager                          
     histmanager = historical_manager(
-                    config_file=APPCONFIG_FILE_YAML
+                    config = 'C:/Projects/forex-data/appconfig'
     )
      
     # add logging to stderr 

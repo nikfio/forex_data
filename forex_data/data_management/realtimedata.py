@@ -81,10 +81,9 @@ __all__ = ['realtime_manager']
 class realtime_manager:
     
     # interface parameters
-    providers_key   : dict = field(validator=validators.instance_of(dict))
-    # interface parameters
     config_file     : str = field(default=None,
                               validator=validators.instance_of(str))
+    providers_key   : dict = field(validator=validators.instance_of(dict))
     data_filetype   : str = field(default='parquet',
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
     engine          : str = field(default='pandas',
@@ -506,12 +505,6 @@ class realtime_manager:
                 
                 day_start = any_date_to_datetime64(day_start)
                 day_end   = any_date_to_datetime64(day_end)
-                
-            # try to convert to datetime data type if not already is
-            #if self.engine == 'polars':
-                 
-                #day_start =  day_start.to_pydatetime()
-                #day_end = day_end.to_pydatetime()
             
         # parse alpha vantage response from daily api request
         resp_data_dict = daily_data[CANONICAL_INDEX.AV_DF_DATA_INDEX]
