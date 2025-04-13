@@ -96,7 +96,7 @@ def read_config_folder(folder_path=None, file_pattern='appconfig.yaml'):
         Path(folder_path).is_dir()
         ):
             
-        appconfig_filepath = list(Path(folder_path).glob(file_pattern))
+        appconfig_filepath = list(Path(folder_path).glob('*'+file_pattern))
         
         if appconfig_filepath:
             
@@ -104,8 +104,8 @@ def read_config_folder(folder_path=None, file_pattern='appconfig.yaml'):
         
         else:
             
-            return None
+            return Path()
         
     else:
         
-        return None
+        return Path()
