@@ -15,7 +15,8 @@ __all__ = ['common',
            'get_dataframe_column',
            'get_dataframe_row',
            'get_dataframe_element',
-           'get_attrs_names'
+           'get_attrs_names',
+           'any_date_to_datetime64'
        ]
 
 from . import common
@@ -28,7 +29,8 @@ from .common import (
     get_dataframe_column,
     get_dataframe_row,
     get_dataframe_element,
-    get_attrs_names
+    get_attrs_names,
+    any_date_to_datetime64
 )
 
 from .historicaldata import historical_manager

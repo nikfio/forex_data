@@ -181,8 +181,6 @@ class historical_manager:
                                  'has no valid yaml formatted data')
                 raise TypeError
             
-            self.config = kwargs['config']
-            
             # set args from config file
             attrs_keys_configfile = \
                     set(_class_attributes_name).intersection(config_args.keys())

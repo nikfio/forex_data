@@ -61,7 +61,8 @@ from alpha_vantage.foreignexchange import ForeignExchange as av_forex_client
 from .common import *
 from ..config import ( 
             read_config_file,
-            read_config_string
+            read_config_string,
+            read_config_folder
     )
 
 # constants
@@ -81,8 +82,8 @@ __all__ = ['realtime_manager']
 class realtime_manager:
     
     # interface parameters
-    config_file     : str = field(default=None,
-                              validator=validators.instance_of(str))
+    config          : str = field(default=None,
+                                  validator=validators.instance_of(str))
     providers_key   : dict = field(validator=validators.instance_of(dict))
     data_filetype   : str = field(default='parquet',
                                  validator=validators.in_(SUPPORTED_DATA_FILES))
@@ -125,9 +126,9 @@ class realtime_manager:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
         
-        if kwargs['config_file']:
+        if kwargs['config']:
             
-            onfig_path = Path(kwargs['config'])
+            config_path = Path(kwargs['config'])
             
             if (
                 config_path.exists() 
@@ -143,29 +144,29 @@ class realtime_manager:
                 config_filepath = Path()
                 
             config_args = {}
-            if config_path.exists() \
+            if config_filepath.exists() \
                 and  \
-                config_path.is_file() \
+                config_filepath.is_file() \
                 and  \
-                config_path.suffix == '.yaml':
+                config_filepath.suffix == '.yaml':
                 
                 # read parameters from config file 
                 # and force keys to lower case
                 config_args = {key.lower(): val for key, val in 
-                               read_config_file(str(config_path)).items()}
+                               read_config_file(str(config_filepath)).items()}
             
-            elif isinstance(kwargs['config_file'], str):
+            elif isinstance(kwargs['config'], str):
                 
                 # read parameters from config file 
                 # and force keys to lower case
                 config_args = {key.lower(): val for key, val in 
-                               read_config_string(kwargs['config_file']).items()
+                               read_config_string(kwargs['config']).items()
                                }
                 
             else:
             
-                logger.error('invalid config_file type '
-                             '{kwargs["config_file"]}')
+                logger.error('invalid config type '
+                             '{kwargs["config"]}')
                 raise TypeError
                         
             # check consistency of config_args
@@ -175,12 +176,10 @@ class realtime_manager:
                     not bool(config_args)
                 ):
                 
-                logger.error(f'config_file {kwargs["config_file"]} '
+                logger.error(f'config {kwargs["config"]} '
                              'has no valid yaml formatted data')
                 raise ValueError
-            
-            self.config_file = kwargs['config_file']
-            
+                
             # set args from config file
             attrs_keys_configfile = \
                     set(_class_attributes_name).intersection(config_args.keys())
