@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{include = "forex_data"}]
 
 [tool.poetry.dependencies]
-python = "~3.11"
+python = "~3.12"
 spyder-kernels = ">=2.5.0"
 pyaml = "^21.10.1"
 pandas = ">=2.0.0"
@@ -36,6 +36,8 @@ pandas-stubs = "^2.2.3.241126"
 pytest-mypy = "^0.10.3"
 pytest-flake8 = "^1.3.0"
 sqlalchemy = "^2.0.38"
+taospy = "^2.8.1"
+connectorx = "^0.4.3"
 
 [build-system]
 requires = ["poetry-core"]

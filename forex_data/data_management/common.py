@@ -13,7 +13,7 @@ __all__ = [
             'HISTDATA_BASE_DOWNLOAD_METHOD',
             'HISTDATA_BASE_DOWNLOAD_URL',
             'DEFAULT_PATHS',
-            'DATA_FILE_TYPE',
+            'DATA_TYPE',
             'BASE_DATA_COLUMN_NAME',
             'DATA_FILE_COLUMN_INDEX',
             'SUPPORTED_DATA_FILES',
@@ -166,6 +166,8 @@ DATE_NO_HOUR_FORMAT             = '%Y-%m-%d'
 DATE_FORMAT_ISO8601             = 'ISO8601'
 DATE_FORMAT_HISTDATA_CSV        = '%Y%m%d %H%M%S%f'
 
+DATA_KEY_TEMPLATE_STR           = '{ticker}.Y{year}.{tf}'
+DATA_KEY_TEMPLATE_PATTERN       =  '^[A-Za-z]+.Y[0-9]+.[A-Za-z0-9]+'
 FILENAME_STR                    = '{ticker}_Y{year}_{tf}.{file_ext}'
 DEFAULT_TIMEZONE                = 'utc'
 TICK_TIMEFRAME                  = 'TICK'
@@ -189,7 +191,7 @@ POLY_IO_KEY_ENV                 = 'POLYGON_IO_KEY'
 
 ## TIME PATTERN
 TIME_WINDOW_PATTERN_STR         = '^[-+]?[0-9]+[A-Za-z]{1,}$'
-TIME_WINDOW_COMPONENTS_PATTERN_STR         = '^[-+]?[0-9]+|[A-Za-z]{1,}$'
+TIME_WINDOW_COMPONENTS_PATTERN_STR = '^[-+]?[0-9]+|[A-Za-z]{1,}$'
 TIME_WINDOW_UNIT_PATTERN_STR    = '[A-Za-z]{1,}$'
 GET_YEAR_FROM_TICK_KEY_PATTERN_STR = '^[A-Za-z].Y[0-9].TICK'
 YEAR_FIELD_PATTERN_STR          = '^Y([0-9]{4,})$'              
@@ -197,18 +199,18 @@ YEAR_FIELD_PATTERN_STR          = '^Y([0-9]{4,})$'
 
 ### auxiliary CONSTANT DEFINITIONS
      
-# dotty key template: <PAIR>.Y<year>.<timeframe>.<data-type>
+# dotty key template: <ticker>.Y<year>.<timeframe>.<data-type>
 class DATA_KEY:
     
-    PAIR_INDEX              = 0
+    TICKER_INDEX            = 0
     YEAR_INDEX              = 1 
     TF_INDEX                = 2 
     DATATYPE_INDEX          = 3 
 
-# filename template : <PAIR>_Y<year>_<timeframe>.<filetype>
+# filename template : <ticker>_Y<year>_<timeframe>.<filetype>
 class FILENAME_TEMPLATE:
     
-    PAIR_INDEX              = 0
+    TICKER_INDEX            = 0
     YEAR_INDEX              = 1
     YEAR_NUMERICAL_CHAR     = 1
     TF_INDEX                = 2
@@ -221,18 +223,20 @@ class DEFAULT_PATHS:
     HIST_DATA_FOLDER        = 'HistoricalData'
     REALTIME_DATA_FOLDER    = 'RealtimeData'
     
-class DATA_FILE_TYPE:
+class DATA_TYPE:
     
     CSV_FILETYPE            = 'csv'
     PARQUET_FILETYPE        = 'parquet'
+    TDENGINE_DATABASE       = 'tdengine'
     
 class DATA_FILE_COLUMN_INDEX:
     
     TIMESTAMP               = 0
     
 SUPPORTED_DATA_FILES = [
-                        DATA_FILE_TYPE.CSV_FILETYPE,
-                        DATA_FILE_TYPE.PARQUET_FILETYPE
+                        DATA_TYPE.CSV_FILETYPE,
+                        DATA_TYPE.PARQUET_FILETYPE,
+                        DATA_TYPE.TDENGINE_DATABASE
                     ]
 
 # supported dataframe engines
@@ -273,7 +277,6 @@ class REALTIME_DATA_PROVIDER:
 REALTIME_DATA_PROVIDER_LIST = [REALTIME_DATA_PROVIDER.ALPHA_VANTAGE,
                                REALTIME_DATA_PROVIDER.POLYGON_IO]
 
-
 class DB_MODE:
     
     FULL_MODE           = 'FULL_MODE'
@@ -288,18 +291,18 @@ class ASSET_TYPE:
     
 class BASE_DATA_COLUMN_NAME:
     
-    TIMESTAMP = 'timestamp'    
-    OPEN      = 'open'
-    HIGH      = 'high'
-    LOW       = 'low'
-    CLOSE     = 'close'
-    ASK       = 'ask'
-    BID       = 'bid'
-    VOL       = 'vol'
-    P_VALUE   = 'p'
-    TRANSACTIONS = 'transactions'
-    VWAP        = 'vwap'
-    OTC         = 'otc'
+    TIMESTAMP           = 'timestamp'    
+    OPEN                = 'open'
+    HIGH                = 'high'
+    LOW                 = 'low'
+    CLOSE               = 'close'
+    ASK                 = 'ask'
+    BID                 = 'bid'
+    VOL                 = 'vol'
+    P_VALUE             = 'p'
+    TRANSACTIONS        = 'transactions'
+    VWAP                = 'vwap'
+    OTC                 = 'otc'
 
 class CANONICAL_INDEX:
 
@@ -309,6 +312,21 @@ class CANONICAL_INDEX:
 
 
 ### auxiliary functions
+
+# get elements from db key
+def get_db_key_elements(key):
+    
+    res = fullmatch(DATA_KEY_TEMPLATE_STR, key)
+    
+    if res:
+        
+        return res.groups()
+    
+    else:
+        
+        logger.error(f'key {key} does not respect regex template {DATA_KEY_TEMPLATE_STR}')
+        raise ValueError
+    
 
 # parse argument to get datetime object with date format as input
 def infer_date_from_format_dt(s, date_format='ISO8601', unit=None, utc=False):
