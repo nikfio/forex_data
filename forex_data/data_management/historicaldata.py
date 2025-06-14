@@ -75,6 +75,11 @@ from ..config import (
         read_config_folder
     )
 
+from .database import (
+        DatabaseConnector,
+        TDengineConnector
+    )
+
 
 __all__ = ['historical_manager']
 
@@ -84,14 +89,12 @@ __all__ = ['historical_manager']
 class historical_manager:
     
     # interface parameters
-    config          : str = field(default=None,
+    config          : str = field(default='',
                                   validator=validators.instance_of(str))
-    data_filetype   : str = field(default='parquet',
+    data_type       : str = field(default='parquet',
                                   validator=validators.in_(SUPPORTED_DATA_FILES))
     engine          : str = field(default='polars_lazy',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
-    in_memory       : bool = field(default=False,
-                                  validator=validators.instance_of(bool))
     
     # internal parameters
     _db_dict = field(factory=dotty, validator=validators.instance_of(Dotty))
@@ -264,10 +267,10 @@ class historical_manager:
             
         validate(self)
         
-        self.__attrs_post_init__()
+        self.__attrs_post_init__(**kwargs)
         
             
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self, **kwargs):
         
         # reset logging handlers
         logger.remove()
@@ -309,8 +312,8 @@ class historical_manager:
                                         / TEMP_FOLDER
                                         
         self._clear_temporary_data_folder()
-
-
+        
+      
     def _clear_temporary_data_folder(self):
         
         # delete temporary data path
@@ -328,12 +331,12 @@ class historical_manager:
                 
                 logger.warning('Deleting temporary data folder '
                                f'{str(self._temporary_data_path)} not successfull: {e}')
-            
+        
+    # TODO: EVALUATE TO REMOVE DATA_TYPE FROM KEY
     def _db_key(self, 
                 ticker    : str, 
                 year      : str,
-                timeframe : str,
-                data_type : str
+                timeframe : str
         ) -> str:
         """
 
@@ -358,7 +361,8 @@ class historical_manager:
 
         tf = check_timeframe_str(timeframe)
 
-        return '.'.join([ticker, 'Y'+str(year), tf, data_type])
+        return '.'.join([ticker, 'Y'+str(year), tf])
+
 
     def _get_ticker_list(self):
         
@@ -368,9 +372,9 @@ class historical_manager:
     def _get_ticker_keys(self, ticker):
         
         return [
-                key for key in get_dotty_leafs(self._db_dict)
-                if search(f'^{ticker}',
-                          key)
+            key for key in get_dotty_leafs(self._db_dict)
+            if search(f'^{ticker}',
+                      key)
         ]
         
     
@@ -461,8 +465,7 @@ class historical_manager:
                 # create key for dataframe type
                 isinstance(self._db_dict.get(self._db_key(ticker,
                                                           year,
-                                                          tf,
-                                                          'df')),
+                                                          tf)),
                            type(self._dataframe_type([])))
                 for tf in self._tf_list
             ])
@@ -571,8 +574,7 @@ class historical_manager:
         
         year_tf_key = self._db_key(ticker,
                                   year,
-                                  tf,
-                                  'df')
+                                  tf)
 
         if self._db_dict.get(year_tf_key) is None \
             or not isinstance(self._db_dict.get(year_tf_key),
@@ -581,8 +583,7 @@ class historical_manager:
             # get tick key
             year_tick_key = self._db_key(ticker,
                                          year,
-                                         'TICK',
-                                         'df')
+                                         'TICK')
 
             try:
 
@@ -972,7 +973,7 @@ class historical_manager:
             year_path.mkdir(parents=True, exist_ok=False)
 
         # alternative: get year by referenced key
-        year_tf_key = self._db_key(ticker, year, tf, 'df')
+        year_tf_key = self._db_key(ticker, year, tf)
         
         if not (
             isinstance(self._db_dict.get(year_tf_key), 
@@ -992,13 +993,13 @@ class historical_manager:
             return
 
         # dump data to file
-        if self.data_filetype == DATA_FILE_TYPE.CSV_FILETYPE:
+        if self.data_type == DATA_TYPE.CSV_FILETYPE:
             
             # csv data file
             write_csv(year_data, filepath)
             
             
-        elif self.data_filetype == DATA_FILE_TYPE.PARQUET_FILETYPE:
+        elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
             
             # parquet data file
             write_parquet(year_data, str(filepath.absolute()))
@@ -1031,10 +1032,10 @@ class historical_manager:
         return FILENAME_STR.format(ticker   = ticker,
                                    year     = year,
                                    tf       = tf,
-                                   file_ext = self.data_filetype)
+                                   file_ext = self.data_type)
 
 
-    def _update_local_data_folder(self) -> None:
+    def _update_local_data_folder(self):
 
         for ticker in self._get_ticker_list():
             
@@ -1056,7 +1057,7 @@ class historical_manager:
                                                      year,
                                                      tf)
     
-                    tf_key = self._db_key(ticker, year, tf, 'df')
+                    tf_key = self._db_key(ticker, year, tf)
     
                     # check if file is present in local data folder
                     # and if valid dataframe is currently loaded in database
@@ -1171,7 +1172,7 @@ class historical_manager:
                                 )
 
                 # get key for dotty dict: TICK
-                year_tick_key = self._db_key(ticker, year, 'TICK', 'df')
+                year_tick_key = self._db_key(ticker, year, 'TICK')
                 self._db_dict[year_tick_key] = year_tick_df
 
         # update manager database
@@ -1265,11 +1266,11 @@ class historical_manager:
                 
                 parquet_file = item \
                                 + '.' \
-                                + DATA_FILE_TYPE.PARQUET_FILETYPE
+                                + DATA_TYPE.PARQUET_FILETYPE
                                 
                 csv_file = item \
                             + '.' \
-                            + DATA_FILE_TYPE.CSV_FILETYPE
+                            + DATA_TYPE.CSV_FILETYPE
                 
                 if (
                     parquet_file in local_files_name_filtered
@@ -1296,8 +1297,7 @@ class historical_manager:
                 # create key for dataframe type
                 year_tf_key = self._db_key(file_ticker,
                                           file_year,
-                                          file_tf,
-                                          'df')
+                                          file_tf)
 
                 if self._db_dict.get(year_tf_key) is None:
                     
@@ -1308,7 +1308,7 @@ class historical_manager:
                         if file_tf == TICK_TIMEFRAME:
                             years_tick_files_found.append(file_year)
     
-                        if match(f'.({DATA_FILE_TYPE.CSV_FILETYPE})$',
+                        if match(f'.({DATA_TYPE.CSV_FILETYPE})$',
                                 file.suffix):
                             
                             if engine == 'pandas':
@@ -1447,7 +1447,7 @@ class historical_manager:
                                              f'available: {SUPPORTED_DATA_ENGINES}')
                                 raise TypeError
                     
-                        elif  match(f'.({DATA_FILE_TYPE.PARQUET_FILETYPE})$',
+                        elif  match(f'.({DATA_TYPE.PARQUET_FILETYPE})$',
                                     file.suffix):
                         
                             self._db_dict[year_tf_key] = read_parquet(engine,
@@ -1455,7 +1455,7 @@ class historical_manager:
                             
                         else:
                             
-                            logger.error(f'file type {self.data_filetype} not supported '
+                            logger.error(f'file type {self.data_type} not supported '
                                          f'available: {SUPPORTED_DATA_FILES}')
                             raise TypeError
                             
@@ -1521,7 +1521,8 @@ class historical_manager:
                 timeframe,
                 start,
                 end,
-                add_timeframe = True):
+                add_timeframe = True,
+                add_in_memory = True):
         
         """
         
@@ -1813,15 +1814,12 @@ class historical_manager:
                              ' for get_data function')
                 raise TypeError
                 
-                
-            if not self.in_memory:
-                
-                # TODO: here wipe out self db_dict
-                # to not have any in memory data left?
-                pass 
+        # if not requested to save data in memory
+        # wipe out db keys dictionary
+        if not add_in_memory:
             
+            self._db_dict.clear()
             
-    
         return data_df
     
 
@@ -1873,3 +1871,184 @@ class historical_manager:
         mpf_plot(chart_data,type='candle',**chart_kwargs)
 
         mpf_show()
+        
+        
+# HISTORICAL DATA MANAGER
+@define(kw_only=True, slots=True)
+class historical_manager_db:
+    
+    # interface parameters
+    config          : str = field(default='',
+                                  validator=validators.instance_of(str))
+    data_type       : str = field(default='parquet',
+                                  validator=validators.in_(SUPPORTED_DATA_FILES))
+    engine          : str = field(default='polars_lazy',
+                                  validator=validators.in_(SUPPORTED_DATA_ENGINES))
+    
+    # internal
+    _db_connector = field(factory=DatabaseConnector)
+    
+    
+    # if a valid config file or string
+    # is passed
+    # arguments contained are assigned here 
+    # if instantiation passed values are present
+    # they will override the related argument
+    # value in the next initialization step
+    
+    # if neither by instantation or config file
+    # an argument value is set, the argument
+    # will be set by asociated defined default 
+    # or factory generator
+        
+    def __init__(self, **kwargs):
+            
+        _class_attributes_name = get_attrs_names(self, **kwargs)
+        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
+        
+        if kwargs['config']:
+            
+            config_path = Path(kwargs['config'])
+            
+            if (
+                config_path.exists() 
+                and  
+                config_path.is_dir() 
+                ):
+                
+                config_filepath = read_config_folder(config_path,
+                                                     file_pattern='_config.yaml')
+            
+            else:
+                
+                config_filepath = Path()
+                
+            config_args = {}
+            if config_filepath.exists() \
+                and  \
+                config_filepath.is_file() \
+                and  \
+                config_filepath.suffix == '.yaml':
+                
+                # read parameters from config file 
+                # and force keys to lower case
+                config_args = {key.lower(): val for key, val in 
+                               read_config_file(str(config_filepath)).items()}
+            
+            elif isinstance(kwargs['config'], str):
+                
+                # read parameters from config file 
+                # and force keys to lower case
+                config_args = {key.lower(): val for key, val in 
+                               read_config_string(kwargs['config']).items()}
+                
+            else:
+            
+                logger.critical('invalid config type '
+                                f'{kwargs["config"]}: '
+                                'required str or Path, got '
+                                f'{type(kwargs["config"])}')
+                raise TypeError
+                        
+            # check consistency of config_args
+            if  (
+                    not isinstance(config_args, dict)
+                    or
+                    not bool(config_args)
+                ):
+                
+                logger.critical(f'config {kwargs["config"]} '
+                                 'has no valid yaml formatted data')
+                raise TypeError
+            
+            # set args from config file
+            attrs_keys_configfile = \
+                    set(_class_attributes_name).intersection(config_args.keys())
+            
+            for attr_key in attrs_keys_configfile:
+                
+                self.__setattr__(attr_key, 
+                                 config_args[attr_key])
+                
+                _not_assigned_attrs_index_mask[ 
+                       _class_attributes_name.index(attr_key)  
+                ] = False
+                
+            # set args from instantiation 
+            # override if attr already has a value from config
+            attrs_keys_input = \
+                    set(_class_attributes_name).intersection(kwargs.keys())
+            
+            for attr_key in attrs_keys_input:
+                
+                self.__setattr__(attr_key, 
+                                 kwargs[attr_key])
+                
+                _not_assigned_attrs_index_mask[ 
+                       _class_attributes_name.index(attr_key)  
+                ] = False
+            
+            # attrs not present in config file or instance inputs
+            # --> self.attr leads to KeyError
+            # are manually assigned to default value derived
+            # from __attrs_attrs__
+            
+            for attr_key in array(_class_attributes_name)[
+                    _not_assigned_attrs_index_mask
+            ]:
+                
+                try:
+                    
+                    attr = [attr 
+                            for attr in self.__attrs_attrs__
+                            if attr.name == attr_key][0]
+                    
+                except KeyError:
+                    
+                    logger.warning('KeyError: initializing object has no '
+                                    f'attribute {attr.name}')
+                    
+                except IndexError:
+                    
+                    logger.warning('IndexError: initializing object has no '
+                                    f'attribute {attr.name}')
+                
+                else:
+                    
+                    # assign default value
+                    # try default and factory sabsequently
+                    # if neither are present
+                    # assign None
+                    if hasattr(attr, 'default'):
+                        
+                        if hasattr(attr.default, 'factory'): 
+                
+                            self.__setattr__(attr.name, 
+                                             attr.default.factory())
+                            
+                        else:
+                            
+                            self.__setattr__(attr.name, 
+                                             attr.default)
+                        
+                    else:
+                            
+                        self.__setattr__(attr.name, 
+                                         None)
+            
+        else:
+            
+            # no config file is defined
+            # call generated init 
+            self.__attrs_init__(**kwargs)
+            
+        validate(self)
+        
+        self.__attrs_post_init__(**kwargs)
+    
+    def __attr_post_init__(self, **kwargs):
+        
+        # instance database connector if selected
+        if self.data_type == DATA_TYPE.TDENGINE_DATABASE:
+            
+            self._db_connector = TDengineConnector(**kwargs)

@@ -21,7 +21,6 @@ Description:
 
 from forex_data import (
         historical_manager,
-        APPCONFIG_FILE_YAML,
         BASE_DATA_COLUMN_NAME,
         is_empty_dataframe,
         shape_dataframe,
