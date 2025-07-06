@@ -7,9 +7,4 @@ PROVIDERS_KEY:
     ALPHA_VANTAGE_KEY : IN4NHG0RHCBDZJ77, 
     POLYGON_IO_KEY    : Sp4b6BXnMoxfCRAKDQ7W14cva_YSDrns
 
-DATA_TYPE           : 'tdengine'
-TARGET_URL          : 'tdengine-linux-local'
-PROTOCOL            : 'taos'
-PORT                : '6060'
-USER                : 'root'
-PASSWORD            : 'taosdata'
+DATA_TYPE           : duckdb

@@ -8,6 +8,7 @@ Created on Sat Jul 16 01:31:35 2022
 __all__ = ['common',
            'historical_manager',
            'realtime_manager',
+           'TICK_TIMEFRAME',
            'BASE_DATA_COLUMN_NAME',
            'DATA_FILE_COLUMN_INDEX',
            'is_empty_dataframe',
@@ -19,12 +20,14 @@ __all__ = ['common',
            'any_date_to_datetime64',
            'get_db_key_elements',
            'DatabaseConnector',
-           'TDengineConnector' 
+           'TDengineConnector',
+           'historical_manager_db'
        ]
 
 from . import common
 
-from .common import (    
+from .common import (
+    TICK_TIMEFRAME,
     BASE_DATA_COLUMN_NAME,
     DATA_FILE_COLUMN_INDEX,
     is_empty_dataframe,
@@ -42,7 +45,7 @@ from .database import (
     TDengineConnector    
 )
 
-from .historicaldata import historical_manager
+from .historicaldata import historical_manager, historical_manager_db
 
 from .realtimedata import realtime_manager
 
