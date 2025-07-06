@@ -8,6 +8,7 @@ Created on Sat Apr 30 09:23:19 2022
 __all__ = [
             'YEARS',
             'MONTHS',
+            'DATE_FORMAT_SQL',
             'DATE_FORMAT_HISTDATA_CSV',
             'HISTDATA_URL_TICKDATA_TEMPLATE',
             'HISTDATA_BASE_DOWNLOAD_METHOD',
@@ -162,21 +163,28 @@ MONTHS                          = ['January', 'February', 'March', 'April', 'May
                                    'July', 'August', 'September', 'October', 'November', 'December']
 YEARS                           = list(range(2000, 2022, 1))
 
+
 DATE_NO_HOUR_FORMAT             = '%Y-%m-%d'
 DATE_FORMAT_ISO8601             = 'ISO8601'
+DATE_FORMAT_SQL                 = '%Y-%m-%d %H:%M:%S.%f'
 DATE_FORMAT_HISTDATA_CSV        = '%Y%m%d %H%M%S%f'
 
-DATA_KEY_TEMPLATE_STR           = '{ticker}.Y{year}.{tf}'
-DATA_KEY_TEMPLATE_PATTERN       =  '^[A-Za-z]+.Y[0-9]+.[A-Za-z0-9]+'
-FILENAME_STR                    = '{ticker}_Y{year}_{tf}.{file_ext}'
+#DATA_KEY_TEMPLATE_STR           = '{ticker}.Y{year}.{tf}'
+#DATA_KEY_TEMPLATE_PATTERN       =  '^[A-Za-z]+.Y[0-9]+.[A-Za-z0-9]+'
+#FILENAME_STR                    = '{ticker}_Y{year}_{tf}.{file_ext}'
+DATA_KEY_TEMPLATE_STR           = '{market}.{ticker}.{tf}'
+DATA_KEY_TEMPLATE_PATTERN       =  '^[A-Za-z0-9]_[A-Za-z]+.[A-Za-z0-9]+'
+FILENAME_STR                    = '{market}_{ticker}_{tf}.{file_ext}'
 DEFAULT_TIMEZONE                = 'utc'
 TICK_TIMEFRAME                  = 'TICK'
 
 ## ticker PAIR of forex market
+SINGLE_CURRENCY_PATTERN_STR     = '[A-Za-z]{3}'
+TICKER_PATTERN                  = '^' + SINGLE_CURRENCY_PATTERN_STR  \
+                                      + SINGLE_CURRENCY_PATTERN_STR + '$'
 PAIR_GENERIC_FORMAT             = '{TO}/{FROM}'
-SINGLE_CURRENCY_PATTERN_STR     = '[A-Z]{3}'
 
-## PAIR ALPHAVANTAGE
+## ALPHAVANTAGE
 PAIR_ALPHAVANTAGE_FORMAT        = '{TO}/{FROM}'
 PAIR_ALPHAVANTAGE_PATTERN       = '^' + SINGLE_CURRENCY_PATTERN_STR + '/' \
                                       + SINGLE_CURRENCY_PATTERN_STR + '$'
@@ -194,18 +202,17 @@ TIME_WINDOW_PATTERN_STR         = '^[-+]?[0-9]+[A-Za-z]{1,}$'
 TIME_WINDOW_COMPONENTS_PATTERN_STR = '^[-+]?[0-9]+|[A-Za-z]{1,}$'
 TIME_WINDOW_UNIT_PATTERN_STR    = '[A-Za-z]{1,}$'
 GET_YEAR_FROM_TICK_KEY_PATTERN_STR = '^[A-Za-z].Y[0-9].TICK'
-YEAR_FIELD_PATTERN_STR          = '^Y([0-9]{4,})$'              
-
+YEAR_FIELD_PATTERN_STR          = '^Y([0-9]{4,})$'
 
 ### auxiliary CONSTANT DEFINITIONS
      
 # dotty key template: <ticker>.Y<year>.<timeframe>.<data-type>
 class DATA_KEY:
     
-    TICKER_INDEX            = 0
-    YEAR_INDEX              = 1 
+    MARKET                  = 0
+    TICKER_INDEX            = 1
     TF_INDEX                = 2 
-    DATATYPE_INDEX          = 3 
+    
 
 # filename template : <ticker>_Y<year>_<timeframe>.<filetype>
 class FILENAME_TEMPLATE:
@@ -228,6 +235,7 @@ class DATA_TYPE:
     CSV_FILETYPE            = 'csv'
     PARQUET_FILETYPE        = 'parquet'
     TDENGINE_DATABASE       = 'tdengine'
+    DUCKDB                  = 'duckdb'
     
 class DATA_FILE_COLUMN_INDEX:
     
@@ -236,7 +244,8 @@ class DATA_FILE_COLUMN_INDEX:
 SUPPORTED_DATA_FILES = [
                         DATA_TYPE.CSV_FILETYPE,
                         DATA_TYPE.PARQUET_FILETYPE,
-                        DATA_TYPE.TDENGINE_DATABASE
+                        DATA_TYPE.TDENGINE_DATABASE,
+                        DATA_TYPE.DUCKDB
                     ]
 
 # supported dataframe engines
@@ -923,12 +932,10 @@ def write_parquet(dataframe, filepath):
         
         try:
             
-            # sink_parquet() methods is not supported 
-            # gives error, find alternatives
-            #dataframe.sink_parquet(filepath)
+            dataframe.sink_parquet(filepath)
             
             # alternative to sink_parquet()
-            dataframe.collect(streaming=True).write_parquet(filepath)
+            #dataframe.collect(streaming=False).write_parquet(filepath)
         
         except Exception as e:
             
@@ -1428,7 +1435,7 @@ def get_dotty_leafs(dotty_dict):
     get_leaf(dotty_dict, 'root')
     
     # leave out root field from all paths to leafs
-    leaf_keys = [ search('(?<=root.)\S+', leaf).group(0) for leaf in leaf_keys]
+    leaf_keys = [ search(r'(?<=root.)\S+', leaf).group(0) for leaf in leaf_keys]
     
     return leaf_keys
         
