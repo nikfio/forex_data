@@ -1078,22 +1078,6 @@ docs = ["Sphinx", "furo"]
 test = ["objgraph", "psutil"]
 
 [[package]]
-name = "histdata"
-version = "1.1"
-description = "Download FX/commodities data (M1, Tick) from histdata.com."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "histdata-1.1-py3-none-any.whl", hash = "sha256:4cc034c20f243be04b81aedbd04769085b5b4e25f047ebb18d3b7f9ced82050e"},
-    {file = "histdata-1.1.tar.gz", hash = "sha256:e840ea10b9242210509c1bd61e853cd7308c87bb517021453332d777bd54f034"},
-]
-
-[package.dependencies]
-beautifulsoup4 = "*"
-requests = "*"
-
-[[package]]
 name = "idna"
 version = "3.10"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -3424,4 +3408,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "6b0834ac9b6d5b3bfa798ca03f0386d441c9a5c28dd066a23385ecfe2d2a00bc"
+content-hash = "1dd5ea85b0652c11ee3058e3629772c428a31c82d58351d44ee51fcee9eeb57c"
