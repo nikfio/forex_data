@@ -23,7 +23,6 @@ from pandas import (
 # custom lib
 from forex_data import (
                     BASE_DATA_COLUMN_NAME,
-                    APPCONFIG_FILE_YAML,
                     realtime_manager,
                     get_dataframe_element,
                     is_empty_dataframe,
