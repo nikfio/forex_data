@@ -1019,7 +1019,7 @@ class historical_manager:
         filename_details = filename.replace('_', '.').split(sep='.')
 
         # store each file details in local variables
-        file_ticker = filename_details[FILENAME_TEMPLATE.PAIR_INDEX]
+        file_ticker = filename_details[FILENAME_TEMPLATE.TICKER_INDEX]
         file_year = int(
             filename_details[FILENAME_TEMPLATE.YEAR_INDEX][FILENAME_TEMPLATE.YEAR_NUMERICAL_CHAR:])
         file_tf = filename_details[FILENAME_TEMPLATE.TF_INDEX]
@@ -2767,7 +2767,7 @@ class historical_manager_db:
         ticker_years_list = self._get_ticker_years_list(ticker, timeframe=timeframe)
         
         # aggregate data to current instance if necessary
-        if years_interval_req != ticker_years_list:
+        if not set(years_interval_req).issubset(ticker_years_list):
             
             year_tf_missing = list(set(years_interval_req).difference(ticker_years_list))
             

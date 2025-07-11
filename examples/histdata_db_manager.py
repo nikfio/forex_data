@@ -21,6 +21,8 @@ from loguru import logger
 
 from sys import stderr
 
+from time import time
+
 def main():
     
     #TODO: look for config file and get reference
@@ -35,23 +37,15 @@ def main():
     
     # test auxiliary
     tickers = histmanager._get_ticker_list()
-    
-    if tickers:
-        
-        keys = histmanager._get_ticker_keys(ticker = tickers[0])
-        
-        TICK_keys = histmanager._get_ticker_keys(ticker = tickers[0],
-                                                 timeframe = TICK_TIMEFRAME
-        )
-        
-        years = histmanager._get_ticker_years_list(tickers[0],
-                                                   timeframe = TICK_TIMEFRAME)
         
     # example parameters
     ex_ticker     = 'EURJPY'
     ex_timeframe  = '1d'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date   = '2018-12-03 10:00:00'
+    
+    start_time = time()
+    logger.trace(f'Start measure time: {start_time}')
     
     # get data
     yeardata = histmanager.get_data(
@@ -87,12 +81,13 @@ def main():
     histmanager.add_timeframe('1W', update_data=True)
     
     # plot data 
+    '''
     histmanager.plot( ticker      = ex_ticker,
                       timeframe   = '1D',
                       start_date  = '2016-02-02 18:00:00',
                       end_date    = '2016-06-23 23:00:00'
     )
-    
+    '''
     
     ## get data from another ticker
     
@@ -130,6 +125,10 @@ def main():
                      start {ex_start_date}, "
                      end {ex_start_date}"""
         )
+        
+    end_time = time()
+    logger.trace(f'end time: {end_time}')
+    logger.trace(f'elapsed time: {end_time - start_time}')
         
     
 if __name__ == '__main__':
