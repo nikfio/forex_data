@@ -18,20 +18,6 @@ appconfig_folder = Path(__file__).parent.parent.parent / 'appconfig'
 
 appconfig_filepath = list(appconfig_folder.glob('*appconfig.yaml'))
 
-if ( 
-    bool(appconfig_filepath)
-    and
-    len(appconfig_filepath) == 1
-    ):
-    
-    APPCONFIG_FILE_YAML = str(appconfig_filepath[0])
-    
-else:
-    
-     APPCONFIG_FILE_YAML = ''
-     
-     logger.warning('no config file present')
-
 
 def read_config_file(config_file):
     
