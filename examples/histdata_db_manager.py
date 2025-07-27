@@ -81,13 +81,12 @@ def main():
     histmanager.add_timeframe('1W', update_data=True)
     
     # plot data 
-    '''
-    histmanager.plot( ticker      = ex_ticker,
-                      timeframe   = '1D',
-                      start_date  = '2016-02-02 18:00:00',
-                      end_date    = '2016-06-23 23:00:00'
+    histmanager.plot( 
+        ticker      = ex_ticker,
+        timeframe   = '1D',
+        start_date  = '2016-02-02 18:00:00',
+        end_date    = '2016-06-23 23:00:00'
     )
-    '''
     
     ## get data from another ticker
     
@@ -130,6 +129,7 @@ def main():
     logger.trace(f'end time: {end_time}')
     logger.trace(f'elapsed time: {end_time - start_time}')
         
+    
     
 if __name__ == '__main__':
     main()
