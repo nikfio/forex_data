@@ -76,6 +76,10 @@ from re import (
                 search
     )
 
+from datetime import (
+                timedelta
+    )
+
 # PANDAS
 from pandas import (
                 DataFrame as pandas_dataframe,
@@ -358,26 +362,43 @@ def infer_date_from_format_dt(s, date_format='ISO8601', unit=None, utc=False):
 # following pandas DateOffset freqstr rules and 'TICK' (=lowest timeframe available)
 # link to official pandas doc
 # https://pandas.pydata.org/docs/user_guide/timeseries.html#dateoffset-objects
+# add compatibility to polars frequency string
+
 def check_timeframe_str(tf):
+    
+    check = False
     
     if tf == 'TICK':
         
-        return tf
+        check = True
     
     else:
     
         try:
             
-            to_offset(tf) 
+            check = (
+                        isinstance(to_offset(tf), DateOffset)
+                        or
+                        isinstance(Timedelta(tf).to_pytimedelta(),
+                                   timedelta)
+                    )
             
         except ValueError:
             
-            logger.critical(f"Invalid date offset: {tf}")
+            logger.critical(f"Type check: Invalid timeframe: {tf}")
             raise 
         
-        else: 
-            return tf
-
+        
+    if check:
+    
+        return tf
+    
+    else:
+        
+        logger.critical(f"Type check: Invalid timeframe "
+                        f"conversion to timedelta: {tf}")
+        raise ValueError
+        
 
 ## PAIR symbol functions        
 def get_pair_symbols(ticker):
