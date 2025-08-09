@@ -78,7 +78,6 @@ from ..config import (
 
 from .database import (
         DatabaseConnector,
-        TDengineConnector,
         DuckDBConnector,
         LocalDBConnector
     )
@@ -2094,11 +2093,7 @@ class historical_manager_db:
         self._clear_temporary_data_folder()
         
         # instance database connector if selected
-        if self.data_type == DATA_TYPE.TDENGINE_DATABASE:
-            
-            self._db_connector = TDengineConnector(**kwargs)
-            
-        elif self.data_type == DATA_TYPE.DUCKDB:
+        if self.data_type == DATA_TYPE.DUCKDB:
             
             self._db_connector = DuckDBConnector(duckdb_filepath =
                                                  str(self._histdata_path 

@@ -239,7 +239,6 @@ class DATA_TYPE:
     
     CSV_FILETYPE            = 'csv'
     PARQUET_FILETYPE        = 'parquet'
-    TDENGINE_DATABASE       = 'tdengine'
     DUCKDB                  = 'duckdb'
     
 class DATA_FILE_COLUMN_INDEX:
