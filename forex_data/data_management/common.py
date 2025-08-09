@@ -248,7 +248,6 @@ class DATA_FILE_COLUMN_INDEX:
 SUPPORTED_DATA_FILES = [
                         DATA_TYPE.CSV_FILETYPE,
                         DATA_TYPE.PARQUET_FILETYPE,
-                        DATA_TYPE.TDENGINE_DATABASE,
                         DATA_TYPE.DUCKDB
                     ]
 
@@ -258,10 +257,10 @@ SUPPORTED_DATA_FILES = [
 # to a refame call with polars
 # reframe_data() on pyarrow Table
 SUPPORTED_DATA_ENGINES = [
-                            'pandas',
-                            'pyarrow',
-                            'polars',
-                            'polars_lazy'
+                        'pandas',
+                        'pyarrow',
+                        'polars',
+                        'polars_lazy'
     ]
 
 ### SINGLE BASE DATA COMPOSIION TEMPLATE: ['open','close','high','low']
