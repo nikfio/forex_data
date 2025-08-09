@@ -1553,7 +1553,7 @@ class historical_manager:
         # force ticker parameter to upper case
         ticker = ticker.upper()
 
-        if not check_time_offset_str(timeframe):
+        if not check_timeframe_str(timeframe):
             
             logger.error(f'timeframe request {timeframe} invalid')
             raise ValueError
@@ -2744,7 +2744,7 @@ class historical_manager_db:
         # force ticker parameter to upper case
         ticker = ticker.upper()
 
-        if not check_time_offset_str(timeframe):
+        if not check_timeframe_str(timeframe):
             
             logger.error(f'timeframe request {timeframe} invalid')
             raise ValueError
