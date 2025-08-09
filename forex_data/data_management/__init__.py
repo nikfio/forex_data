@@ -20,6 +20,7 @@ __all__ = ['common',
            'get_attrs_names',
            'any_date_to_datetime64',
            'get_db_key_elements',
+           'check_timeframe_str',
            'DatabaseConnector',
            'TDengineConnector',
            'historical_manager_db',
@@ -41,7 +42,8 @@ from .common import (
     get_dataframe_element,
     get_attrs_names,
     any_date_to_datetime64,
-    get_db_key_elements
+    get_db_key_elements,
+    check_timeframe_str
 )
 
 from .database import (
