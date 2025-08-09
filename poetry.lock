@@ -1196,18 +1196,6 @@ test = ["packaging", "pickleshare", "pytest", "pytest-asyncio (<0.22)", "testpat
 test-extra = ["curio", "ipython[test]", "jupyter_ai", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.23)", "pandas", "trio"]
 
 [[package]]
-name = "iso8601"
-version = "1.0.2"
-description = "Simple module to parse ISO 8601 dates"
-optional = false
-python-versions = ">=3.6.2,<4.0"
-groups = ["main"]
-files = [
-    {file = "iso8601-1.0.2-py3-none-any.whl", hash = "sha256:d7bc01b1c2a43b259570bb307f057abc578786ea734ba2b87b836c5efc5bd443"},
-    {file = "iso8601-1.0.2.tar.gz", hash = "sha256:27f503220e6845d9db954fb212b95b0362d8b7e6c1b2326a87061c3de93594b1"},
-]
-
-[[package]]
 name = "iteration-utilities"
 version = "0.12.1"
 description = "Utilities based on Pythons iterators and generators."
@@ -3055,26 +3043,6 @@ pure-eval = "*"
 tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
 
 [[package]]
-name = "taospy"
-version = "2.8.1"
-description = "The official TDengine Python connector"
-optional = false
-python-versions = "<4.0,>=3.6.2"
-groups = ["main"]
-files = [
-    {file = "taospy-2.8.1-py3-none-any.whl", hash = "sha256:19f6cf40b4fb06b3e8ad2426b047d17a7945a3fadf9e189f7c92327c3f82bc94"},
-    {file = "taospy-2.8.1.tar.gz", hash = "sha256:894407b9608759cf21bfcc26445446dc78db9cf45a36ff238b3d77e5a91cc6e2"},
-]
-
-[package.dependencies]
-iso8601 = "1.0.2"
-pytz = "*"
-requests = ">=2.27.1"
-
-[package.extras]
-ws = ["taos-ws-py (>=0.3.0) ; python_version >= \"3.7\" and python_version < \"4.0\""]
-
-[[package]]
 name = "tornado"
 version = "6.5.1"
 description = "Tornado is a Python web framework and asynchronous networking library, originally developed at FriendFeed."
@@ -3408,4 +3376,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "1dd5ea85b0652c11ee3058e3629772c428a31c82d58351d44ee51fcee9eeb57c"
+content-hash = "dcde382693303cf2787e1135263b4de7ce86dcfa9bae917db2197947aa795729"

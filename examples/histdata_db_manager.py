@@ -5,9 +5,6 @@ Created on Sun Jun 15 11:48:53 2025
 @author: fiora
 """
 
-from taos.sqlalchemy import TaosDialect
-TaosDialect.supports_statement_cache = False 
-
 from forex_data import (
         historical_manager_db,
         BASE_DATA_COLUMN_NAME,
