@@ -546,8 +546,6 @@ class DuckDBConnector(DatabaseConnector):
     
     def write_data(self, target_table, dataframe, clean=False):
         
-        
-        # have column structure for tdengine
         duckdb_cols_dict = {}
         if isinstance(dataframe, polars_lazyframe):
             
