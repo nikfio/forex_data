@@ -25,7 +25,8 @@ __all__ = [
             'DatabaseConnector',
             'historical_manager_db',
             'DuckDBConnector',
-            'LocalDBConnector'
+            'LocalDBConnector',
+            'validator_list_timeframe'
        ]
 
 from . import common
@@ -43,7 +44,8 @@ from .common import (
     get_attrs_names,
     any_date_to_datetime64,
     get_db_key_elements,
-    check_timeframe_str
+    check_timeframe_str,
+    validator_list_timeframe
 )
 
 from .database import (
