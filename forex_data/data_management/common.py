@@ -65,7 +65,8 @@ __all__ = [
             'get_pair_symbols',
             'to_source_symbol',
             'get_date_interval',
-            'polygon_agg_to_dict'
+            'polygon_agg_to_dict',
+            'validator_list_timeframe'
     ]
 
 from loguru import logger
@@ -1541,13 +1542,13 @@ def validator_list_timeframe(instance, attribute, value):
         raise TypeError
         
     if not all([
-                check_time_offset_str(val) 
+                check_timeframe_str(val) 
                 for val in value
                 ]):
         
         fails = value[
                  [
-                    check_time_offset_str(val) 
+                    check_timeframe_str(val) 
                     for val in value
                 ]           
         ]

@@ -82,12 +82,13 @@ __all__ = ['realtime_manager']
 class realtime_manager:
     
     # interface parameters
-    config          : str = field(default=None,
+    config          : str = field(default='',
                                   validator=validators.instance_of(str))
-    providers_key   : dict = field(validator=validators.instance_of(dict))
-    data_filetype   : str = field(default='parquet',
-                                 validator=validators.in_(SUPPORTED_DATA_FILES))
-    engine          : str = field(default='pandas',
+    providers_key   : dict = field(default=dict(), 
+                                   validator=validators.instance_of(dict))
+    data_type       : str = field(default='parquet',
+                                  validator=validators.in_(SUPPORTED_DATA_FILES))
+    engine          : str = field(default='polars_lazy',
                                   validator=validators.in_(SUPPORTED_DATA_ENGINES))
     
     # internal parameters
