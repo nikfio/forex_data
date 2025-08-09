@@ -272,8 +272,6 @@ class DuckDBConnector(DatabaseConnector):
                             self.__setattr__(attr.name, 
                                              None)
                             
-            self.__attrs_post_init__(**kwargs)
-            
         else:
             
             # no config file is defined
@@ -281,6 +279,8 @@ class DuckDBConnector(DatabaseConnector):
             self.__attrs_init__(**kwargs)
             
         validate(self)
+        
+        self.__attrs_post_init__(**kwargs)
         
         
     def __attrs_post_init__(self, **kwargs):
@@ -841,8 +841,6 @@ class LocalDBConnector(DatabaseConnector):
                                 
                             self.__setattr__(attr.name, 
                                              None)
-                            
-            self.__attrs_post_init__(**kwargs)
             
         else:
             
@@ -851,6 +849,8 @@ class LocalDBConnector(DatabaseConnector):
             self.__attrs_init__(**kwargs)
             
         validate(self)
+        
+        self.__attrs_post_init__(**kwargs)
         
         
     def __attrs_post_init__(self, **kwargs):
