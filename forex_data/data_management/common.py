@@ -67,7 +67,8 @@ __all__ = [
             'to_source_symbol',
             'get_date_interval',
             'polygon_agg_to_dict',
-            'validator_list_timeframe'
+            'validator_list_timeframe',
+            'validator_dir_path'
     ]
 
 from loguru import logger
