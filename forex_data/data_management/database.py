@@ -34,15 +34,6 @@ from re import (
     )
 from numpy import array
 
-from sqlalchemy import (
-        create_engine,
-        text
-    )
-
-from sqlalchemy.engine.cursor import (
-        CursorResult as sqlalchemy_CursorResult
-    )
-
 from adbc_driver_sqlite import(
         dbapi as sqlite_dbapi
     )
