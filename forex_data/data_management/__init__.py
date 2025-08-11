@@ -28,7 +28,8 @@ __all__ = [
             'DuckDBConnector',
             'LocalDBConnector',
             'validator_list_timeframe',
-            'concat_data'
+            'concat_data',
+            'validator_dir_path'
        ]
 
 from . import common
@@ -49,7 +50,8 @@ from .common import (
     get_db_key_elements,
     check_timeframe_str,
     validator_list_timeframe,
-    concat_data
+    concat_data,
+    validator_dir_path
 )
 
 from .database import (
