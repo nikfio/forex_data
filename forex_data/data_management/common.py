@@ -35,6 +35,7 @@ __all__ = [
             'CANONICAL_INDEX',
             'DATE_NO_HOUR_FORMAT',
             'POLY_IO_KEY_ENV',
+            'DEFAULT_PATHS'
             
             'validator_file_path',
             'validator_dir_path',
