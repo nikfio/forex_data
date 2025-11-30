@@ -13,5 +13,3 @@ PROVIDERS_KEY:
     
 # uncomment row below and modify path to set custom data location 
 # DATA_PATH: 'C:\forex_data\database'  
-
-LOGGING_FILE_PATH: 'PATH TO A FILE .log'  
