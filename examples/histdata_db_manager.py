@@ -26,7 +26,7 @@ def main():
     
     # instance data manager                          
     histmanager = historical_manager_db(
-        config = 'C:/Projects/forex-data/appconfig'
+        config = '/Users/nicolafiorato/python/projects/forex-data/appconfig'
     )
      
     # add logging to stderr 

@@ -1931,7 +1931,7 @@ class historical_manager_db:
                     ):
                     
                     config_filepath = read_config_folder(config_path,
-                                                         file_pattern='_config.yaml')
+                                                         file_pattern='data_config.yaml')
                 
                 else:
                     
