@@ -83,7 +83,7 @@ from .database import (
     )
 
 
-__all__ = ['historical_manager']
+__all__ = ['historical_manager_db']
 
         
 # HISTORICAL DATA MANAGER

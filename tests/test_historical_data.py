@@ -20,7 +20,7 @@ from polars import (
 
 from forex_data import (
                     data_management as data_mng,
-                    historical_manager,
+                    historical_manager_db,
                     get_dataframe_column,
                     is_empty_dataframe,
                     DATA_FILE_COLUMN_INDEX
@@ -47,7 +47,7 @@ class TestHistData(unittest.TestCase):
     def test_with_config_file(self):
         
         # historical manager instantiation                            
-        histmanager = historical_manager(
+        histmanager = historical_manager_db(
             config_file=config_file_yaml
         )
         
@@ -72,7 +72,7 @@ class TestHistData(unittest.TestCase):
         # test that if a paraemter is assigned in
         # clas constructor it ovverides
         # value assigned from config file if present                           
-        histmanager = historical_manager(
+        histmanager = historical_manager_db(
             engine='pandas',
             config_file=config_file_yaml
         )
@@ -89,7 +89,7 @@ class TestHistData(unittest.TestCase):
     def test_getdata_with_timeframe(self):
         
         # historical manager instantiation                            
-        histmanager = historical_manager(
+        histmanager = historical_manager_db(
             config_file=config_file_yaml
         )
 

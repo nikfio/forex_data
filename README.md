@@ -146,7 +146,7 @@ Let's walk through the [example for historical data source](test/test_hist_data_
 
 1. **data manager instance** 
     ```                            
-    histmanager = historical_manager(
+    histmanager = historical_manager_db(
                     ticker='NZDUSD',
                     config_file=APPCONFIG_FILE_YAML
     )
