@@ -7,7 +7,7 @@ Created on Sat Jul 16 01:31:35 2022
 
 __all__ = [
             'common',
-            'historical_manager',
+            'historical_manager_db',
             'realtime_manager',
             'TICK_TIMEFRAME',
             'BASE_DATA_COLUMN_NAME',
@@ -24,7 +24,6 @@ __all__ = [
             'get_db_key_elements',
             'check_timeframe_str',
             'DatabaseConnector',
-            'historical_manager_db',
             'DuckDBConnector',
             'LocalDBConnector',
             'validator_list_timeframe',
@@ -60,7 +59,7 @@ from .database import (
     LocalDBConnector
 )
 
-from .historicaldata import historical_manager, historical_manager_db
+from .historicaldata import historical_manager_db
 
 from .realtimedata import realtime_manager
 
