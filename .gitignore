@@ -4,4 +4,3 @@ issues/
 .vscode/
 notes/
 appconfig.yaml
-test/test_dynamodb.py

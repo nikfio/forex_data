@@ -6,30 +6,30 @@ Created on Sat Jul 16 01:31:35 2022
 """
 
 __all__ = [
-            'common',
-            'historical_manager_db',
-            'realtime_manager',
-            'TICK_TIMEFRAME',
-            'BASE_DATA_COLUMN_NAME',
-            'DATA_FILE_COLUMN_INDEX',
-            'DEFAULT_PATHS',
-            'empty_dataframe',
-            'is_empty_dataframe',
-            'shape_dataframe',
-            'get_dataframe_column',
-            'get_dataframe_row',
-            'get_dataframe_element',
-            'get_attrs_names',
-            'any_date_to_datetime64',
-            'get_db_key_elements',
-            'check_timeframe_str',
-            'DatabaseConnector',
-            'DuckDBConnector',
-            'LocalDBConnector',
-            'validator_list_timeframe',
-            'concat_data',
-            'validator_dir_path'
-       ]
+    'common',
+    'HistoricalManagerDB',
+    'RealtimeManager',
+    'TICK_TIMEFRAME',
+    'BASE_DATA_COLUMN_NAME',
+    'DATA_FILE_COLUMN_INDEX',
+    'DEFAULT_PATHS',
+    'empty_dataframe',
+    'is_empty_dataframe',
+    'shape_dataframe',
+    'get_dataframe_column',
+    'get_dataframe_row',
+    'get_dataframe_element',
+    'get_attrs_names',
+    'any_date_to_datetime64',
+    'get_db_key_elements',
+    'check_timeframe_str',
+    'DatabaseConnector',
+    'DuckDBConnector',
+    'LocalDBConnector',
+    'validator_list_timeframe',
+    'concat_data',
+    'validator_dir_path'
+]
 
 from . import common
 
@@ -59,8 +59,6 @@ from .database import (
     LocalDBConnector
 )
 
-from .historicaldata import historical_manager_db
+from .historicaldata import HistoricalManagerDB
 
-from .realtimedata import realtime_manager
-
-
+from .realtimedata import RealtimeManager
