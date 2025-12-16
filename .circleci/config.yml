@@ -33,7 +33,7 @@ run_tests:
   command: poetry run pytest --flake8 
   
 jobs:
-  py310:
+  py312:
     <<: *defaults
     docker:
       - image: cimg/python:3.12.12
