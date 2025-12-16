@@ -305,7 +305,7 @@ class RealtimeManager:
                         # assign None
                         if hasattr(attr, 'default'):
 
-                            if hasattr(attr.default, 'factory'):  # type: ignore[union-attr]
+                            if hasattr(attr.default, 'factory'):
 
                                 self.__setattr__(attr.name,
                                                  attr.default.factory())
@@ -406,14 +406,14 @@ class RealtimeManager:
 
         tickers_list = list()
 
-        if data_source == REALTIME_DATA_SOURCE.ALPHA_VANTAGE:
+        if data_source == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
 
             # compose URL for tickers listing request
             # decode content
-            with self._session as s:
-                listing_downloaded = s.get(AV_LIST_URL.format(api_key=self._av_api_key))
+            with self._session as s:  # type: ignore[attr-defined]
+                listing_downloaded = s.get(AV_LIST_URL.format(api_key=self._av_api_key))  # type: ignore[attr-defined]
                 decoded_content = listing_downloaded.content.decode('utf-8')
-                tickers_df = pd.read_csv(StringIO(decoded_content), sep=',', header=0)
+                tickers_df = pandas_read_csv(StringIO(decoded_content), sep=',', header=0)
 
             if asset_class:
 
@@ -436,7 +436,7 @@ class RealtimeManager:
 
                 tickers_list = tickers_df.loc[:, 'symbol'].to_list()
 
-        elif data_source == REALTIME_DATA_SOURCE.POLYGON_IO:
+        elif data_source == REALTIME_DATA_PROVIDER.POLYGON_IO:
 
             if asset_class:
 
@@ -449,14 +449,14 @@ class RealtimeManager:
                 poly_asset_class = None
 
             # call function for forex asset_class
-            listing_downloaded = self._poly_reader.get_exchanges(
+            listing_downloaded = self._poly_reader.get_exchanges(  # type: ignore[attr-defined]
                 asset_class=poly_asset_class)
 
             tickers_list = [item.acronym for item in listing_downloaded]
 
         return tickers_list
 
-    def get_realtime_quote(self) -> Any:
+    def get_realtime_quote(self, ticker: str) -> Any:
 
         with self._getClient(REALTIME_DATA_PROVIDER.POLYGON_IO) as client:
 
