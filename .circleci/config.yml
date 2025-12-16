@@ -36,7 +36,7 @@ jobs:
   py310:
     <<: *defaults
     docker:
-      - image: cimg/python:3.10.14
+      - image: cimg/python:3.12.12
     steps:
       - checkout
       - run: *install_poetry
