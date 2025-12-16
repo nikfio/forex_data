@@ -32,7 +32,7 @@ from re import (
 )
 from collections import OrderedDict
 from numpy import array
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from pathlib import Path as PathType
 from datetime import datetime
 
@@ -88,25 +88,41 @@ BASE CONNECTOR
 @define(kw_only=True, slots=True)
 class DatabaseConnector:
 
-    def connect(self) -> None:
-
-        pass
+    def connect(self) -> Any:
+        """Connect to database - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement connect")
 
     def check_connection(self) -> bool:
         """Check database connection - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement check_connection")
 
-    def write_data(self) -> None:
+    def write_data(self, target_table: str, dataframe: Union[polars_dataframe, polars_lazyframe], clean: bool = False) -> None:
         """Write data to database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement write_data")
 
-    def read_data(self) -> None:
+    def read_data(self, market: str, ticker: str, timeframe: str, start: datetime, end: datetime) -> polars_lazyframe:
         """Read data from database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_data")
 
     def exec_sql(self) -> None:
+        """Execute SQL - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement exec_sql")
 
-        pass
+    def _db_key(self, market: str, ticker: str, timeframe: str) -> str:
+        """Generate database key - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement _db_key")
+
+    def get_tickers_list(self) -> List[str]:
+        """Get list of tickers - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement get_tickers_list")
+
+    def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
+        """Get ticker keys - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement get_ticker_keys")
+
+    def get_ticker_years_list(self, ticker: str, timeframe: str = TICK_TIMEFRAME) -> List[int]:
+        """Get years list for ticker - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement get_ticker_years_list")
 
 
 '''
@@ -247,7 +263,6 @@ class DuckDBConnector(DatabaseConnector):
                         if hasattr(attr, 'default'):
 
                             if hasattr(attr.default, 'factory'):
-
                                 self.__setattr__(attr.name,
                                                  attr.default.factory())
 
@@ -321,7 +336,7 @@ class DuckDBConnector(DatabaseConnector):
 
         except Exception as e:
 
-            logger.error(f'Error during connection to {self._db_uri}')
+            logger.error(f'Error during connection to {self.duckdb_filepath}')
 
         else:
 
@@ -366,8 +381,7 @@ class DuckDBConnector(DatabaseConnector):
         if not list(duckdb_columns_dict.keys())[0] == BASE_DATA_COLUMN_NAME.TIMESTAMP:
 
             o_dict = OrderedDict(duckdb_columns_dict.items())
-            o_dict = o_dict.move_to_end(BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                                        last=False)
+            o_dict.move_to_end(BASE_DATA_COLUMN_NAME.TIMESTAMP, last=False)
 
             duckdb_columns_dict = dict(o_dict)
 
@@ -375,7 +389,7 @@ class DuckDBConnector(DatabaseConnector):
 
     def _list_tables(self) -> List[str]:
 
-        tables_list = {}
+        tables_list: List[str] = []
 
         conn = self.connect()
 
@@ -631,12 +645,12 @@ class DuckDBConnector(DatabaseConnector):
                 if timeframe == TICK_TIMEFRAME:
 
                     # final cast to standard dtypes
-                    dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                    dataframe = dataframe.cast(cast(Any, POLARS_DTYPE_DICT.TIME_TICK_DTYPE))
 
                 else:
 
                     # final cast to standard dtypes
-                    dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+                    dataframe = dataframe.cast(cast(Any, POLARS_DTYPE_DICT.TIME_TF_DTYPE))
 
         # close
         conn.commit()

@@ -159,8 +159,8 @@ class TestRealtimeManager(unittest.TestCase):
                                      BASE_DATA_COLUMN_NAME.CLOSE]
 
                     for col in expected_cols:
-                        self.assertIn(col, result.columns,
-                                      msg=f"Column '{col}' missing from daily close data")
+                        msg = f"Column '{col}' missing from daily close data"
+                        self.assertIn(col, result.columns, msg=msg)
         except Exception as e:
             self.skipTest(f"API call failed: {str(e)}")
 
@@ -297,13 +297,13 @@ class TestRealtimeManager(unittest.TestCase):
 
             # Both should be valid types
             valid_single = (isinstance(result_single,
-                                       (pandas_series, pandas_dataframe)) or
-                            is_empty_dataframe(result_single))
+                                       (pandas_series, pandas_dataframe))
+                            or is_empty_dataframe(result_single))
             self.assertTrue(valid_single)
 
             valid_window = (isinstance(result_window,
-                                       (pandas_dataframe, polars_dataframe)) or
-                            is_empty_dataframe(result_window))
+                                       (pandas_dataframe, polars_dataframe))
+                            or is_empty_dataframe(result_window))
             self.assertTrue(valid_window)
         except Exception as e:
             self.skipTest(f"API call failed: {str(e)}")

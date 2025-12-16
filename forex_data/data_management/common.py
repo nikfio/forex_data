@@ -79,6 +79,11 @@ from re import (
     search
 )
 
+from typing import (
+    cast,
+    Any
+)
+
 from datetime import (
     timedelta
 )
@@ -591,14 +596,7 @@ def get_date_interval(start=None,
                               byweekday=(MO, TU, WE, TH, FR))
                     )
 
-    if not (
-            isinstance(start_date, Timestamp) and
-        isinstance(end_date, Timestamp)
-    ):
-
-        logger.error('start or end is not a valid Timestamp type')
-        raise TypeError
-
+    # Timestamp() constructor ensures these are Timestamp objects
     if normalize:
 
         if not isnull(start_date):
@@ -1275,14 +1273,14 @@ def reframe_data(dataframe, tf):
 
             # convert to polars dataframe
             dataframe = from_arrow(dataframe,
-                                   schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                                   schema=cast(Any, POLARS_DTYPE_DICT.TIME_TICK_DTYPE))
 
         elif all([col in DATA_COLUMN_NAMES.TF_DATA
                   for col in dataframe.column_names]):
 
             # convert to polars dataframe
             dataframe = from_arrow(dataframe,
-                                   schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+                                   schema=cast(Any, POLARS_DTYPE_DICT.TIME_TF_DTYPE))
 
         # perform operation
         # convert to arrow Table and return
@@ -1479,7 +1477,12 @@ def get_dotty_leafs(dotty_dict):
     get_leaf(dotty_dict, 'root')
 
     # leave out root field from all paths to leafs
-    leaf_keys = [search(r'(?<=root.)\S+', leaf).group(0) for leaf in leaf_keys]
+    original_leaf_keys = leaf_keys
+    leaf_keys = []
+    for leaf in original_leaf_keys:
+        match_result = search(r'(?<=root.)\\S+', leaf)
+        if match_result:
+            leaf_keys.append(match_result.group(0))
 
     return leaf_keys
 
@@ -1566,11 +1569,9 @@ def validator_list_timeframe(instance, attribute, value):
         for val in value
     ]):
 
-        fails = value[
-            [
-                check_timeframe_str(val)
-                for val in value
-            ]
+        fails = [
+            val for val in value
+            if not check_timeframe_str(val)
         ]
 
         return ValueError('Values are not timeframe compatible: '
@@ -1596,11 +1597,9 @@ def validator_list_ge(min_value):
             for val in value
         ]):
 
-            fails = value[
-                [
-                    val < min_value
-                    for val in value
-                ]
+            fails = [
+                val for val in value
+                if val < min_value
             ]
 
             logger.error(f'Values in {attribute}: {fails} '

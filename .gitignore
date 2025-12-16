@@ -3,4 +3,4 @@
 issues/
 .vscode/
 notes/
-appconfig.yaml
+*data_config.yaml

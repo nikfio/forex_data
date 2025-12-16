@@ -247,7 +247,7 @@ class HistoricalManagerDB:
                         # assign None
                         if hasattr(attr, 'default'):
 
-                            if hasattr(attr.default, 'factory'):  # type: ignore[union-attr]
+                            if hasattr(attr.default, 'factory'):
 
                                 self.__setattr__(attr.name,
                                                  attr.default.factory())
