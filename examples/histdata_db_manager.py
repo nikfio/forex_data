@@ -19,6 +19,12 @@ from sys import stderr
 
 from time import time
 
+# Use a runtime defined config yaml file
+test_config_yaml = f'''
+DATA_FILETYPE: 'parquet'
+
+ENGINE: 'polars_lazy'
+'''
 
 def main():
 
@@ -26,7 +32,7 @@ def main():
 
     # instance data manager
     histmanager = HistoricalManagerDB(
-        config='/Users/nicolafiorato/python/projects/forex-data/appconfig'
+        config=test_config_yaml
     )
 
     # add logging to stderr
@@ -68,7 +74,7 @@ def main():
                      )
 
     # add new timeframe
-    histmanager.add_timeframe('1W', update_data=True)
+    histmanager.add_timeframe('1W')
 
     # plot data
     histmanager.plot(

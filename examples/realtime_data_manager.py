@@ -30,15 +30,31 @@ from forex_data import (
 )
 
 from sys import stderr
+from os import getenv
 
+# Use a runtime defined config yaml file
+alpha_vantage_key = getenv('ALPHA_VANTAGE_API_KEY')
+polygon_io_key = getenv('POLYGON_IO_API_KEY')
+if not alpha_vantage_key:
+    raise ValueError("ALPHA_VANTAGE_API_KEY environment variable is required")
+if not polygon_io_key:
+    raise ValueError("POLYGON_IO_API_KEY environment variable is required")
 
+test_config_yaml = f'''
+DATA_FILETYPE: 'parquet'
+
+ENGINE: 'polars_lazy'
+
+PROVIDERS_KEY: 
+    ALPHA_VANTAGE_API_KEY : {alpha_vantage_key}, 
+    POLYGON_IO_API_KEY    : {polygon_io_key}
+    
+'''
 def main():
-
-    # TODO: look for config file and get reference
 
     # instance data manager
     realtimedata_manager = RealtimeManager(
-        config='/Users/nicolafiorato/python/projects/forex-data/appconfig'
+        config=test_config_yaml
     )
 
     # add logging to stderr

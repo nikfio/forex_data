@@ -86,10 +86,10 @@ from .common import (
     TICK_TIMEFRAME,
     FILENAME_STR,
     REALTIME_DATA_PROVIDER,
-    ALPHA_VANTAGE_KEY_ENV,
+    ALPHA_VANTAGE_API_KEY,
     CANONICAL_INDEX,
     DATE_NO_HOUR_FORMAT,
-    POLY_IO_KEY_ENV,
+    POLYGON_IO_API_KEY,
     validator_file_path,
     validator_dir_path,
     get_attrs_names,
@@ -392,11 +392,11 @@ class RealtimeManager:
 
         if provider == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
 
-            return av_forex_client(key=self.providers_key[ALPHA_VANTAGE_KEY_ENV])
+            return av_forex_client(key=self.providers_key[ALPHA_VANTAGE_API_KEY])
 
         elif provider == REALTIME_DATA_PROVIDER.POLYGON_IO:
 
-            return polygonio_client(api_key=self.providers_key[POLY_IO_KEY_ENV])
+            return polygonio_client(api_key=self.providers_key[POLYGON_IO_API_KEY])
 
     def tickers_list(self,
                      data_source,

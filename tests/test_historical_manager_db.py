@@ -10,9 +10,11 @@ the functionality of the historical data manager including:
 - Data validation
 """
 
+
 import unittest
 from pathlib import Path
 from datetime import datetime
+from os import getenv
 
 from polars import (
     DataFrame as polars_dataframe,
@@ -26,6 +28,12 @@ from forex_data import (
 
 __all__ = ['TestHistoricalManagerDB']
 
+# Use a runtime defined config yaml file
+test_config_yaml = f'''
+DATA_FILETYPE: 'parquet'
+
+ENGINE: 'polars_lazy'
+'''
 
 class TestHistoricalManagerDB(unittest.TestCase):
     """Test suite for HistoricalManagerDB class."""
@@ -33,25 +41,20 @@ class TestHistoricalManagerDB(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures that are shared across all tests."""
-        cls.config_path = Path(__file__).parent.parent / 'appconfig'
 
         # Create manager instance for tests
         cls.hist_manager = HistoricalManagerDB(
-            config=str(cls.config_path),
-            data_type='duckdb',
-            engine='polars_lazy'
+            config=test_config_yaml
         )
 
     def test_01_initialization_with_config(self):
         """Test that HistoricalManagerDB initializes correctly with config."""
         manager = HistoricalManagerDB(
-            config=str(self.config_path),
-            data_type='duckdb',
-            engine='polars_lazy'
+            config=test_config_yaml
         )
 
         self.assertIsNotNone(manager)
-        self.assertEqual(manager.data_type, 'duckdb')
+        self.assertEqual(manager.data_type, 'parquet')
         self.assertEqual(manager.engine, 'polars_lazy')
 
     def test_02_initialization_without_config(self):
@@ -66,7 +69,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         """Test that invalid data_type raises appropriate error."""
         with self.assertRaises(ValueError):
             HistoricalManagerDB(
-                config=str(self.config_path),
+                config=test_config_yaml,
                 data_type='invalid_type'
             )
 
@@ -74,7 +77,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         """Test that invalid engine raises appropriate error."""
         with self.assertRaises(ValueError):
             HistoricalManagerDB(
-                config=str(self.config_path),
+                config=test_config_yaml,
                 engine='invalid_engine'
             )
 
@@ -248,7 +251,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         new_timeframe = '2D'
 
         # Add the timeframe
-        self.hist_manager.add_timeframe(new_timeframe, update_data=False)
+        self.hist_manager.add_timeframe(new_timeframe)
 
         # Verify it was added (if _tf_list is accessible)
         if hasattr(self.hist_manager, '_tf_list'):
