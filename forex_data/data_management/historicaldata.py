@@ -890,7 +890,7 @@ class HistoricalManagerDB:
         # update manager database
         self._update_db()
 
-    def add_timeframe(self, timeframe: str, update_data: bool = False) -> None:
+    def add_timeframe(self, timeframe: str) -> None:
 
         if not hasattr(self, '_tf_list'):
             self._tf_list = []
@@ -914,10 +914,7 @@ class HistoricalManagerDB:
             # concat timeframe accordingly
             # only just new elements not already present
             self._tf_list.extend(set(tf_list).difference(self._tf_list))
-
-            if update_data:
-
-                self._update_db()
+            self._update_db()
 
     def get_data(self,
                  ticker,
@@ -976,8 +973,7 @@ class HistoricalManagerDB:
             if timeframe not in self._tf_list:
 
                 # call add single tf data
-                self.add_timeframe(timeframe,
-                                   update_data=True)
+                self.add_timeframe(timeframe)
 
             # get all keys referring to specific ticker
             ticker_keys = self._get_ticker_keys(ticker)

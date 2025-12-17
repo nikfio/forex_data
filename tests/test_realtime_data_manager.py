@@ -12,6 +12,7 @@ the functionality of the realtime data manager including:
 
 import unittest
 from pathlib import Path
+from os import getenv
 
 from pandas import (
     Timestamp,
@@ -36,6 +37,24 @@ from forex_data import (
 
 __all__ = ['TestRealtimeManager']
 
+# Use a runtime defined config yaml file
+alpha_vantage_key = getenv('ALPHA_VANTAGE_API_KEY')
+polygon_io_key = getenv('POLYGON_IO_API_KEY')
+if not alpha_vantage_key:
+    raise ValueError("ALPHA_VANTAGE_API_KEY environment variable is required")
+if not polygon_io_key:
+    raise ValueError("POLYGON_IO_API_KEY environment variable is required")
+
+test_config_yaml = f'''
+DATA_FILETYPE: 'parquet'
+
+ENGINE: 'polars_lazy'
+
+PROVIDERS_KEY: 
+    ALPHA_VANTAGE_API_KEY : {alpha_vantage_key}, 
+    POLYGON_IO_API_KEY    : {polygon_io_key}
+    
+'''
 
 class TestRealtimeManager(unittest.TestCase):
     """Test suite for RealtimeManager class."""
@@ -43,11 +62,9 @@ class TestRealtimeManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures that are shared across all tests."""
-        cls.config_path = Path(__file__).parent.parent / 'appconfig'
-
         # Create manager instance for tests
         cls.realtime_manager = RealtimeManager(
-            config=str(cls.config_path)
+            config=test_config_yaml
         )
 
         # Example ticker for tests
@@ -56,7 +73,7 @@ class TestRealtimeManager(unittest.TestCase):
     def test_01_initialization_with_config(self):
         """Test that RealtimeManager initializes correctly with config."""
         manager = RealtimeManager(
-            config=str(self.config_path)
+            config=test_config_yaml
         )
 
         self.assertIsNotNone(manager)
