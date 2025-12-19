@@ -37,7 +37,11 @@ from .data_management import (
     LocalDBConnector,
     validator_list_timeframe,
     concat_data,
-    validator_dir_path
+    validator_dir_path,
+    TickerNotFoundError,
+    TickerDataNotFoundError,
+    TickerDataBadTypeException,
+    TickerDataInvalidException
 )
 
 __all__ = [
@@ -68,5 +72,9 @@ __all__ = [
     'LocalDBConnector',
     'validator_list_timeframe',
     'concat_data',
-    'validator_dir_path'
+    'validator_dir_path',
+    'TickerNotFoundError',
+    'TickerDataNotFoundError',
+    'TickerDataBadTypeException',
+    'TickerDataInvalidException'
 ]

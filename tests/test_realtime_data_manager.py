@@ -11,7 +11,6 @@ the functionality of the realtime data manager including:
 """
 
 import unittest
-from pathlib import Path
 from os import getenv
 
 from pandas import (
@@ -50,11 +49,12 @@ DATA_FILETYPE: 'parquet'
 
 ENGINE: 'polars_lazy'
 
-PROVIDERS_KEY: 
-    ALPHA_VANTAGE_API_KEY : {alpha_vantage_key}, 
+PROVIDERS_KEY:
+    ALPHA_VANTAGE_API_KEY : {alpha_vantage_key},
     POLYGON_IO_API_KEY    : {polygon_io_key}
-    
+
 '''
+
 
 class TestRealtimeManager(unittest.TestCase):
     """Test suite for RealtimeManager class."""

@@ -28,7 +28,11 @@ __all__ = [
     'LocalDBConnector',
     'validator_list_timeframe',
     'concat_data',
-    'validator_dir_path'
+    'validator_dir_path',
+    'TickerNotFoundError',
+    'TickerDataNotFoundError',
+    'TickerDataBadTypeException',
+    'TickerDataInvalidException'
 ]
 
 from . import common
@@ -50,7 +54,11 @@ from .common import (
     check_timeframe_str,
     validator_list_timeframe,
     concat_data,
-    validator_dir_path
+    validator_dir_path,
+    TickerNotFoundError,
+    TickerDataNotFoundError,
+    TickerDataBadTypeException,
+    TickerDataInvalidException
 )
 
 from .database import (

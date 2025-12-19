@@ -68,7 +68,11 @@ __all__ = [
     'to_source_symbol',
     'get_date_interval',
     'polygon_agg_to_dict',
-    'validator_list_timeframe'
+    'validator_list_timeframe',
+    'TickerNotFoundError',
+    'TickerDataNotFoundError',
+    'TickerDataBadTypeException',
+    'TickerDataInvalidException'
 ]
 
 from loguru import logger
@@ -159,6 +163,39 @@ from attrs import (
     validators
 )
 
+
+# =============================================================================
+# CUSTOM EXCEPTIONS
+# =============================================================================
+
+# TickerNotFoundError:
+# This exception is raised when the ticker requested is misspelled
+# or does not exist in the database.
+class TickerNotFoundError(Exception):
+    pass
+
+
+# TickerDataNotFoundError:
+# This exception is raised when the ticker is found
+# but data is not available or data retrieval failed.
+class TickerDataNotFoundError(Exception):
+    pass
+
+
+# TickerDataBadTypeException:
+# This exception is raised when the ticker data
+# is found but data type is not compliant with the expected type.
+class TickerDataBadTypeException(Exception):
+    pass
+
+
+# TickerDataInvalidException:
+# This exception is raised when the ticker data
+# is not found or invalid for generic reasons.
+class TickerDataInvalidException(Exception):
+    pass
+
+
 # common functions, constants and templates
 TEMP_FOLDER = "Temp"
 TEMP_CSV_FILE = "Temp.csv"
@@ -215,7 +252,7 @@ AV_LIST_URL = (
 PAIR_POLYGON_FORMAT = 'C:{TO}{FROM}'
 PAIR_POLYGON_PATTERN = '^C:' + SINGLE_CURRENCY_PATTERN_STR + \
     SINGLE_CURRENCY_PATTERN_STR + '$'
-POLYGON_IO_API_KEY= 'POLYGON_IO_API_KEY'
+POLYGON_IO_API_KEY = 'POLYGON_IO_API_KEY'
 
 # TIME PATTERN
 TIME_WINDOW_PATTERN_STR = '^[-+]?[0-9]+[A-Za-z]{1,}$'

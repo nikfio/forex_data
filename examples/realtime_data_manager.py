@@ -45,11 +45,13 @@ DATA_FILETYPE: 'parquet'
 
 ENGINE: 'polars_lazy'
 
-PROVIDERS_KEY: 
-    ALPHA_VANTAGE_API_KEY : {alpha_vantage_key}, 
+PROVIDERS_KEY:
+    ALPHA_VANTAGE_API_KEY : {alpha_vantage_key},
     POLYGON_IO_API_KEY    : {polygon_io_key}
-    
+
 '''
+
+
 def main():
 
     # instance data manager

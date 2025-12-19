@@ -20,11 +20,12 @@ from sys import stderr
 from time import time
 
 # Use a runtime defined config yaml file
-test_config_yaml = f'''
+test_config_yaml = '''
 DATA_FILETYPE: 'parquet'
 
 ENGINE: 'polars_lazy'
 '''
+
 
 def main():
 
@@ -39,7 +40,7 @@ def main():
     logger.add(stderr, level="TRACE")
 
     # example parameters
-    ex_ticker = 'EURJPY'
+    ex_ticker = 'AUDUSD'
     ex_timeframe = '1d'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date = '2018-12-03 10:00:00'
@@ -61,17 +62,15 @@ def main():
             f"get_data: ticker {ex_ticker}, timeframe {ex_timeframe}, "
             f"rows {shape_dataframe(yeardata)[0]}, "
             f"start {get_dataframe_element(yeardata, BASE_DATA_COLUMN_NAME.TIMESTAMP, 0)}, "
-            f"end {get_dataframe_element(yeardata, BASE_DATA_COLUMN_NAME.TIMESTAMP, shape_dataframe(yeardata)[0] - 1)}"
-                     )
+            f"end {get_dataframe_element(yeardata, BASE_DATA_COLUMN_NAME.TIMESTAMP, shape_dataframe(yeardata)[0] - 1)}")
 
     else:
 
         logger.trace("""
                      get_data: no data found
                      requested pair {ex_ticker}
-                     start {ex_start_date}, "
-                     end {ex_start_date}"""
-                     )
+                     start {ex_start_date},
+                     end {ex_start_date}""")
 
     # add new timeframe
     histmanager.add_timeframe('1W')
@@ -106,17 +105,15 @@ def main():
             f"get_data: ticker {ex_ticker}, timeframe {ex_timeframe}, "
             f"rows {shape_dataframe(yeardata)[0]}, "
             f"start {get_dataframe_element(yeardata, BASE_DATA_COLUMN_NAME.TIMESTAMP, 0)}, "
-            f"end {get_dataframe_element(yeardata, BASE_DATA_COLUMN_NAME.TIMESTAMP, shape_dataframe(yeardata)[0] - 1)}"
-                     )
+            f"end {get_dataframe_element(yeardata, BASE_DATA_COLUMN_NAME.TIMESTAMP, shape_dataframe(yeardata)[0] - 1)}")
 
     else:
 
         logger.trace("""
                      get_data: no data found
                      requested pair {ex_ticker}
-                     start {ex_start_date}, "
-                     end {ex_start_date}"""
-                     )
+                     start {ex_start_date},
+                     end {ex_start_date}""")
 
     end_time = time()
     logger.trace(f'end time: {end_time}')
