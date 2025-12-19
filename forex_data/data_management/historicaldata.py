@@ -39,6 +39,7 @@ from polars import (
 
 from zipfile import (
     ZipFile,
+    ZipExtFile,
     BadZipFile
 )
 
@@ -450,13 +451,19 @@ class HistoricalManagerDB:
         session = Session()
         r = session.get(url)
 
+        token = None
         with logger.catch(exception=AttributeError,
                           level='CRITICAL',
                           message=f'token value was not found scraping '
-                          f'url {url}: probably {ticker} '
-                          f'is not supported by histdata.com'):
+                          f'url {url}: {ticker} not existing or'
+                          f'not supported by histdata.com: {ticker} - '
+                          f'{year}-{MONTHS[month_num - 1]}'):
 
             token = search('id="tk" value="(.*?)"', r.text).groups()[0]
+
+        # If exception was caught, token will still be None
+        if token is None:
+            raise TickerNotFoundError(f"Ticker {ticker} not found or not supported by histdata.com")
 
         ''' Alternative: using BeautifulSoup parser
         r = session.get(url, allow_redirects=True)
@@ -497,18 +504,29 @@ class HistoricalManagerDB:
 
             zf = ZipFile(bio)
 
-        except BadZipFile:
+        except BadZipFile as e:
 
             # here will be a warning log
-            logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
-                         f'not found or invalid download')
-
-            return None
+            logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: {e}')
+            raise TickerDataBadTypeException(f"Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}")
 
         else:
 
             # return opened zip file
-            return zf.open(zf.namelist()[0])
+            try:
+                ExtFile = zf.open(zf.namelist()[0])
+            except Exception as e:
+                logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
+                             f'not found or invalid download: {e}')
+                raise TickerDataNotFoundError(f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
+
+            else:
+                if isinstance(ExtFile, ZipExtFile):
+                    return ExtFile
+                else:
+                    logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
+                                 f'data type not expected')
+                    raise TickerDataBadTypeException(f"Data {ticker} - {year} - {MONTHS[month_num - 1]} type not expected")
 
     def _raw_zipfile_to_df(self,
                            raw_file,
@@ -802,7 +820,7 @@ class HistoricalManagerDB:
     def _download_year(self,
                        ticker,
                        year
-                       ) -> None:
+                       ) -> Union[polars_dataframe, polars_lazyframe, pandas_dataframe, Table, None]:
 
         year_tick_df = self._dataframe_type([])
 
@@ -814,9 +832,6 @@ class HistoricalManagerDB:
                 year=year,
                 month_num=month_num)
 
-            logger.info(f'To download: {ticker} - {year} - '
-                        f'{MONTHS[month_num - 1]}')
-
             file = self._download_month_raw(
                 ticker,
                 url,
@@ -824,7 +839,7 @@ class HistoricalManagerDB:
                 month_num
             )
 
-            if file:
+            if file and isinstance(file, ZipExtFile):
 
                 month_data = self._raw_zipfile_to_df(file,
                                                      str(self._temporary_data_path /
@@ -844,6 +859,11 @@ class HistoricalManagerDB:
                 else:
 
                     year_tick_df = concat_data([year_tick_df, month_data])
+
+            else:
+
+                logger.critical(f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} data not found or invalid")
+                raise TickerDataInvalidException(f"Ticker {ticker} - {year} - {MONTHS[month_num - 1]} data not found or invalid: generic error")
 
         return sort_dataframe(year_tick_df,
                               BASE_DATA_COLUMN_NAME.TIMESTAMP)
@@ -883,9 +903,10 @@ class HistoricalManagerDB:
                                                   ticker,
                                                   'TICK')
 
-            # call to upload df to database
-            self._db_connector.write_data(tick_key,
-                                          year_tick_df)
+            # call to upload df to database if not empty
+            if not is_empty_dataframe(year_tick_df):
+                self._db_connector.write_data(tick_key,
+                                              year_tick_df)
 
         # update manager database
         self._update_db()

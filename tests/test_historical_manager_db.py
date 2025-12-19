@@ -12,9 +12,7 @@ the functionality of the historical data manager including:
 
 
 import unittest
-from pathlib import Path
 from datetime import datetime
-from os import getenv
 
 from polars import (
     DataFrame as polars_dataframe,
@@ -22,18 +20,21 @@ from polars import (
 )
 
 from forex_data import (
-    HistoricalManagerDB
+    HistoricalManagerDB,
+    TickerNotFoundError,
+    is_empty_dataframe
 )
 
 
 __all__ = ['TestHistoricalManagerDB']
 
 # Use a runtime defined config yaml file
-test_config_yaml = f'''
+test_config_yaml = '''
 DATA_FILETYPE: 'parquet'
 
 ENGINE: 'polars_lazy'
 '''
+
 
 class TestHistoricalManagerDB(unittest.TestCase):
     """Test suite for HistoricalManagerDB class."""
@@ -83,7 +84,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
     def test_05_get_data_with_daily_timeframe(self):
         """Test retrieving data with daily (1D) timeframe."""
-        ticker = 'EURJPY'
+        ticker = 'EURUSD'
         timeframe = '1D'
         start = datetime(2018, 10, 4)
         end = datetime(2018, 12, 3)
@@ -340,6 +341,26 @@ class TestHistoricalManagerDB(unittest.TestCase):
             (data_upper is not None),
             msg="Ticker case handling inconsistent"
         )
+
+        # Both check dataframe are not empty
+        self.assertFalse(is_empty_dataframe(data_lower))
+        self.assertFalse(is_empty_dataframe(data_upper))
+
+    def test_17_ticker_not_found_exception(self):
+        """Test that TickerNotFoundError is raised for invalid tickers."""
+        ticker = "USDNZD"
+        timeframe = '1D'
+        start = datetime(2018, 10, 4)
+        end = datetime(2018, 12, 3)
+
+        # USDNZD is used as an example of a ticker not supported/found
+        with self.assertRaises(TickerNotFoundError):
+            self.hist_manager.get_data(
+                ticker=ticker,
+                timeframe=timeframe,
+                start=start,
+                end=end
+            )
 
 
 if __name__ == '__main__':
