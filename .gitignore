@@ -5,3 +5,4 @@ issues/
 notes/
 appconfig.yaml
 test/test_dynamodb.py
+appconfig/data_config.yaml
