@@ -892,13 +892,13 @@ class LocalDBConnector(DatabaseConnector):
         # return each file details
         return file_items
 
-    def _get_filename(self, market: str, ticker: str, tf: str, file_ext: str) -> str:
+    def _get_filename(self, market: str, ticker: str, tf: str) -> str:
 
         # based on standard filename template
-        return FILENAME_STR.format(market=market,
-                                   ticker=ticker,
-                                   tf=tf,
-                                   file_ext=self.data_type)
+        return FILENAME_STR.format(market=market.lower(),
+                                   ticker=ticker.lower(),
+                                   tf=tf.lower(),
+                                   file_ext=self.data_type.lower()) 
 
     def _list_local_data(self) -> List[PathType]:
 
@@ -1011,8 +1011,7 @@ class LocalDBConnector(DatabaseConnector):
 
         filename = self._get_filename(items[DATA_KEY.MARKET],
                                       items[DATA_KEY.TICKER_INDEX],
-                                      items[DATA_KEY.TF_INDEX],
-                                      self.data_type)
+                                      items[DATA_KEY.TF_INDEX])
 
         filepath = (self._local_path /
                     items[DATA_KEY.MARKET] /
@@ -1065,8 +1064,7 @@ class LocalDBConnector(DatabaseConnector):
 
         filename = self._get_filename(market,
                                       ticker,
-                                      timeframe,
-                                      self.data_type)
+                                      timeframe)
 
         filepath = (self._local_path /
                     market /
@@ -1122,5 +1120,10 @@ class LocalDBConnector(DatabaseConnector):
 
                     # final cast to standard dtypes
                     dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        else:
+
+            logger.critical(f'file {filepath} not found')
+            raise FileNotFoundError("file {filepath} not found")
 
         return dataframe
