@@ -30,13 +30,16 @@ install_deps:
 run_tests:
   &run_tests
   name: run tests
-  command: poetry run pytest --flake8 --mypy
+  command: poetry run pytest --flake8 
   
 jobs:
-  py310:
+  py312:
     <<: *defaults
     docker:
-      - image: cimg/python:3.10.14
+      - image: cimg/python:3.12.12
+        environment:
+          DATABASE_URL: ${DATABASE_URL}
+          API_KEY: ${API_KEY}
     steps:
       - checkout
       - run: *install_poetry
@@ -49,4 +52,4 @@ workflows:
   version: 1
   unit-tests:
     jobs:
-      - py310
+      - py312

@@ -6,9 +6,7 @@ Created on Sat Feb  1 21:29:23 2025
 """
 
 __all__ = [
-        'tests_historical_data',
-        'TestHistData'
-    ]
+    'test_historical_manager_db'
+]
 
-from .test_historical_data import *
-from . import test_historical_data
+from . import test_historical_manager_db

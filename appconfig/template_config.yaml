@@ -1,15 +1,11 @@
 ---
 # yaml document template for data management configuration
 
-TICKER: 'EURUSD'
-
 DATA_FILETYPE: 'parquet'
 
-ENGINE: 'pandas'
+ENGINE: 'polars_lazy'
 
 PROVIDERS_KEY: 
     ALPHA_VANTAGE_KEY : <ALPHA-VANTAGE-API-KEY>, 
     POLYGON_IO_KEY    : <POLYGON-IO-API-KEY>
     
-# uncomment row below and modify path to set custom data location 
-# DATA_PATH: 'C:\forex_data\database'  
