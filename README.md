@@ -188,11 +188,10 @@ Let's walk through the [example for historical data source](test/test_hist_data_
 
 3. **add a timeframe**
     ```
-    histmanager.add_timeframe('1W', update_data=True)
+    histmanager.add_timeframe('1W')
     ```
     here a new timeframe is appended to existing ones.
-    By assigning `update_data=True`, the data manager creates 
-    and if not present dumps new timeframe data in its data path.
+    By default, the data manager creates and if not present dumps new timeframe data in its data path.
     Otherwise, the new timeframe is just appended to the instance internal list.
 <br>
 
