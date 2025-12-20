@@ -898,7 +898,7 @@ class LocalDBConnector(DatabaseConnector):
         return FILENAME_STR.format(market=market.lower(),
                                    ticker=ticker.lower(),
                                    tf=tf.lower(),
-                                   file_ext=self.data_type.lower()) 
+                                   file_ext=self.data_type.lower())
 
     def _list_local_data(self) -> List[PathType]:
 
