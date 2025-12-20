@@ -901,7 +901,7 @@ class HistoricalManagerDB:
             # get key for dotty dict: TICK
             tick_key = self._db_connector._db_key('forex',
                                                   ticker,
-                                                  'TICK')
+                                                  TICK_TIMEFRAME)
 
             # call to upload df to database if not empty
             if not is_empty_dataframe(year_tick_df):
@@ -944,8 +944,8 @@ class HistoricalManagerDB:
                  end,
                  add_timeframe: bool = True) -> Union[polars_dataframe, polars_lazyframe]:
 
-        # force ticker parameter to upper case
-        ticker = ticker.upper()
+        # force ticker parameter to lower case
+        ticker = ticker.lower()
 
         if not check_timeframe_str(timeframe):
 

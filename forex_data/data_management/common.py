@@ -230,7 +230,7 @@ DATA_KEY_TEMPLATE_STR = '{market}.{ticker}.{tf}'
 DATA_KEY_TEMPLATE_PATTERN = '^[A-Za-z0-9]_[A-Za-z]+.[A-Za-z0-9]+'
 FILENAME_STR = '{market}_{ticker}_{tf}.{file_ext}'
 DEFAULT_TIMEZONE = 'utc'
-TICK_TIMEFRAME = 'TICK'
+TICK_TIMEFRAME = 'tick'
 
 # ticker PAIR of forex market
 SINGLE_CURRENCY_PATTERN_STR = '[A-Za-z]{3}'
