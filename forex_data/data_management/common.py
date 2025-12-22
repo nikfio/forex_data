@@ -156,6 +156,8 @@ from dateutil.rrule import (
     FR
 )
 
+from datetime import datetime
+
 from pathlib import Path
 
 from attrs import (
@@ -215,7 +217,7 @@ HISTDATA_BASE_DOWNLOAD_METHOD = 'POST'
 
 MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December']
-YEARS = list(range(2000, 2022, 1))
+YEARS = list(range(2001, datetime.now().year, 1))
 
 
 DATE_NO_HOUR_FORMAT = '%Y-%m-%d'

@@ -263,6 +263,9 @@ class HistoricalManagerDB:
                             self.__setattr__(attr.name,
                                              None)
 
+            else:
+                logger.trace(f'config {kwargs["config"]} is empty, using default configuration')
+
         else:
 
             # no config file is defined
@@ -301,6 +304,11 @@ class HistoricalManagerDB:
 
             self._dataframe_type = polars_lazyframe
 
+        else:
+
+            logger.error(f'Engine {self.engine} not supported')
+            raise ValueError(f'Engine {self.engine} not supported')
+
         self._temporary_data_path = self._histdata_path \
             / TEMP_FOLDER
 
@@ -325,6 +333,11 @@ class HistoricalManagerDB:
                     engine=self.engine
                 )
 
+        else:
+
+            logger.error(f'Data type {self.data_type} not supported')
+            raise ValueError(f'Data type {self.data_type} not supported')
+
     def _clear_temporary_data_folder(self) -> None:
 
         # delete temporary data path
@@ -341,6 +354,9 @@ class HistoricalManagerDB:
 
                 logger.warning('Deleting temporary data folder '
                                f'{str(self._temporary_data_path)} not successfull: {e}')
+
+        else:
+            logger.trace(f'Temporary data folder {self._temporary_data_path} does not exist')
 
     def _get_ticker_list(self) -> List[str]:
 
@@ -419,6 +435,12 @@ class HistoricalManagerDB:
 
                     raise KeyError
 
+                else:
+                    logger.trace(f'ticker {ticker}: {tf} timeframe completing operation successful')
+
+            else:
+                logger.trace(f'ticker {ticker}: {tf} timeframe already complete')
+
     def _update_db(self) -> None:
 
         self._complete_timeframe()
@@ -452,14 +474,13 @@ class HistoricalManagerDB:
         r = session.get(url)
 
         token = None
-        with logger.catch(exception=AttributeError,
-                          level='CRITICAL',
-                          message=f'token value was not found scraping '
-                          f'url {url}: {ticker} not existing or'
-                          f'not supported by histdata.com: {ticker} - '
-                          f'{year}-{MONTHS[month_num - 1]}'):
-
+        try:
             token = search('id="tk" value="(.*?)"', r.text).groups()[0]
+        except AttributeError:
+            logger.critical(f'token value was not found scraping '
+                            f'url {url}: {ticker} not existing or'
+                            f'not supported by histdata.com: {ticker} - '
+                            f'{year}-{MONTHS[month_num - 1]}')
 
         # If exception was caught, token will still be None
         if token is None:
@@ -487,6 +508,8 @@ class HistoricalManagerDB:
             'fxpair': ticker
         }
 
+        # logger trace ticker year and month specifed are being downloaded
+        logger.trace(f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
         r = session.request(
             HISTDATA_BASE_DOWNLOAD_METHOD,
             HISTDATA_BASE_DOWNLOAD_URL,
@@ -822,7 +845,7 @@ class HistoricalManagerDB:
                        year
                        ) -> Union[polars_dataframe, polars_lazyframe, pandas_dataframe, Table, None]:
 
-        year_tick_df = self._dataframe_type([])
+        year_tick_df = empty_dataframe(self.engine)
 
         for month in MONTHS:
 
@@ -883,9 +906,12 @@ class HistoricalManagerDB:
             set(years).issubset(YEARS)
         ):
 
-            logger.error('requestedyears{years} not available. '
-                         'Years must be limited to: {YEARS}')
+            logger.error(f'requestedyears{years} not available. '
+                         f'Years must be limited to: {YEARS}')
             raise ValueError
+
+        else:
+            logger.trace(f'Requested years {years} are valid')
 
         # convert to list of int
         if not all(isinstance(year, int) for year in years):
@@ -907,14 +933,22 @@ class HistoricalManagerDB:
             if not is_empty_dataframe(year_tick_df):
                 self._db_connector.write_data(tick_key,
                                               year_tick_df)
+            else:
+                logger.warning(f'Year tick dataframe for {tick_key} is empty, skipping database write')
 
         # update manager database
         self._update_db()
+
+    def clear_database(self, filter: Optional[str] = None) -> None:
+
+        self._db_connector.clear_database(filter=filter)
 
     def add_timeframe(self, timeframe: str) -> None:
 
         if not hasattr(self, '_tf_list'):
             self._tf_list = []
+        else:
+            logger.trace('_tf_list already exists')
 
         if isinstance(timeframe, str):
 
@@ -996,6 +1030,9 @@ class HistoricalManagerDB:
                 # call add single tf data
                 self.add_timeframe(timeframe)
 
+            else:
+                logger.trace(f'Timeframe {timeframe} already in _tf_list')
+
             # get all keys referring to specific ticker
             ticker_keys = self._get_ticker_keys(ticker)
 
@@ -1007,6 +1044,9 @@ class HistoricalManagerDB:
                 logger.critical(f'processing year data completion for '
                                 f'{years_interval_req} not ok')
                 raise ValueError
+
+            else:
+                logger.trace(f'Year data completion for {years_interval_req} successful')
 
         # at this point all data requested have been aggregated to the database
 
@@ -1054,6 +1094,9 @@ class HistoricalManagerDB:
                                  inplace=True)
 
             chart_data.index = to_datetime(chart_data.index)
+
+        else:
+            logger.trace(f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
 
         # candlestick chart type
         # use mplfinance

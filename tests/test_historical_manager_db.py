@@ -12,7 +12,8 @@ the functionality of the historical data manager including:
 
 
 import unittest
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 
 from polars import (
     DataFrame as polars_dataframe,
@@ -22,7 +23,9 @@ from polars import (
 from forex_data import (
     HistoricalManagerDB,
     TickerNotFoundError,
-    is_empty_dataframe
+    is_empty_dataframe,
+    YEARS,
+    POLARS_DTYPE_DICT
 )
 
 
@@ -362,6 +365,60 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 end=end
             )
 
+    def test_18_clear_database_and_redownload(self):
+        """
+        Test that clear_database wipes data for a specific ticker
+        and verify that data can be correctly re-downloaded.
+        """
+        ticker = 'GBPUSD'
+        timeframe = '1W'
 
+        # 1. Ensure GBPUSD data is present (pull some data)
+        # Use a more recent year to avoid issues with old data on histdata.com
+        test_year = 2018
+        start = datetime(test_year, 1, 1)
+        end = datetime(test_year, 1, 15)
+
+        self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe='1D',
+            start=start,
+            end=end
+        )
+
+        # Verify it's in the ticker list
+        self.assertIn(ticker.lower(), self.hist_manager._get_ticker_list())
+
+        # 2. Clear GBPUSD data
+        self.hist_manager.clear_database(filter=ticker)
+
+        # 3. Verify GBPUSD is NOT in the ticker list anymore
+        self.assertNotIn(ticker.lower(), self.hist_manager._get_ticker_list())
+
+        # 4. Re-download data for a random 4-month timespan
+        # Pick 4 random consecutive months within a valid year
+        random_year = random.choice(YEARS)
+        random_month = random.randint(1, 12) 
+        start_date = datetime(random_year, random_month, 1)
+        # approx 4 months later
+        end_date = start_date + timedelta(days=4 * 30)
+
+        data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start_date,
+            end=end_date
+        )
+
+        # 5. Verify data is successfully re-downloaded
+        self.assertIsNotNone(data)
+       
+        self.assertFalse(is_empty_dataframe(data), msg=f"Data re-downloaded for {ticker} is empty")
+        self.assertTrue(dict(data.collect().schema) == POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        # Final check that ticker is back in the list
+        self.assertIn(ticker.lower(), self.hist_manager._get_ticker_list())
+
+    
 if __name__ == '__main__':
     unittest.main()
