@@ -18,6 +18,8 @@ from .data_management import (
     common,
     HistoricalManagerDB,
     RealtimeManager,
+    YEARS,
+    MONTHS,
     TICK_TIMEFRAME,
     BASE_DATA_COLUMN_NAME,
     DATA_FILE_COLUMN_INDEX,
@@ -41,7 +43,8 @@ from .data_management import (
     TickerNotFoundError,
     TickerDataNotFoundError,
     TickerDataBadTypeException,
-    TickerDataInvalidException
+    TickerDataInvalidException,
+    POLARS_DTYPE_DICT
 )
 
 __all__ = [
@@ -53,6 +56,8 @@ __all__ = [
     'common',
     'HistoricalManagerDB',
     'RealtimeManager',
+    'YEARS',
+    'MONTHS',
     'TICK_TIMEFRAME',
     'BASE_DATA_COLUMN_NAME',
     'DATA_FILE_COLUMN_INDEX',
@@ -76,5 +81,6 @@ __all__ = [
     'TickerNotFoundError',
     'TickerDataNotFoundError',
     'TickerDataBadTypeException',
-    'TickerDataInvalidException'
+    'TickerDataInvalidException',
+    'POLARS_DTYPE_DICT'
 ]
