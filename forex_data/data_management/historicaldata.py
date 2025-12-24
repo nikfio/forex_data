@@ -978,9 +978,9 @@ class HistoricalManagerDB:
                  end,
                  add_timeframe: bool = True) -> Union[polars_dataframe, polars_lazyframe]:
 
-        # check ticker exists in available tickers 
+        # check ticker exists in available tickers
         # from histdata database
-        if ticker not in get_histdata_tickers():
+        if ticker.upper() not in get_histdata_tickers():
             logger.error(f'ticker {ticker} not found in database')
             raise TickerNotFoundError(f'ticker {ticker} not found in database')
 
