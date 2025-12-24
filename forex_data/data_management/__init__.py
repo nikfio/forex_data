@@ -35,6 +35,7 @@ __all__ = [
     'TickerDataNotFoundError',
     'TickerDataBadTypeException',
     'TickerDataInvalidException',
+    'get_histdata_tickers',
     'POLARS_DTYPE_DICT'
 ]
 
@@ -64,6 +65,7 @@ from .common import (
     TickerDataNotFoundError,
     TickerDataBadTypeException,
     TickerDataInvalidException,
+    get_histdata_tickers,
     POLARS_DTYPE_DICT
 )
 

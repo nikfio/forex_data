@@ -986,10 +986,9 @@ class LocalDBConnector(DatabaseConnector):
         if filter:
 
             # in local path search for files having filter in path stem
-            # and delete them   
-            # list all files in local path ending with data_type 
-            # and use re.search to catch matches 
-
+            # and delete them
+            # list all files in local path ending with data_type
+            # and use re.search to catch matches
             if isinstance(filter, str):
 
                 data_files = self._local_path.rglob(f'*.{self.data_type}')
@@ -1006,7 +1005,7 @@ class LocalDBConnector(DatabaseConnector):
         else:
 
             # clear all files in local path at
-            # fodler level using shutil 
+            # folder level using shutil
             shutil.rmtree(self._local_path)
 
     def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:

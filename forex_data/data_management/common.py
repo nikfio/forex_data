@@ -69,6 +69,7 @@ __all__ = [
     'get_date_interval',
     'polygon_agg_to_dict',
     'validator_list_timeframe',
+    'get_histdata_tickers',
     'TickerNotFoundError',
     'TickerDataNotFoundError',
     'TickerDataBadTypeException',
@@ -85,8 +86,12 @@ from re import (
 
 from typing import (
     cast,
-    Any
+    Any,
+    List
 )
+
+import requests
+from bs4 import BeautifulSoup
 
 from datetime import (
     timedelta
@@ -1669,10 +1674,46 @@ def list_remove_duplicates(list_in):
     return list(dict.fromkeys(list_in))
 
 
-# EXIT CODES
+# HISTDATA utilities
 
+# Analyze the Histdata Forex download base page
+# https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes
+# and get a list of all avilable tickers in the form as the example "EURUSD"
+def get_histdata_tickers() -> List[str]:
+    """
+    Get all available tickers from HistData.com.
 
+    Returns
+    -------
+    List[str]
+        List of all available tickers (e.g., ['EURUSD', 'GBPUSD', ...]).
+    """
+    url = "https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes"
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        tickers = []
+        # Tickers are typically in links that lead to the pair's specific page
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            # Pattern check based on the observed links
+            if "/ascii/1-minute-bar-quotes/" in href:
+                parts = href.split('/')
+                ticker = parts[-1]
+                # Validate it's a valid ticker (usually 6 chars like EURUSD)
+                if ticker and len(ticker) >= 6:
+                    tickers.append(ticker.upper())
+
+        return sorted(list(set(tickers)))
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve tickers from HistData: {e}")
+        return []
 # REAL TIME PROVIDERS UTILITIES
+
 
 def polygon_agg_to_dict(agg):
 
