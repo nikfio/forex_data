@@ -10,14 +10,15 @@ from forex_data import (
     BASE_DATA_COLUMN_NAME,
     is_empty_dataframe,
     shape_dataframe,
-    get_dataframe_element
+    get_dataframe_element,
+    get_histdata_tickers
 )
 
 from loguru import logger
-
 from sys import stderr
-
 from time import time
+from random import choice
+
 
 # Use a runtime defined config yaml file
 test_config_yaml = '''
@@ -40,7 +41,9 @@ def main():
     logger.add(stderr, level="TRACE")
 
     # example parameters
-    ex_ticker = 'AUDUSD'
+    # get a random choice for ex_ticker picking from list
+    # returned by function get_ticker_list
+    ex_ticker = choice(get_histdata_tickers())
     ex_timeframe = '1d'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date = '2018-12-03 10:00:00'

@@ -28,7 +28,8 @@ from attrs import (
 )
 from re import (
     fullmatch,
-    search
+    search,
+    IGNORECASE
 )
 from collections import OrderedDict
 from numpy import array
@@ -123,6 +124,10 @@ class DatabaseConnector:
     def get_ticker_years_list(self, ticker: str, timeframe: str = TICK_TIMEFRAME) -> List[int]:
         """Get years list for ticker - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement get_ticker_years_list")
+
+    def clear_database(self, filter: Optional[str] = None) -> None:
+        """Clear database - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement clear_database")
 
 
 '''
@@ -276,6 +281,9 @@ class DuckDBConnector(DatabaseConnector):
                             self.__setattr__(attr.name,
                                              None)
 
+            else:
+                logger.trace(f'config {kwargs["config"]} is empty, using default configuration')
+
         else:
 
             # no config file is defined
@@ -296,6 +304,8 @@ class DuckDBConnector(DatabaseConnector):
 
             Path(self.duckdb_filepath).parent.mkdir(parents=True,
                                                     exist_ok=True)
+        else:
+            logger.trace(f'DuckDB file {self.duckdb_filepath} already exists')
 
         # set autovacuum
         conn = self.connect()
@@ -384,6 +394,9 @@ class DuckDBConnector(DatabaseConnector):
             o_dict.move_to_end(BASE_DATA_COLUMN_NAME.TIMESTAMP, last=False)
 
             duckdb_columns_dict = dict(o_dict)
+
+        else:
+            logger.trace(f'Timestamp is already the first column in {duckdb_columns_dict.keys()}')
 
         return duckdb_columns_dict
 
@@ -658,6 +671,27 @@ class DuckDBConnector(DatabaseConnector):
 
         return dataframe
 
+    def clear_database(self, filter: Optional[str] = None) -> None:
+        """
+        Clear database tables
+        If filter is provided, delete only tables related to that ticker
+        """
+        tables = self._list_tables()
+        conn = self.connect()
+        cur = conn.cursor()
+
+        for table in tables:
+            if filter:
+                if search(filter, table, IGNORECASE):
+                    cur.execute(f"DROP TABLE {table}")
+            else:
+                cur.execute(f"DROP TABLE {table}")
+
+        cur.execute("VACUUM")
+        cur.close()
+        conn.commit()
+        conn.close()
+
 
 '''
 LOCAL DATA FILES MANAGER
@@ -816,6 +850,9 @@ class LocalDBConnector(DatabaseConnector):
                             self.__setattr__(attr.name,
                                              None)
 
+            else:
+                logger.trace(f'config {kwargs["config"]} is empty, using default configuration')
+
         else:
 
             # no config file is defined
@@ -836,6 +873,8 @@ class LocalDBConnector(DatabaseConnector):
 
             Path(self.local_data_folder).mkdir(parents=True,
                                                exist_ok=True)
+        else:
+            logger.trace(f'Local data folder {self.local_data_folder} already exists')
 
         self._local_path = Path(self.local_data_folder)
 
@@ -886,6 +925,7 @@ class LocalDBConnector(DatabaseConnector):
         ):
 
             logger.error('filename {filename} invalid type: required str')
+            raise TypeError(f'filename {filename} invalid type: required str')
 
         file_items = self._get_items_from_db_key(filename)
 
@@ -934,6 +974,39 @@ class LocalDBConnector(DatabaseConnector):
             tickers_list.append(items[DATA_KEY.TICKER_INDEX])
 
         return list_remove_duplicates(tickers_list)
+
+    def clear_database(self, filter: Optional[str] = None) -> None:
+
+        """
+        Clear database files
+        If filter is provided and is a ticker present in database (files present)
+        delete only files related to that ticker
+        """
+
+        if filter:
+
+            # in local path search for files having filter in path stem
+            # and delete them
+            # list all files in local path ending with data_type
+            # and use re.search to catch matches
+            if isinstance(filter, str):
+
+                data_files = self._local_path.rglob(f'*.{self.data_type}')
+                if data_files:
+                    for file in data_files:
+                        if search(filter, file.stem, IGNORECASE):
+                            file.unlink(missing_ok=True)
+                else:
+                    logger.info(f'No data files found in {self._local_path} with filter {filter}')
+
+            else:
+                logger.error(f'Filter {filter} invalid type: required str')
+
+        else:
+
+            # clear all files in local path at
+            # folder level using shutil
+            shutil.rmtree(self._local_path)
 
     def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
 
@@ -1002,6 +1075,9 @@ class LocalDBConnector(DatabaseConnector):
             else:
 
                 ticker_years_list = [int(row[0]) for row in read.collect().iter_rows()]
+
+        else:
+            logger.warning(f'Expected 1 file for {ticker} - {timeframe}, found {len(files)}')
 
         return ticker_years_list
 
@@ -1075,9 +1151,14 @@ class LocalDBConnector(DatabaseConnector):
 
             dataframe = polars_dataframe()
 
-        elif self.data_type == 'polars_lazy':
+        elif self.engine == 'polars_lazy':
 
             dataframe = polars_lazyframe()
+
+        else:
+
+            logger.error(f'Engine {self.engine} or data type {self.data_type} not supported')
+            raise ValueError(f'Engine {self.engine} or data type {self.data_type} not supported')
 
         if (
                 filepath.exists() and
