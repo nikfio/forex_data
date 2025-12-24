@@ -44,6 +44,7 @@ from .data_management import (
     TickerDataNotFoundError,
     TickerDataBadTypeException,
     TickerDataInvalidException,
+    get_histdata_tickers,
     POLARS_DTYPE_DICT
 )
 
@@ -82,5 +83,6 @@ __all__ = [
     'TickerDataNotFoundError',
     'TickerDataBadTypeException',
     'TickerDataInvalidException',
+    'get_histdata_tickers',
     'POLARS_DTYPE_DICT'
 ]

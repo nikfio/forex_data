@@ -24,6 +24,7 @@ from forex_data import (
     HistoricalManagerDB,
     TickerNotFoundError,
     is_empty_dataframe,
+    get_histdata_tickers,
     YEARS,
     POLARS_DTYPE_DICT
 )
@@ -398,7 +399,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         # 4. Re-download data for a random 4-month timespan
         # Pick 4 random consecutive months within a valid year
         random_year = random.choice(YEARS)
-        random_month = random.randint(1, 12) 
+        random_month = random.randint(1, 12)
         start_date = datetime(random_year, random_month, 1)
         # approx 4 months later
         end_date = start_date + timedelta(days=4 * 30)
@@ -412,13 +413,29 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
         # 5. Verify data is successfully re-downloaded
         self.assertIsNotNone(data)
-       
-        self.assertFalse(is_empty_dataframe(data), msg=f"Data re-downloaded for {ticker} is empty")
-        self.assertTrue(dict(data.collect().schema) == POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        self.assertFalse(
+            is_empty_dataframe(data),
+            msg=f"Data re-downloaded for {ticker} is empty"
+        )
+        self.assertTrue(dict(data.collect_schema()) == POLARS_DTYPE_DICT.TIME_TF_DTYPE)
 
         # Final check that ticker is back in the list
         self.assertIn(ticker.lower(), self.hist_manager._get_ticker_list())
 
-    
+    def test_19_get_histdata_tickers(self):
+        """Test retrieving available tickers from HistData.com."""
+        tickers = get_histdata_tickers()
+
+        self.assertIsInstance(tickers, list)
+        self.assertGreater(len(tickers), 0, msg="No tickers retrieved from HistData")
+        self.assertIn('EURUSD', tickers, msg="EURUSD missing from retrieved tickers")
+
+        # Verify ticker format (should be uppercase and at least 6 chars)
+        for ticker in tickers[:10]:  # Check first 10 for performance
+            self.assertTrue(ticker.isupper(), msg=f"Ticker {ticker} is not uppercase")
+            self.assertGreaterEqual(len(ticker), 6, msg=f"Ticker {ticker} is too short")
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -439,7 +439,7 @@ class HistoricalManagerDB:
                     logger.trace(f'ticker {ticker}: {tf} timeframe completing operation successful')
 
             else:
-                logger.trace(f'ticker {ticker}: {tf} timeframe already complete')
+                logger.trace(f'ticker {ticker}: no complete timeframe found')
 
     def _update_db(self) -> None:
 
@@ -977,6 +977,12 @@ class HistoricalManagerDB:
                  start,
                  end,
                  add_timeframe: bool = True) -> Union[polars_dataframe, polars_lazyframe]:
+
+        # check ticker exists in available tickers 
+        # from histdata database
+        if ticker not in get_histdata_tickers():
+            logger.error(f'ticker {ticker} not found in database')
+            raise TickerNotFoundError(f'ticker {ticker} not found in database')
 
         # force ticker parameter to lower case
         ticker = ticker.lower()
