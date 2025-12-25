@@ -264,7 +264,9 @@ class HistoricalManagerDB:
                                              None)
 
             else:
-                logger.trace(f'config {kwargs["config"]} is empty, using default configuration')
+                logger.trace(
+                    f'config {
+                        kwargs["config"]} is empty, using default configuration')
 
         else:
 
@@ -356,7 +358,9 @@ class HistoricalManagerDB:
                                f'{str(self._temporary_data_path)} not successfull: {e}')
 
         else:
-            logger.trace(f'Temporary data folder {self._temporary_data_path} does not exist')
+            logger.trace(
+                f'Temporary data folder {
+                    self._temporary_data_path} does not exist')
 
     def _get_ticker_list(self) -> List[str]:
 
@@ -364,14 +368,20 @@ class HistoricalManagerDB:
 
         return self._db_connector.get_tickers_list()
 
-    def _get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
+    def _get_ticker_keys(
+            self,
+            ticker: str,
+            timeframe: Optional[str] = None) -> List[str]:
 
         # return list of ticker keys elements as str
 
         return self._db_connector.get_ticker_keys(ticker,
                                                   timeframe=timeframe)
 
-    def _get_ticker_years_list(self, ticker: str, timeframe: str = TICK_TIMEFRAME) -> List[int]:
+    def _get_ticker_years_list(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> List[int]:
 
         # return list of ticker years covered in data elements as str
         # if timeframe is None means years in data in tick or 1m timeframe
@@ -436,7 +446,8 @@ class HistoricalManagerDB:
                     raise KeyError
 
                 else:
-                    logger.trace(f'ticker {ticker}: {tf} timeframe completing operation successful')
+                    logger.trace(
+                        f'ticker {ticker}: {tf} timeframe completing operation successful')
 
             else:
                 logger.trace(f'ticker {ticker}: no complete timeframe found')
@@ -484,7 +495,8 @@ class HistoricalManagerDB:
 
         # If exception was caught, token will still be None
         if token is None:
-            raise TickerNotFoundError(f"Ticker {ticker} not found or not supported by histdata.com")
+            raise TickerNotFoundError(
+                f"Ticker {ticker} not found or not supported by histdata.com")
 
         ''' Alternative: using BeautifulSoup parser
         r = session.get(url, allow_redirects=True)
@@ -531,7 +543,8 @@ class HistoricalManagerDB:
 
             # here will be a warning log
             logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: {e}')
-            raise TickerDataBadTypeException(f"Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}")
+            raise TickerDataBadTypeException(
+                f"Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}")
 
         else:
 
@@ -541,7 +554,8 @@ class HistoricalManagerDB:
             except Exception as e:
                 logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
                              f'not found or invalid download: {e}')
-                raise TickerDataNotFoundError(f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
+                raise TickerDataNotFoundError(
+                    f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
 
             else:
                 if isinstance(ExtFile, ZipExtFile):
@@ -549,11 +563,10 @@ class HistoricalManagerDB:
                 else:
                     logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
                                  f'data type not expected')
-                    raise TickerDataBadTypeException(f"Data {ticker} - {year} - {MONTHS[month_num - 1]} type not expected")
+                    raise TickerDataBadTypeException(
+                        f"Data {ticker} - {year} - {MONTHS[month_num - 1]} type not expected")
 
-    def _raw_zipfile_to_df(self,
-                           raw_file,
-                           temp_filepath,
+    def _raw_zipfile_to_df(self, raw_file, temp_filepath,
                            engine='polars') -> Union[polars_dataframe, polars_lazyframe]:
         """
 
@@ -842,8 +855,11 @@ class HistoricalManagerDB:
 
     def _download_year(self,
                        ticker,
-                       year
-                       ) -> Union[polars_dataframe, polars_lazyframe, pandas_dataframe, Table, None]:
+                       year) -> Union[polars_dataframe,
+                                      polars_lazyframe,
+                                      pandas_dataframe,
+                                      Table,
+                                      None]:
 
         year_tick_df = empty_dataframe(self.engine)
 
@@ -885,8 +901,10 @@ class HistoricalManagerDB:
 
             else:
 
-                logger.critical(f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} data not found or invalid")
-                raise TickerDataInvalidException(f"Ticker {ticker} - {year} - {MONTHS[month_num - 1]} data not found or invalid: generic error")
+                logger.critical(
+                    f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} data not found or invalid")
+                raise TickerDataInvalidException(
+                    f"Ticker {ticker} - {year} - {MONTHS[month_num - 1]} data not found or invalid: generic error")
 
         return sort_dataframe(year_tick_df,
                               BASE_DATA_COLUMN_NAME.TIMESTAMP)
@@ -934,7 +952,8 @@ class HistoricalManagerDB:
                 self._db_connector.write_data(tick_key,
                                               year_tick_df)
             else:
-                logger.warning(f'Year tick dataframe for {tick_key} is empty, skipping database write')
+                logger.warning(
+                    f'Year tick dataframe for {tick_key} is empty, skipping database write')
 
         # update manager database
         self._update_db()
@@ -946,27 +965,27 @@ class HistoricalManagerDB:
     def add_timeframe(self, timeframe: str) -> None:
         """
         Add and cache a new timeframe to the database.
-        
+
         Creates aggregated data for the specified timeframe from tick data and
         caches it in the database for faster future access. The timeframe is
         added to the internal list of available timeframes.
-        
+
         Args:
             timeframe (str | List[str]): Timeframe(s) to add. Can be a single string
                 or list of strings. Supported values: '1m', '5m', '15m', '30m',
                 '1h', '4h', '1D', '1W', '1M'
-        
+
         Returns:
             None
-        
+
         Raises:
             TypeError: If timeframe is not a string or list of strings
-        
+
         Example:
             >>> manager = HistoricalManagerDB(config='data_config.yaml')
             >>> manager.add_timeframe('1W')  # Add weekly timeframe
             >>> manager.add_timeframe(['4h', '1D'])  # Add multiple timeframes
-        
+
         Note:
             - Only new timeframes (not already in the list) will be processed
             - Aggregation can take time for large datasets
@@ -999,19 +1018,15 @@ class HistoricalManagerDB:
             self._tf_list.extend(set(tf_list).difference(self._tf_list))
             self._update_db()
 
-    def get_data(self,
-                 ticker,
-                 timeframe,
-                 start,
-                 end,
+    def get_data(self, ticker, timeframe, start, end,
                  add_timeframe: bool = True) -> Union[polars_dataframe, polars_lazyframe]:
         """
         Retrieve OHLC historical data for the specified ticker and timeframe.
-        
+
         Fetches historical forex data from the database, automatically downloading
         and aggregating data if not already available. Supports multiple timeframes
         and date ranges.
-        
+
         Args:
             ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'NZDUSD').
                 Case-insensitive.
@@ -1024,7 +1039,7 @@ class HistoricalManagerDB:
                 Must be after start date.
             add_timeframe (bool, optional): If True, automatically creates and caches
                 the requested timeframe if it doesn't exist. Default is True.
-        
+
         Returns:
             polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:
                 - timestamp: datetime column with candle timestamps
@@ -1032,11 +1047,11 @@ class HistoricalManagerDB:
                 - high: Highest price (float32)
                 - low: Lowest price (float32)
                 - close: Closing price (float32)
-        
+
         Raises:
             TickerNotFoundError: If the ticker is not available in the historical database
             ValueError: If timeframe is invalid or end date is before start date
-        
+
         Example:
             >>> manager = HistoricalManagerDB(config='data_config.yaml')
             >>> data = manager.get_data(
@@ -1047,7 +1062,7 @@ class HistoricalManagerDB:
             ... )
             >>> print(f"Retrieved {len(data)} hourly candles")
             Retrieved 744 hourly candles
-        
+
         Note:
             - Data is automatically downloaded from histdata.com if not cached locally
             - First call for a new timeframe may take longer as it builds the aggregation
@@ -1129,7 +1144,8 @@ class HistoricalManagerDB:
                 raise ValueError
 
             else:
-                logger.trace(f'Year data completion for {years_interval_req} successful')
+                logger.trace(
+                    f'Year data completion for {years_interval_req} successful')
 
         # at this point all data requested have been aggregated to the database
 
@@ -1152,19 +1168,19 @@ class HistoricalManagerDB:
              ) -> None:
         """
     Plot candlestick chart for the specified ticker and date range.
-    
+
     Generates an interactive candlestick chart using mplfinance, displaying
     OHLC (Open, High, Low, Close) data for the specified time period.
-    
+
     Args:
         ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD')
         timeframe (str): Candle timeframe (e.g., '1m', '5m', '1h', '1D', '1W')
         start_date (str): Start date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
         end_date (str): End date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
-    
+
     Returns:
         None: Displays the chart using matplotlib
-    
+
     Example:
         >>> manager = HistoricalManagerDB(config='data_config.yaml')
         >>> manager.plot(
@@ -1173,7 +1189,7 @@ class HistoricalManagerDB:
         ...     start_date='2020-01-01',
         ...     end_date='2020-12-31'
         ... )
-    
+
     Note:
         The chart will be displayed in a matplotlib window. The data is automatically
         fetched using get_data() and converted to the appropriate format for plotting.
@@ -1201,7 +1217,9 @@ class HistoricalManagerDB:
             chart_data.index = to_datetime(chart_data.index)
 
         else:
-            logger.trace(f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
+            logger.trace(
+                f'Chart data already has {
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
 
         # candlestick chart type
         # use mplfinance
