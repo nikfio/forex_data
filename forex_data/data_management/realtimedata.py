@@ -411,9 +411,11 @@ class RealtimeManager:
             # compose URL for tickers listing request
             # decode content
             with self._session as s:  # type: ignore[attr-defined]
-                listing_downloaded = s.get(AV_LIST_URL.format(api_key=self._av_api_key))  # type: ignore[attr-defined]
+                listing_downloaded = s.get(AV_LIST_URL.format(
+                    api_key=self._av_api_key))  # type: ignore[attr-defined]
                 decoded_content = listing_downloaded.content.decode('utf-8')
-                tickers_df = pandas_read_csv(StringIO(decoded_content), sep=',', header=0)
+                tickers_df = pandas_read_csv(
+                    StringIO(decoded_content), sep=',', header=0)
 
             if asset_class:
 
@@ -476,10 +478,10 @@ class RealtimeManager:
                         ) -> Any:
         """
         Retrieve daily OHLC data for the specified ticker.
-        
+
         Fetches daily forex data from Alpha Vantage API. Supports three modes of operation:
         last close only, recent N days window, or specific date range.
-        
+
         Args:
             ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'USDJPY').
                 Case-insensitive.
@@ -491,7 +493,7 @@ class RealtimeManager:
                 Used with day_end to specify exact date range. Default is None.
             day_end (str, optional): End date for data retrieval in 'YYYY-MM-DD' format.
                 Used with day_start to specify exact date range. Default is None.
-        
+
         Returns:
             polars.DataFrame | polars.LazyFrame: DataFrame containing daily OHLC data with columns:
                 - timestamp: datetime column with daily timestamps
@@ -500,27 +502,27 @@ class RealtimeManager:
                 - low: Lowest price (float32)
                 - close: Closing price (float32)
                 Returns empty DataFrame if API call fails.
-        
+
         Raises:
             AssertionError: If recent_days_window is not an integer when provided
             BadResponse: If Alpha Vantage API request fails (handled internally)
-        
+
         Example:
             >>> manager = RealtimeManager(config='data_config.yaml')
-            >>> 
+            >>>
             >>> # Get last close only
             >>> latest = manager.get_daily_close(ticker='EURUSD', last_close=True)
-            >>> 
+            >>>
             >>> # Get last 10 days
             >>> recent = manager.get_daily_close(ticker='EURUSD', recent_days_window=10)
-            >>> 
+            >>>
             >>> # Get specific date range
             >>> range_data = manager.get_daily_close(
             ...     ticker='EURUSD',
             ...     day_start='2024-01-01',
             ...     day_end='2024-01-31'
             ... )
-        
+
         Note:
             - Requires valid Alpha Vantage API key in configuration
             - Free tier has 25 requests per day limit
@@ -893,10 +895,10 @@ class RealtimeManager:
                  ) -> Union[polars_lazyframe, polars_dataframe]:
         """
         Retrieve real-time OHLC data for the specified ticker and timeframe.
-        
+
         Fetches intraday forex data from Polygon.io API for the specified date range
         and timeframe. Data is automatically reframed to the requested timeframe.
-        
+
         Args:
             ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'USDJPY').
                 Case-insensitive.
@@ -909,7 +911,7 @@ class RealtimeManager:
             timeframe (str, optional): Target timeframe for aggregation. If specified,
                 minute data will be reframed to this timeframe (e.g., '5m', '1h', '1D').
                 Default is None (returns minute data).
-        
+
         Returns:
             polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:
                 - timestamp: datetime column with candle timestamps
@@ -918,10 +920,10 @@ class RealtimeManager:
                 - low: Lowest price (float32)
                 - close: Closing price (float32)
                 Returns empty DataFrame if API call fails.
-        
+
         Raises:
             BadResponse: If Polygon.io API request fails (handled internally, returns empty DataFrame)
-        
+
         Example:
             >>> manager = RealtimeManager(config='data_config.yaml')
             >>> # Get hourly data for 5 days
@@ -933,7 +935,7 @@ class RealtimeManager:
             ... )
             >>> print(f"Retrieved {len(data)} hourly candles")
             Retrieved 120 hourly candles
-        
+
         Note:
             - Requires valid Polygon.io API key in configuration
             - Free tier has rate limits  and historical data restrictions

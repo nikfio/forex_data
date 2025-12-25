@@ -53,3 +53,7 @@ workflows:
   unit-tests:
     jobs:
       - py312
+        filters:
+          branches:
+            only:
+              - master
