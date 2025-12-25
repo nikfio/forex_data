@@ -474,6 +474,60 @@ class RealtimeManager:
                         day_start=None,
                         day_end=None,
                         ) -> Any:
+        """
+        Retrieve daily OHLC data for the specified ticker.
+        
+        Fetches daily forex data from Alpha Vantage API. Supports three modes of operation:
+        last close only, recent N days window, or specific date range.
+        
+        Args:
+            ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'USDJPY').
+                Case-insensitive.
+            last_close (bool, optional): If True, returns only the most recent daily close.
+                Default is False.
+            recent_days_window (int, optional): Number of recent days to retrieve.
+                Mutually exclusive with day_start/day_end. Default is None.
+            day_start (str, optional): Start date for data retrieval in 'YYYY-MM-DD' format.
+                Used with day_end to specify exact date range. Default is None.
+            day_end (str, optional): End date for data retrieval in 'YYYY-MM-DD' format.
+                Used with day_start to specify exact date range. Default is None.
+        
+        Returns:
+            polars.DataFrame | polars.LazyFrame: DataFrame containing daily OHLC data with columns:
+                - timestamp: datetime column with daily timestamps
+                - open: Opening price (float32)
+                - high: Highest price (float32)
+                - low: Lowest price (float32)
+                - close: Closing price (float32)
+                Returns empty DataFrame if API call fails.
+        
+        Raises:
+            AssertionError: If recent_days_window is not an integer when provided
+            BadResponse: If Alpha Vantage API request fails (handled internally)
+        
+        Example:
+            >>> manager = RealtimeManager(config='data_config.yaml')
+            >>> 
+            >>> # Get last close only
+            >>> latest = manager.get_daily_close(ticker='EURUSD', last_close=True)
+            >>> 
+            >>> # Get last 10 days
+            >>> recent = manager.get_daily_close(ticker='EURUSD', recent_days_window=10)
+            >>> 
+            >>> # Get specific date range
+            >>> range_data = manager.get_daily_close(
+            ...     ticker='EURUSD',
+            ...     day_start='2024-01-01',
+            ...     day_end='2024-01-31'
+            ... )
+        
+        Note:
+            - Requires valid Alpha Vantage API key in configuration
+            - Free tier has 25 requests per day limit
+            - outputsize='compact' returns ~100 most recent data points
+            - outputsize='full' can return several years of data
+            - Use last_close=True for minimal data transfer
+        """
 
         to_symbol, from_symbol = get_pair_symbols(ticker.upper())
 
@@ -838,27 +892,53 @@ class RealtimeManager:
                  timeframe=None,
                  ) -> Union[polars_lazyframe, polars_dataframe]:
         """
-
-
-        Parameters
-        ----------
-        start : TYPE, optional
-        DESCRIPTION. The default is None.
-        end : TYPE, optional
-        DESCRIPTION. The default is None.
-        timeframe : TYPE, optional
-        DESCRIPTION. The default is None.
-
-        Raises
-        ------
-        ValueError
-        DESCRIPTION.
-
-        Returns
-        -------
-        TYPE
-        DESCRIPTION.
-
+        Retrieve real-time OHLC data for the specified ticker and timeframe.
+        
+        Fetches intraday forex data from Polygon.io API for the specified date range
+        and timeframe. Data is automatically reframed to the requested timeframe.
+        
+        Args:
+            ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'USDJPY').
+                Case-insensitive.
+            start (str | datetime, optional): Start date for data retrieval. Accepts:
+                - ISO format: 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+                - datetime object
+                Default is None.
+            end (str | datetime, optional): End date for data retrieval. Same format
+                as start. Must be after start date. Default is None.
+            timeframe (str, optional): Target timeframe for aggregation. If specified,
+                minute data will be reframed to this timeframe (e.g., '5m', '1h', '1D').
+                Default is None (returns minute data).
+        
+        Returns:
+            polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:
+                - timestamp: datetime column with candle timestamps
+                - open: Opening price (float32)
+                - high: Highest price (float32)
+                - low: Lowest price (float32)
+                - close: Closing price (float32)
+                Returns empty DataFrame if API call fails.
+        
+        Raises:
+            BadResponse: If Polygon.io API request fails (handled internally, returns empty DataFrame)
+        
+        Example:
+            >>> manager = RealtimeManager(config='data_config.yaml')
+            >>> # Get hourly data for 5 days
+            >>> data = manager.get_data(
+            ...     ticker='EURUSD',
+            ...     start='2024-01-10',
+            ...     end='2024-01-15',
+            ...     timeframe='1h'
+            ... )
+            >>> print(f"Retrieved {len(data)} hourly candles")
+            Retrieved 120 hourly candles
+        
+        Note:
+            - Requires valid Polygon.io API key in configuration
+            - Free tier has rate limits  and historical data restrictions
+            - Data is fetched at 1-minute resolution and aggregated to requested timeframe
+            - Failed requests return an empty DataFrame with a warning logged
         """
 
         start = any_date_to_datetime64(start)

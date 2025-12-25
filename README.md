@@ -22,8 +22,6 @@ On the contrary, it can provide a ton of history data, tipically from the first 
 
 A perfect data source of this type is [histdata.com](http://www.histdata.com/), which work is really genuine and a lot appreciated.
 
-We could see them as a model, maybe in the future a similar source can be found: that is why for generalization purpose this type of source is called *historical source*.
-
 Summarizing, a historical source can provide tons of data even from many years ago and with no limits at the downside of a slow update rate. For example, *histdata* updates data on a montly basis.
 
 ### REAL-TIME SOURCE
@@ -81,9 +79,7 @@ poetry run pytest
 A configuration file can be passed in order to group fixed parameters values.
 In repository folder clone, look for [appconfig folder](appconfig) to see the [example template file](appconfig/appconfig_template.yaml).
 
-At any run, the package looks for a file called `appconfig.yaml` and associates it to a variable called `APPCONFIG_FILE_YAML` so that it is simpler to use a default config file in package modules calls.
-
-In data managers instantiation, you can pass the configuration file but any parameter value can be overridden by explicit assignment in object instantion.
+In data managers instantiation, you can pass the YAML configuration file ending with `data_config.yaml` but any parameter value can be overridden by explicit assignment in object instantion.
 The feature will be more clear following the [examples section](#examples).
 
 #### ENGINE
@@ -103,18 +99,6 @@ Available options:
 
 *parquet* filetype is strongly suggested for read/write speed and disk space occupation.
 Meanwhile, if you have any analysis application outside the Python environment, it would more likely accept csv files over parquet: so *csv* filetype could be a better choice for its broader acceptance.
-
-#### DATA_PATH
-
-The location where data downloaded or data reframed are cached.
-Here you can pass a absolute folder path where the package will dump data downloaded with files type as assigned by the `DATA_FILETYPE` parameter.
-
-The default locations used are:
-* Historical source data cache path : `~/.database/HistoricalData`
-* Real-time source data cache path : `~/.database/RealtimeData`
-
-where `~` stands for the current user home folder location.
-Beware that data caching is implemented for historical sources, next developments will cover also real-time sources data.
 
 #### PROVIDERS_KEY
 
@@ -138,71 +122,96 @@ Here log is dumped in a file called `forexdata.log`, the complete location of th
 
 ## EXAMPLES
 
-in [test folder](test) you can find examples showing the various modules or functionalities the package offers.
+You can find complete working examples in the [examples folder](examples/) showing the various modules and functionalities the package offers.
+
+To run the examples:
+
+```bash
+# Historical data example
+poetry run python examples/histdata_db_manager.py
+
+# Real-time data example (requires API keys as environment variables)
+export ALPHA_VANTAGE_API_KEY="your_key_here"
+export POLYGON_IO_API_KEY="your_key_here"
+poetry run python examples/realtime_data_manager.py
+```
 
 #### Historical data 
 
-Let's walk through the [example for historical data source](test/test_hist_data_manager.py):
+Let's walk through the [example for historical data source](examples/histdata_db_manager.py):
 
-1. **data manager instance** 
-    ```                            
-    histmanager = historical_manager_db(
-                    ticker='NZDUSD',
-                    config_file=APPCONFIG_FILE_YAML
-    )
+1. **Configuration setup**
+    ```python
+    # Use a runtime defined config yaml file
+    test_config_yaml = '''
+    DATA_FILETYPE: 'parquet'
+    
+    ENGINE: 'polars_lazy'
+    '''
     ```
-    as mentioned in section [configuration](#configuration-file), you can see the feature of overriding the parameter `ticker` by direct assignment in object instantiation, meanwhile the remaining parameters value are assigned by the configuration file.
+    You can define configuration inline or use a file. The configuration can override specific settings.
 <br>
 
-2. **get data**
-    ```
-    yeardata = histmanager.get_data(timeframe = '1h',
-                                    start     = ex_start_date,
-                                    end       = ex_end_date
+2. **Data manager instance** 
+    ```python
+    from forex_data import HistoricalManagerDB
+    
+    histmanager = HistoricalManagerDB(
+        config=test_config_yaml
     )
     ```
-    the call returns a dataframe with data having timeframe, start and end specified by inputs assignment.
-    The output data type is of type related to the engine selected.
+    Create an instance of the historical data manager with your configuration.
+<br>
 
-    With `polars` as DATA_ENGINE option, the output dataframe logs
+3. **Get data**
+    ```python
+    ex_ticker = 'EURUSD'
+    ex_timeframe = '1d'
+    ex_start_date = '2018-10-03 10:00:00'
+    ex_end_date = '2018-12-03 10:00:00'
+    
+    yeardata = histmanager.get_data(
+        ticker=ex_ticker,
+        timeframe=ex_timeframe,
+        start=ex_start_date,
+        end=ex_end_date
+    )
+    ```
+    The call returns a dataframe with data having the timeframe, start, and end specified by the inputs.
+    The output dataframe type depends on the engine selected (polars_lazy, polars, pandas, pyarrow).
+
+    With `polars_lazy` as ENGINE option, the output dataframe:
     ```
     ┌─────────────────────┬─────────┬─────────┬─────────┬─────────┐
     │ timestamp           ┆ open    ┆ high    ┆ low     ┆ close   │
     │ ---                 ┆ ---     ┆ ---     ┆ ---     ┆ ---     │
     │ datetime[ms]        ┆ f32     ┆ f32     ┆ f32     ┆ f32     │
     ╞═════════════════════╪═════════╪═════════╪═════════╪═════════╡
-    │ 2009-10-04 17:00:00 ┆ 0.7172  ┆ 0.71735 ┆ 0.7165  ┆ 0.71665 │
-    │ 2009-10-04 18:00:00 ┆ 0.71655 ┆ 0.7168  ┆ 0.71555 ┆ 0.71635 │
-    │ 2009-10-04 19:00:00 ┆ 0.7164  ┆ 0.71665 ┆ 0.71385 ┆ 0.71445 │
-    │ 2009-10-04 20:00:00 ┆ 0.7144  ┆ 0.7191  ┆ 0.71435 ┆ 0.71795 │
-    │ 2009-10-04 21:00:00 ┆ 0.718   ┆ 0.72165 ┆ 0.71795 ┆ 0.72115 │
-    │ …                   ┆ …       ┆ …       ┆ …       ┆ …       │
-    │ 2009-12-03 06:00:00 ┆ 0.7248  ┆ 0.7256  ┆ 0.72435 ┆ 0.7247  │
-    │ 2009-12-03 07:00:00 ┆ 0.72465 ┆ 0.72515 ┆ 0.72395 ┆ 0.725   │
-    │ 2009-12-03 08:00:00 ┆ 0.72505 ┆ 0.72505 ┆ 0.7217  ┆ 0.7224  │
-    │ 2009-12-03 09:00:00 ┆ 0.7225  ┆ 0.7241  ┆ 0.7214  ┆ 0.7225  │
-    │ 2009-12-03 10:00:00 ┆ 0.72245 ┆ 0.72285 ┆ 0.7212  ┆ 0.72235 │
+    │ 2018-10-03 21:00:00 ┆ 1.1523  ┆ 1.1528  ┆ 1.1512  ┆ 1.1516  │
+    │ 2018-10-04 21:00:00 ┆ 1.1516  ┆ 1.1539  ┆ 1.1485  ┆ 1.1498  │
+    │ 2018-10-05 21:00:00 ┆ 1.1498  ┆ 1.1534  ┆ 1.1486  ┆ 1.1514  │
+    │ ...                 ┆ ...     ┆ ...     ┆ ...     ┆ ...     │
     └─────────────────────┴─────────┴─────────┴─────────┴─────────┘
     ```
 <br>
 
-3. **add a timeframe**
-    ```
+4. **Add a timeframe**
+    ```python
     histmanager.add_timeframe('1W')
     ```
-    here a new timeframe is appended to existing ones.
-    By default, the data manager creates and if not present dumps new timeframe data in its data path.
-    Otherwise, the new timeframe is just appended to the instance internal list.
+    Add a new timeframe. The data manager will create and cache the new timeframe data if not already present.
 <br>
 
-4. **plot data**
-    ```
-     histmanager.plot( timeframe   = '1D',
-                      start_date  = '2013-02-02 18:00:00',
-                      end_date    = '2013-06-23 23:00:00'
+5. **Plot data**
+    ```python
+    histmanager.plot(
+        ticker=ex_ticker,
+        timeframe='1D',
+        start_date='2016-02-02 18:00:00',
+        end_date='2016-06-23 23:00:00'
     )
     ```
-    It performs a get_data function explained in point (2) and generates a classic candles chart
+    Generate a candlestick chart for the specified ticker and date range.
 
 <br>
 
@@ -212,73 +221,88 @@ Let's walk through the [example for historical data source](test/test_hist_data_
 
 #### Real-Time data
 
-Let's walk through the [example for real-time data source](test/test_realtime_data_manager.py), outputs are with `polars` as DATA_ENGINE:
+Let's walk through the [example for real-time data source](examples/realtime_data_manager.py):
 
-1. **data manager instance**
+**Important:** This example requires API keys set as environment variables:
+```bash
+export ALPHA_VANTAGE_API_KEY="your_alphavantage_key"
+export POLYGON_IO_API_KEY="your_polygon_io_key"
+```
+
+1. **Configuration with API keys**
+    ```python
+    from os import getenv
+    
+    alpha_vantage_key = getenv('ALPHA_VANTAGE_API_KEY')
+    polygon_io_key = getenv('POLYGON_IO_API_KEY')
+    
+    test_config_yaml = f'''
+    DATA_FILETYPE: 'parquet'
+    
+    ENGINE: 'polars_lazy'
+    
+    PROVIDERS_KEY:
+        ALPHA_VANTAGE_API_KEY : {alpha_vantage_key},
+        POLYGON_IO_API_KEY    : {polygon_io_key}
+    '''
     ```
-    realtimedata_manager = realtime_manager(
-                            ticker = 'NZDUSD',
-                            config_file = APPCONFIG_FILE_YAML
+    Configuration includes API keys for real-time data providers.
+<br>
+
+2. **Data manager instance**
+    ```python
+    from forex_data import RealtimeManager
+    
+    realtimedata_manager = RealtimeManager(
+        config=test_config_yaml
     )
     ```
-2. **get last daily close**
-    ```
-    # input test request definition
-    test_day_start   = '2024-03-10'
-    test_day_end     = '2024-03-26'
-    test_n_days      = 10
-    dayclose_quote = realtimedata_manager.get_daily_close(last_close=True)
+<br>
 
-    logger.trace(f'Real time daily close quote {dayclose_quote}')
+3. **Get last daily close**
+    ```python
+    ex_ticker = 'EURCAD'
+    
+    dayclose_quote = realtimedata_manager.get_daily_close(
+        ticker=ex_ticker,
+        last_close=True
+    )
     ```
     
     Output:
     ```
-    Real time daily close quote shape: (1, 5)
     ┌─────────────────────┬─────────┬─────────┬─────────┬────────┐
     │ timestamp           ┆ open    ┆ high    ┆ low     ┆ close  │
     │ ---                 ┆ ---     ┆ ---     ┆ ---     ┆ ---    │
     │ datetime[ms]        ┆ f32     ┆ f32     ┆ f32     ┆ f32    │
     ╞═════════════════════╪═════════╪═════════╪═════════╪════════╡
-    │ 2024-04-19 00:00:00 ┆ 0.59022 ┆ 0.59062 ┆ 0.58516 ┆ 0.5886 │
+    │ 2025-01-23 00:00:00 ┆ 1.4123  ┆ 1.4156  ┆ 1.4098  ┆ 1.4125 │
     └─────────────────────┴─────────┴─────────┴─────────┴────────┘
     ```
-3. **get daily close price with date interval argument by querying for the last N days**
-    ```
-    window_daily_ohlc = realtimedata_manager.get_daily_close(recent_days_window=test_n_days)
 
-    logger.trace(f'Last {test_n_days} window data: {window_daily_ohlc}')
+4. **Get daily close for last N days**
+    ```python
+    ex_n_days = 13
+    
+    window_daily_ohlc = realtimedata_manager.get_daily_close(
+        ticker=ex_ticker,
+        recent_days_window=ex_n_days
+    )
     ```
+    Returns the last 13 days of daily OHLC data.
 
-    Output 
+5. **Get daily close for specific date range**
+    ```python
+    ex_start_date = '2025-01-15'
+    ex_end_date = '2025-01-23'
+    
+    window_limits_daily_ohlc = realtimedata_manager.get_daily_close(
+        ticker=ex_ticker,
+        day_start=ex_start_date,
+        day_end=ex_end_date
+    )
     ```
-    Last 10 window data: shape: (10, 5)
-    ┌─────────────────────┬────────┬────────┬────────┬────────┐
-    │ timestamp           ┆ open   ┆ high   ┆ low    ┆ close  │
-    │ ---                 ┆ ---    ┆ ---    ┆ ---    ┆ ---    │
-    │ datetime[ms]        ┆ f32    ┆ f32    ┆ f32    ┆ f32    │
-    ╞═════════════════════╪════════╪════════╪════════╪════════╡
-    │ 2024-04-19 00:00:00 ┆ 1.6935 ┆ 1.7078 ┆ 1.6932 ┆ 1.6971 │
-    │ 2024-04-18 00:00:00 ┆ 1.6894 ┆ 1.6946 ┆ 1.6853 ┆ 1.6934 │
-    │ 2024-04-17 00:00:00 ┆ 1.6999 ┆ 1.7012 ┆ 1.6873 ┆ 1.6897 │
-    │ 2024-04-16 00:00:00 ┆ 1.6928 ┆ 1.7033 ┆ 1.6926 ┆ 1.7    │
-    │ 2024-04-15 00:00:00 ┆ 1.6831 ┆ 1.6947 ┆ 1.6792 ┆ 1.6933 │
-    │ 2024-04-12 00:00:00 ┆ 1.6668 ┆ 1.6846 ┆ 1.6635 ┆ 1.684  │
-    │ 2024-04-11 00:00:00 ┆ 1.6731 ┆ 1.6746 ┆ 1.6624 ┆ 1.6667 │
-    │ 2024-04-10 00:00:00 ┆ 1.6498 ┆ 1.6754 ┆ 1.6437 ┆ 1.6729 │
-    │ 2024-04-09 00:00:00 ┆ 1.657  ┆ 1.6573 ┆ 1.6455 ┆ 1.65   │
-    │ 2024-04-08 00:00:00 ┆ 1.6639 ┆ 1.6658 ┆ 1.6555 ┆ 1.6576 │
-    └─────────────────────┴────────┴────────┴────────┴────────┘
-    ```
-4. **get daily close price with date interval argument by querying start and end date**
-    ```
-     window_limits_daily_ohlc = realtimedata_manager.get_daily_close(day_start=test_day_start,
-      day_end=test_day_end)
-
-    logger.trace(f'From {test_day_start} to {test_day_end} ' 
-                 f'window data: {window_limits_daily_ohlc}')
-    ```
-
+    
     Output:
     ```
     ┌─────────────────────┬────────┬────────┬────────┬────────┐
@@ -286,32 +310,27 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
     │ ---                 ┆ ---    ┆ ---    ┆ ---    ┆ ---    │
     │ datetime[ms]        ┆ f32    ┆ f32    ┆ f32    ┆ f32    │
     ╞═════════════════════╪════════╪════════╪════════╪════════╡
-    │ 2024-03-26 00:00:00 ┆ 1.6651 ┆ 1.6672 ┆ 1.6578 ┆ 1.6647 │
-    │ 2024-03-25 00:00:00 ┆ 1.6679 ┆ 1.6698 ┆ 1.6627 ┆ 1.665  │
-    │ 2024-03-22 00:00:00 ┆ 1.6542 ┆ 1.669  ┆ 1.652  ┆ 1.6681 │
-    │ 2024-03-21 00:00:00 ┆ 1.6474 ┆ 1.6554 ┆ 1.6372 ┆ 1.6539 │
-    │ 2024-03-20 00:00:00 ┆ 1.6519 ┆ 1.6591 ┆ 1.643  ┆ 1.6479 │
-    │ …                   ┆ …      ┆ …      ┆ …      ┆ …      │
-    │ 2024-03-15 00:00:00 ┆ 1.6306 ┆ 1.6439 ┆ 1.6306 ┆ 1.6437 │
-    │ 2024-03-14 00:00:00 ┆ 1.6229 ┆ 1.6329 ┆ 1.619  ┆ 1.6308 │
-    │ 2024-03-13 00:00:00 ┆ 1.6252 ┆ 1.6267 ┆ 1.6203 ┆ 1.6236 │
-    │ 2024-03-12 00:00:00 ┆ 1.6203 ┆ 1.6291 ┆ 1.617  ┆ 1.6256 │
-    │ 2024-03-11 00:00:00 ┆ 1.6183 ┆ 1.6224 ┆ 1.617  ┆ 1.6205 │
+    │ 2025-01-23 00:00:00 ┆ 1.4125 ┆ 1.4156 ┆ 1.4098 ┆ 1.4132 │
+    │ 2025-01-22 00:00:00 ┆ 1.4089 ┆ 1.4147 ┆ 1.4072 ┆ 1.4125 │
+    │ 2025-01-21 00:00:00 ┆ 1.4112 ┆ 1.4134 ┆ 1.4063 ┆ 1.4089 │
+    │ ...                 ┆ ...    ┆ ...    ┆ ...    ┆ ...    │
     └─────────────────────┴────────┴────────┴────────┴────────┘
     ```
-5. **get OHLC data with timeframe specific by querying start and end date interval**
-    ```
-    # input test request definition
-    test_day_start   = '2024-04-10'
-    test_day_end     = '2024-04-15'
-    test_timeframe   = '1h'
-    window_data_ohlc =  realtimedata_manager.get_data(  start     = test_day_start,
-                                                        end       = test_day_end,
-                                                        timeframe = test_timeframe)
 
-    logger.trace(f'Real time {test_timeframe} window data: {window_data_ohlc}')
+6. **Get OHLC data with custom timeframe**
+    ```python
+    ex_start_date = '2024-04-10'
+    ex_end_date = '2024-04-15'
+    ex_timeframe = '1h'
+    
+    window_data_ohlc = realtimedata_manager.get_data(
+        ticker=ex_ticker,
+        start=ex_start_date,
+        end=ex_end_date,
+        timeframe=ex_timeframe
+    )
     ```
-
+    
     Output:
     ```
     Real time 1h window data: shape: (72, 5)
@@ -320,19 +339,30 @@ Let's walk through the [example for real-time data source](test/test_realtime_da
     │ ---                 ┆ ---     ┆ ---     ┆ ---     ┆ ---     │
     │ datetime[ms]        ┆ f32     ┆ f32     ┆ f32     ┆ f32     │
     ╞═════════════════════╪═════════╪═════════╪═════════╪═════════╡
-    │ 2024-04-10 00:00:00 ┆ 0.60648 ┆ 0.6068  ┆ 0.6057  ┆ 0.606   │
-    │ 2024-04-10 01:00:00 ┆ 0.60615 ┆ 0.60636 ┆ 0.6053  ┆ 0.60555 │
-    │ 2024-04-10 02:00:00 ┆ 0.60554 ┆ 0.60772 ┆ 0.60344 ┆ 0.60707 │
-    │ 2024-04-10 03:00:00 ┆ 0.60705 ┆ 0.60757 ┆ 0.6067  ┆ 0.60736 │
-    │ 2024-04-10 04:00:00 ┆ 0.60737 ┆ 0.60762 ┆ 0.607   ┆ 0.60733 │
-    │ …                   ┆ …       ┆ …       ┆ …       ┆ …       │
-    │ 2024-04-12 20:00:00 ┆ 0.59352 ┆ 0.59374 ┆ 0.58252 ┆ 0.58252 │
-    │ 2024-04-12 21:00:00 ┆ 0.54007 ┆ 0.5947  ┆ 0.54007 ┆ 0.594   │
-    │ 2024-04-14 22:00:00 ┆ 0.59376 ┆ 0.59466 ┆ 0.59357 ┆ 0.59434 │
-    │ 2024-04-14 23:00:00 ┆ 0.59439 ┆ 0.59493 ┆ 0.59378 ┆ 0.5941  │
-    │ 2024-04-15 00:00:00 ┆ 0.59438 ┆ 0.59457 ┆ 0.5941  ┆ 0.59445 │
+    │ 2024-04-10 00:00:00 ┆ 1.4765  ┆ 1.4768  ┆ 1.4752  ┆ 1.4761  │
+    │ 2024-04-10 01:00:00 ┆ 1.4761  ┆ 1.4768  ┆ 1.4755  ┆ 1.4762  │
+    │ 2024-04-10 02:00:00 ┆ 1.4762  ┆ 1.4778  ┆ 1.4751  ┆ 1.4771  │
+    │ ...                 ┆ ...     ┆ ...     ┆ ...     ┆ ...     │
     └─────────────────────┴─────────┴─────────┴─────────┴─────────┘
     ```
+
+7. **Intraday data with dynamic dates**
+    ```python
+    from pandas import Timestamp, Timedelta
+    
+    ex_start_date = Timestamp.now() - Timedelta('10D')
+    ex_end_date = Timestamp.now() - Timedelta('8D')
+    ex_timeframe = '5m'
+    
+    window_data_ohlc = realtimedata_manager.get_data(
+        ticker='EURUSD',
+        start=ex_start_date,
+        end=ex_end_date,
+        timeframe=ex_timeframe
+    )
+    ```
+    Get 5-minute data for recent days using dynamic date calculations.
+
 
 ## PYTEST and pipeline implementation
 
@@ -349,20 +379,3 @@ The battle between polars and pyarrow is still on.
 Any suggestion on why one should choose pyarrow over polars or viceversa is welcome.
 
 Or, a further data engine suggested could be taken into consideration to be integrated in the package.
-
-
-## Future developments
-
-Here is a list of elements that could power or make the package more solid:
-
-* scout for open source databases to have a persistent storage instead of simple local files in a folder
-    1. by performance evaluations prefer components that fits with polars and pyarrow, and so components or databases tightened to [Apache Arrow](https://arrow.apache.org/docs/index.html) as much as possible
-    2. use connectorx or ADBC for database driver
-    3. for databases, 
-        * here is a nice repo example by voltrondata [Arrow Flight SQL server - DuckDB / SQLite](https://github.com/voltrondata/flight-sql-server-example)
-        * PostgreSQL, quite mentioned both in polars and pyarrow API, [Polars read database](https://docs.pola.rs/py-polars/html/reference/api/polars.read_database.html) and [Pyarrow PostgreSQL Recipes](https://arrow.apache.org/adbc/0.5.1/python/recipe/postgresql.html) 
-
-* enhance charting part of the package
-
-* enhance real time data manager to have a layer uniforming calls to different remote sources: 
-    1. if a remote source API call is denied, iteratively search for another remote source type having similar API call and deliver the same results. So the final achievment is a cumulative sum of free API calls.

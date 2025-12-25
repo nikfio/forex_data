@@ -944,6 +944,34 @@ class HistoricalManagerDB:
         self._db_connector.clear_database(filter=filter)
 
     def add_timeframe(self, timeframe: str) -> None:
+        """
+        Add and cache a new timeframe to the database.
+        
+        Creates aggregated data for the specified timeframe from tick data and
+        caches it in the database for faster future access. The timeframe is
+        added to the internal list of available timeframes.
+        
+        Args:
+            timeframe (str | List[str]): Timeframe(s) to add. Can be a single string
+                or list of strings. Supported values: '1m', '5m', '15m', '30m',
+                '1h', '4h', '1D', '1W', '1M'
+        
+        Returns:
+            None
+        
+        Raises:
+            TypeError: If timeframe is not a string or list of strings
+        
+        Example:
+            >>> manager = HistoricalManagerDB(config='data_config.yaml')
+            >>> manager.add_timeframe('1W')  # Add weekly timeframe
+            >>> manager.add_timeframe(['4h', '1D'])  # Add multiple timeframes
+        
+        Note:
+            - Only new timeframes (not already in the list) will be processed
+            - Aggregation can take time for large datasets
+            - Once added, the timeframe is permanently cached in the database
+        """
 
         if not hasattr(self, '_tf_list'):
             self._tf_list = []
@@ -977,11 +1005,60 @@ class HistoricalManagerDB:
                  start,
                  end,
                  add_timeframe: bool = True) -> Union[polars_dataframe, polars_lazyframe]:
+        """
+        Retrieve OHLC historical data for the specified ticker and timeframe.
+        
+        Fetches historical forex data from the database, automatically downloading
+        and aggregating data if not already available. Supports multiple timeframes
+        and date ranges.
+        
+        Args:
+            ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'NZDUSD').
+                Case-insensitive.
+            timeframe (str): Candle timeframe for data aggregation. Supported values:
+                '1m', '5m', '15m', '30m', '1h', '4h', '1D', '1W', '1M'
+            start (str | datetime): Start date for data retrieval. Accepts:
+                - ISO format: 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+                - datetime object
+            end (str | datetime): End date for data retrieval. Same format as start.
+                Must be after start date.
+            add_timeframe (bool, optional): If True, automatically creates and caches
+                the requested timeframe if it doesn't exist. Default is True.
+        
+        Returns:
+            polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:
+                - timestamp: datetime column with candle timestamps
+                - open: Opening price (float32)
+                - high: Highest price (float32)
+                - low: Lowest price (float32)
+                - close: Closing price (float32)
+        
+        Raises:
+            TickerNotFoundError: If the ticker is not available in the historical database
+            ValueError: If timeframe is invalid or end date is before start date
+        
+        Example:
+            >>> manager = HistoricalManagerDB(config='data_config.yaml')
+            >>> data = manager.get_data(
+            ...     ticker='EURUSD',
+            ...     timeframe='1h',
+            ...     start='2020-01-01',
+            ...     end='2020-01-31'
+            ... )
+            >>> print(f"Retrieved {len(data)} hourly candles")
+            Retrieved 744 hourly candles
+        
+        Note:
+            - Data is automatically downloaded from histdata.com if not cached locally
+            - First call for a new timeframe may take longer as it builds the aggregation
+            - Downloaded data is cached for faster subsequent access
+            - Ticker names are case-insensitive and automatically normalized
+        """
 
         # check ticker exists in available tickers
         # from histdata database
         if ticker.upper() not in get_histdata_tickers():
-            logger.error(f'ticker {ticker} not found in database')
+            logger.error(f'ticker {ticker.upper()} not found in database')
             raise TickerNotFoundError(f'ticker {ticker} not found in database')
 
         # force ticker parameter to lower case
@@ -1074,11 +1151,33 @@ class HistoricalManagerDB:
              end_date
              ) -> None:
         """
-        Plot data in selected time frame and start and end date bound
-        :param date_bounds: start and end of plot
-        :param timeframe: timeframe to visualize
-        :return: void
-        """
+    Plot candlestick chart for the specified ticker and date range.
+    
+    Generates an interactive candlestick chart using mplfinance, displaying
+    OHLC (Open, High, Low, Close) data for the specified time period.
+    
+    Args:
+        ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD')
+        timeframe (str): Candle timeframe (e.g., '1m', '5m', '1h', '1D', '1W')
+        start_date (str): Start date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+        end_date (str): End date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+    
+    Returns:
+        None: Displays the chart using matplotlib
+    
+    Example:
+        >>> manager = HistoricalManagerDB(config='data_config.yaml')
+        >>> manager.plot(
+        ...     ticker='EURUSD',
+        ...     timeframe='1D',
+        ...     start_date='2020-01-01',
+        ...     end_date='2020-12-31'
+        ... )
+    
+    Note:
+        The chart will be displayed in a matplotlib window. The data is automatically
+        fetched using get_data() and converted to the appropriate format for plotting.
+    """
 
         logger.info(f'''Chart request:
                     ticker {ticker}
