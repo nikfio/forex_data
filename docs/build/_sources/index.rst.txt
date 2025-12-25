@@ -1,0 +1,18 @@
+.. forex_data documentation master file, created by
+   autogen.
+
+Welcome to forex_data's documentation!
+======================================
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   modules
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

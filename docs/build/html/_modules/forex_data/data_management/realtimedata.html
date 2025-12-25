@@ -1,0 +1,1369 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>forex_data.data_management.realtimedata &mdash; forex_data 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            forex_data
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#prerequisites">Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#installing-poetry">Installing Poetry</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#installation-steps">Installation Steps</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#clone-the-repository">1. Clone the Repository</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#install-dependencies">2. Install Dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#verify-installation">3. Verify Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#alternative-installation-methods">Alternative Installation Methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#using-pip-not-recommended">Using pip (Not Recommended)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#installation-options">Installation Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#development-installation">Development Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#minimal-installation">Minimal Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#basic-concepts">Basic Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#working-with-historical-data">Working with Historical Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#basic-usage">Basic Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#changing-timeframes">Changing Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#adding-custom-timeframes">Adding Custom Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#visualizing-data">Visualizing Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#working-with-real-time-data">Working with Real-time Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#id1">Basic Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#get-latest-close-price">Get Latest Close Price</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#get-recent-history">Get Recent History</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#get-intraday-data">Get Intraday Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#complete-example">Complete Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#data-engine-selection">Data Engine Selection</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#polars-recommended">Polars (Recommended)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#pyarrow">PyArrow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#pandas">Pandas</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#next-steps">Next Steps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#need-help">Need Help?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#configuration-file">Configuration File</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#basic-configuration-file">Basic Configuration File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#configuration-options">Configuration Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#engine">ENGINE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#data-filetype">DATA_FILETYPE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#providers-key">PROVIDERS_KEY</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../configuration.html#getting-api-keys">Getting API Keys</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#using-configuration-in-code">Using Configuration in Code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#automatic-loading">Automatic Loading</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#explicit-configuration-file">Explicit Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#overriding-configuration">Overriding Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#template-configuration-file">Template Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#multiple-configuration-files">Multiple Configuration Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#environment-variables">Environment Variables</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#configuration-best-practices">Configuration Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#example-production-configuration">Example: Production Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#configuration-not-found">Configuration Not Found</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#invalid-api-key">Invalid API Key</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#historical-data-examples">Historical Data Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-1-basic-data-retrieval">Example 1: Basic Data Retrieval</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-2-working-with-multiple-timeframes">Example 2: Working with Multiple Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-3-visualizing-historical-data">Example 3: Visualizing Historical Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-4-multi-year-analysis">Example 4: Multi-Year Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#real-time-data-examples">Real-time Data Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-5-get-latest-market-price">Example 5: Get Latest Market Price</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-6-recent-price-history">Example 6: Recent Price History</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-7-specific-date-range-real-time">Example 7: Specific Date Range (Real-time)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-8-intraday-real-time-data">Example 8: Intraday Real-time Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#combined-examples">Combined Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-9-historical-real-time-combination">Example 9: Historical + Real-time Combination</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-10-multi-currency-analysis">Example 10: Multi-Currency Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#advanced-examples">Advanced Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-11-custom-data-processing-pipeline">Example 11: Custom Data Processing Pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-12-error-handling-and-validation">Example 12: Error Handling and Validation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-13-performance-optimization">Example 13: Performance Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-14-export-to-different-formats">Example 14: Export to Different Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#testing-examples">Testing Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-15-running-the-test-suite">Example 15: Running the Test Suite</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#tips-and-best-practices">Tips and Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">forex_data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../forex_data.html">forex_data package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../forex_data.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.config.html">forex_data.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.data_management.html">forex_data.data_management package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../forex_data.html#module-forex_data">Module contents</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.read_config_file"><code class="docutils literal notranslate"><span class="pre">read_config_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.read_config_string"><code class="docutils literal notranslate"><span class="pre">read_config_string()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.read_config_folder"><code class="docutils literal notranslate"><span class="pre">read_config_folder()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.HistoricalManagerDB"><code class="docutils literal notranslate"><span class="pre">HistoricalManagerDB</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.RealtimeManager"><code class="docutils literal notranslate"><span class="pre">RealtimeManager</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.BASE_DATA_COLUMN_NAME"><code class="docutils literal notranslate"><span class="pre">BASE_DATA_COLUMN_NAME</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DATA_FILE_COLUMN_INDEX"><code class="docutils literal notranslate"><span class="pre">DATA_FILE_COLUMN_INDEX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DEFAULT_PATHS"><code class="docutils literal notranslate"><span class="pre">DEFAULT_PATHS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.empty_dataframe"><code class="docutils literal notranslate"><span class="pre">empty_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.is_empty_dataframe"><code class="docutils literal notranslate"><span class="pre">is_empty_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.shape_dataframe"><code class="docutils literal notranslate"><span class="pre">shape_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_dataframe_column"><code class="docutils literal notranslate"><span class="pre">get_dataframe_column()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_dataframe_row"><code class="docutils literal notranslate"><span class="pre">get_dataframe_row()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_dataframe_element"><code class="docutils literal notranslate"><span class="pre">get_dataframe_element()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_attrs_names"><code class="docutils literal notranslate"><span class="pre">get_attrs_names()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.any_date_to_datetime64"><code class="docutils literal notranslate"><span class="pre">any_date_to_datetime64()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_db_key_elements"><code class="docutils literal notranslate"><span class="pre">get_db_key_elements()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.check_timeframe_str"><code class="docutils literal notranslate"><span class="pre">check_timeframe_str()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DatabaseConnector"><code class="docutils literal notranslate"><span class="pre">DatabaseConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DuckDBConnector"><code class="docutils literal notranslate"><span class="pre">DuckDBConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.LocalDBConnector"><code class="docutils literal notranslate"><span class="pre">LocalDBConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.validator_list_timeframe"><code class="docutils literal notranslate"><span class="pre">validator_list_timeframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.concat_data"><code class="docutils literal notranslate"><span class="pre">concat_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.validator_dir_path"><code class="docutils literal notranslate"><span class="pre">validator_dir_path()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerNotFoundError"><code class="docutils literal notranslate"><span class="pre">TickerNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerDataNotFoundError"><code class="docutils literal notranslate"><span class="pre">TickerDataNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerDataBadTypeException"><code class="docutils literal notranslate"><span class="pre">TickerDataBadTypeException</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerDataInvalidException"><code class="docutils literal notranslate"><span class="pre">TickerDataInvalidException</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_histdata_tickers"><code class="docutils literal notranslate"><span class="pre">get_histdata_tickers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.POLARS_DTYPE_DICT"><code class="docutils literal notranslate"><span class="pre">POLARS_DTYPE_DICT</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributing.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#getting-started">Getting Started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#development-setup">Development Setup</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#code-standards">Code Standards</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#python-style-guide">Python Style Guide</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#linting-and-formatting">Linting and Formatting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#testing">Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#writing-tests">Writing Tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#running-tests">Running Tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#continuous-integration">Continuous Integration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#documentation">Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#building-documentation">Building Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#docstring-format">Docstring Format</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#adding-documentation-pages">Adding Documentation Pages</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#contribution-workflow">Contribution Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#making-changes">Making Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#submitting-a-pull-request">Submitting a Pull Request</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#what-to-contribute">What to Contribute</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#features">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#bug-fixes">Bug Fixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#id1">Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#tests">Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#development-priorities">Development Priorities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#current-focus-areas">Current Focus Areas</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#code-review-process">Code Review Process</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#what-reviewers-look-for">What Reviewers Look For</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#getting-help">Getting Help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#community-guidelines">Community Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#be-respectful">Be Respectful</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#code-of-conduct">Code of Conduct</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#recognition">Recognition</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#thank-you">Thank You!</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#version-0-1-0-current">Version 0.1.0 (Current)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#added">Added</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#core-features">Core Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#data-management">Data Management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#developer-experience">Developer Experience</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#documentation">Documentation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#known-issues">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#future-releases">Future Releases</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#planned-for-v0-2-0">Planned for v0.2.0</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#database-integration">Database Integration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#enhanced-features">Enhanced Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#planned-for-v0-3-0">Planned for v0.3.0</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#planned-for-v0-4-0">Planned for v0.4.0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#how-to-upgrade">How to Upgrade</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#from-development-to-v0-1-0">From Development to v0.1.0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#migration-notes">Migration Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#v0-1-0-breaking-changes">v0.1.0 Breaking Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#deprecation-warnings">Deprecation Warnings</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#version-history-details">Version History Details</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#development-pre-release">Development (Pre-release)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#contributing-to-changelog">Contributing to Changelog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">forex_data</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">forex_data.data_management.realtimedata</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for forex_data.data_management.realtimedata</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Mon Apr 25 18:07:21 2022</span>
+
+<span class="sd">@author: fiora</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">loguru</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">shutil</span><span class="w"> </span><span class="kn">import</span> <span class="n">rmtree</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">io</span><span class="w"> </span><span class="kn">import</span> <span class="n">StringIO</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">attrs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">define</span><span class="p">,</span>
+    <span class="n">field</span><span class="p">,</span>
+    <span class="n">validate</span><span class="p">,</span>
+    <span class="n">validators</span>
+<span class="p">)</span>
+
+<span class="c1"># PANDAS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DataFrame</span> <span class="k">as</span> <span class="n">pandas_dataframe</span><span class="p">,</span>
+    <span class="n">read_csv</span> <span class="k">as</span> <span class="n">pandas_read_csv</span>
+<span class="p">)</span>
+
+<span class="c1"># PYARROW</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarrow</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Table</span> <span class="k">as</span> <span class="n">pyarrow_Table</span><span class="p">,</span>
+    <span class="n">table</span> <span class="k">as</span> <span class="n">pyarrow_table</span><span class="p">,</span>
+    <span class="n">compute</span> <span class="k">as</span> <span class="n">pc</span>
+<span class="p">)</span>
+
+<span class="c1"># POLARS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">col</span><span class="p">,</span>
+    <span class="n">from_epoch</span><span class="p">,</span>
+    <span class="n">from_dict</span> <span class="k">as</span> <span class="n">polars_fromdict</span><span class="p">,</span>
+    <span class="n">DataFrame</span> <span class="k">as</span> <span class="n">polars_dataframe</span><span class="p">,</span>
+    <span class="n">LazyFrame</span> <span class="k">as</span> <span class="n">polars_lazyframe</span>
+<span class="p">)</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">array</span>
+
+<span class="c1"># python base</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dotty_dict</span><span class="w"> </span><span class="kn">import</span> <span class="n">dotty</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dotty_dict</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dotty</span>
+
+<span class="c1"># external</span>
+
+<span class="c1"># polygon-io source</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">polygon</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">polygon</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RESTClient</span> <span class="k">as</span> <span class="n">polygonio_client</span><span class="p">,</span>
+    <span class="n">BadResponse</span>
+<span class="p">)</span>
+
+<span class="c1"># alpha-vantage source</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">alpha_vantage.foreignexchange</span><span class="w"> </span><span class="kn">import</span> <span class="n">ForeignExchange</span> <span class="k">as</span> <span class="n">av_forex_client</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">YEARS</span><span class="p">,</span>
+    <span class="n">MONTHS</span><span class="p">,</span>
+    <span class="n">DATE_FORMAT_SQL</span><span class="p">,</span>
+    <span class="n">DATE_FORMAT_HISTDATA_CSV</span><span class="p">,</span>
+    <span class="n">HISTDATA_URL_TICKDATA_TEMPLATE</span><span class="p">,</span>
+    <span class="n">HISTDATA_BASE_DOWNLOAD_METHOD</span><span class="p">,</span>
+    <span class="n">HISTDATA_BASE_DOWNLOAD_URL</span><span class="p">,</span>
+    <span class="n">DEFAULT_PATHS</span><span class="p">,</span>
+    <span class="n">DATA_TYPE</span><span class="p">,</span>
+    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="p">,</span>
+    <span class="n">DATA_FILE_COLUMN_INDEX</span><span class="p">,</span>
+    <span class="n">SUPPORTED_DATA_FILES</span><span class="p">,</span>
+    <span class="n">SUPPORTED_DATA_ENGINES</span><span class="p">,</span>
+    <span class="n">ASSET_TYPE</span><span class="p">,</span>
+    <span class="n">TEMP_FOLDER</span><span class="p">,</span>
+    <span class="n">TEMP_CSV_FILE</span><span class="p">,</span>
+    <span class="n">DTYPE_DICT</span><span class="p">,</span>
+    <span class="n">PYARROW_DTYPE_DICT</span><span class="p">,</span>
+    <span class="n">POLARS_DTYPE_DICT</span><span class="p">,</span>
+    <span class="n">DATA_COLUMN_NAMES</span><span class="p">,</span>
+    <span class="n">FILENAME_TEMPLATE</span><span class="p">,</span>
+    <span class="n">DATA_KEY</span><span class="p">,</span>
+    <span class="n">TICK_TIMEFRAME</span><span class="p">,</span>
+    <span class="n">FILENAME_STR</span><span class="p">,</span>
+    <span class="n">REALTIME_DATA_PROVIDER</span><span class="p">,</span>
+    <span class="n">ALPHA_VANTAGE_API_KEY</span><span class="p">,</span>
+    <span class="n">CANONICAL_INDEX</span><span class="p">,</span>
+    <span class="n">DATE_NO_HOUR_FORMAT</span><span class="p">,</span>
+    <span class="n">POLYGON_IO_API_KEY</span><span class="p">,</span>
+    <span class="n">validator_file_path</span><span class="p">,</span>
+    <span class="n">validator_dir_path</span><span class="p">,</span>
+    <span class="n">get_attrs_names</span><span class="p">,</span>
+    <span class="n">check_time_offset_str</span><span class="p">,</span>
+    <span class="n">check_timeframe_str</span><span class="p">,</span>
+    <span class="n">any_date_to_datetime64</span><span class="p">,</span>
+    <span class="n">empty_dataframe</span><span class="p">,</span>
+    <span class="n">is_empty_dataframe</span><span class="p">,</span>
+    <span class="n">shape_dataframe</span><span class="p">,</span>
+    <span class="n">get_dataframe_column</span><span class="p">,</span>
+    <span class="n">get_dataframe_row</span><span class="p">,</span>
+    <span class="n">get_dataframe_element</span><span class="p">,</span>
+    <span class="n">get_dotty_leafs</span><span class="p">,</span>
+    <span class="n">astype</span><span class="p">,</span>
+    <span class="n">read_csv</span><span class="p">,</span>
+    <span class="n">polars_datetime</span><span class="p">,</span>
+    <span class="n">sort_dataframe</span><span class="p">,</span>
+    <span class="n">concat_data</span><span class="p">,</span>
+    <span class="n">list_remove_duplicates</span><span class="p">,</span>
+    <span class="n">get_dotty_key_field</span><span class="p">,</span>
+    <span class="n">reframe_data</span><span class="p">,</span>
+    <span class="n">write_csv</span><span class="p">,</span>
+    <span class="n">write_parquet</span><span class="p">,</span>
+    <span class="n">read_parquet</span><span class="p">,</span>
+    <span class="n">to_pandas_dataframe</span><span class="p">,</span>
+    <span class="n">get_pair_symbols</span><span class="p">,</span>
+    <span class="n">to_source_symbol</span><span class="p">,</span>
+    <span class="n">get_date_interval</span><span class="p">,</span>
+    <span class="n">polygon_agg_to_dict</span><span class="p">,</span>
+    <span class="n">validator_list_timeframe</span><span class="p">,</span>
+    <span class="n">AV_LIST_URL</span><span class="p">,</span>
+    <span class="n">PAIR_ALPHAVANTAGE_FORMAT</span><span class="p">,</span>
+    <span class="n">PAIR_POLYGON_FORMAT</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">..config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">read_config_file</span><span class="p">,</span>
+    <span class="n">read_config_string</span><span class="p">,</span>
+    <span class="n">read_config_folder</span>
+<span class="p">)</span>
+
+<span class="c1"># constants</span>
+<span class="n">READ_RETRY_COUNT</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">READ_PAUSE</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">READ_CHUNKSIZE</span> <span class="o">=</span> <span class="mi">96</span>
+
+<span class="n">MINIMAL_RECENT_TIME_WINDOW_DAYS</span> <span class="o">=</span> <span class="mi">3</span>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;RealtimeManager&#39;</span><span class="p">]</span>
+
+<span class="c1"># Realtime data manager</span>
+<span class="c1">#  source data providers to test APIs: polygon-IO, alpha-vantage</span>
+
+
+<div class="viewcode-block" id="RealtimeManager">
+<a class="viewcode-back" href="../../../forex_data.data_management.html#forex_data.RealtimeManager">[docs]</a>
+<span class="nd">@define</span><span class="p">(</span><span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">RealtimeManager</span><span class="p">:</span>
+
+    <span class="c1"># interface parameters</span>
+    <span class="n">config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span>
+                        <span class="n">validator</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">instance_of</span><span class="p">(</span><span class="nb">str</span><span class="p">))</span>
+    <span class="n">providers_key</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
+                                <span class="n">validator</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">instance_of</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;parquet&#39;</span><span class="p">,</span>
+                           <span class="n">validator</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">in_</span><span class="p">(</span><span class="n">SUPPORTED_DATA_FILES</span><span class="p">))</span>
+    <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;polars_lazy&#39;</span><span class="p">,</span>
+                        <span class="n">validator</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">in_</span><span class="p">(</span><span class="n">SUPPORTED_DATA_ENGINES</span><span class="p">))</span>
+
+    <span class="c1"># internal parameters</span>
+    <span class="n">_db_dict</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">factory</span><span class="o">=</span><span class="n">dotty</span><span class="p">,</span>
+                     <span class="n">validator</span><span class="o">=</span><span class="n">validators</span><span class="o">.</span><span class="n">instance_of</span><span class="p">(</span><span class="n">Dotty</span><span class="p">))</span>
+    <span class="n">_dataframe_type</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">pandas_dataframe</span><span class="p">)</span>
+    <span class="n">_data_path</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="n">DEFAULT_PATHS</span><span class="o">.</span><span class="n">BASE_PATH</span><span class="p">),</span>
+                       <span class="n">validator</span><span class="o">=</span><span class="n">validator_dir_path</span><span class="p">(</span><span class="n">create_if_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+    <span class="n">_realtimedata_path</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="n">DEFAULT_PATHS</span><span class="o">.</span><span class="n">BASE_PATH</span><span class="p">)</span> <span class="o">/</span> <span class="n">DEFAULT_PATHS</span><span class="o">.</span><span class="n">REALTIME_DATA_FOLDER</span><span class="p">,</span>
+        <span class="n">validator</span><span class="o">=</span><span class="n">validator_dir_path</span><span class="p">(</span><span class="n">create_if_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">_temporary_data_path</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">DEFAULT_PATHS</span><span class="o">.</span><span class="n">BASE_PATH</span><span class="p">)</span> <span class="o">/</span>
+                 <span class="n">DEFAULT_PATHS</span><span class="o">.</span><span class="n">REALTIME_DATA_FOLDER</span> <span class="o">/</span>
+                 <span class="n">TEMP_FOLDER</span><span class="p">),</span>
+        <span class="n">validator</span><span class="o">=</span><span class="n">validator_dir_path</span><span class="p">(</span><span class="n">create_if_missing</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+
+    <span class="c1"># if a valid config file or string</span>
+    <span class="c1"># is passed</span>
+    <span class="c1"># arguments contained are assigned here</span>
+    <span class="c1"># if instantiation passed values are present</span>
+    <span class="c1"># they will override the related argument</span>
+    <span class="c1"># value in the next initialization step</span>
+
+    <span class="c1"># if neither by instantation or config file</span>
+    <span class="c1"># an argument value is set, the argument</span>
+    <span class="c1"># will be set by asociated defined default</span>
+    <span class="c1"># or factory</span>
+
+<div class="viewcode-block" id="RealtimeManager.__init__">
+<a class="viewcode-back" href="../../../forex_data.data_management.html#forex_data.RealtimeManager.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+
+        <span class="n">_class_attributes_name</span> <span class="o">=</span> <span class="n">get_attrs_names</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">_not_assigned_attrs_index_mask</span> <span class="o">=</span> <span class="p">[</span><span class="kc">True</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">_class_attributes_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s1">&#39;config&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+
+            <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">]:</span>
+
+                <span class="n">config_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">config_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span>
+                    <span class="n">config_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">()</span>
+                <span class="p">):</span>
+
+                    <span class="n">config_filepath</span> <span class="o">=</span> <span class="n">read_config_folder</span><span class="p">(</span>
+                        <span class="n">config_path</span><span class="p">,</span> <span class="n">file_pattern</span><span class="o">=</span><span class="s1">&#39;data_config.yaml&#39;</span><span class="p">)</span>
+
+                <span class="k">else</span><span class="p">:</span>
+
+                    <span class="n">config_filepath</span> <span class="o">=</span> <span class="n">Path</span><span class="p">()</span>
+
+                <span class="n">config_args</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">if</span> <span class="n">config_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> \
+                        <span class="ow">and</span>  \
+                        <span class="n">config_filepath</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> \
+                        <span class="ow">and</span>  \
+                        <span class="n">config_filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s1">&#39;.yaml&#39;</span><span class="p">:</span>
+
+                    <span class="c1"># read parameters from config file</span>
+                    <span class="c1"># and force keys to lower case</span>
+                    <span class="n">config_args</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span> <span class="n">val</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span>
+                                   <span class="n">read_config_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">config_filepath</span><span class="p">))</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+
+                    <span class="c1"># read parameters from config file</span>
+                    <span class="c1"># and force keys to lower case</span>
+                    <span class="n">config_args</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span> <span class="n">val</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span>
+                                   <span class="n">read_config_string</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;config&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+                <span class="k">else</span><span class="p">:</span>
+
+                    <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="s1">&#39;invalid config type &#39;</span>
+                                    <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">: &#39;</span>
+                                    <span class="s1">&#39;required str or Path, got &#39;</span>
+                                    <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">])</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span>
+
+                <span class="c1"># check consistency of config_args</span>
+                <span class="k">if</span> <span class="p">(</span>
+                        <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config_args</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span>
+                    <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">config_args</span><span class="p">)</span>
+                <span class="p">):</span>
+
+                    <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;config </span><span class="si">{</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1"> &#39;</span>
+                                    <span class="s1">&#39;has no valid yaml formatted data&#39;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span>
+
+                <span class="c1"># set args from config file</span>
+                <span class="n">attrs_keys_configfile</span> <span class="o">=</span> \
+                    <span class="nb">set</span><span class="p">(</span><span class="n">_class_attributes_name</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">config_args</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+                <span class="k">for</span> <span class="n">attr_key</span> <span class="ow">in</span> <span class="n">attrs_keys_configfile</span><span class="p">:</span>
+
+                    <span class="bp">self</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">attr_key</span><span class="p">,</span>
+                                     <span class="n">config_args</span><span class="p">[</span><span class="n">attr_key</span><span class="p">])</span>
+
+                    <span class="n">_not_assigned_attrs_index_mask</span><span class="p">[</span>
+                        <span class="n">_class_attributes_name</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">attr_key</span><span class="p">)</span>
+                    <span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+
+                <span class="c1"># set args from instantiation</span>
+                <span class="c1"># override if attr already has a value from config</span>
+                <span class="n">attrs_keys_input</span> <span class="o">=</span> \
+                    <span class="nb">set</span><span class="p">(</span><span class="n">_class_attributes_name</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+                <span class="k">for</span> <span class="n">attr_key</span> <span class="ow">in</span> <span class="n">attrs_keys_input</span><span class="p">:</span>
+
+                    <span class="bp">self</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">attr_key</span><span class="p">,</span>
+                                     <span class="n">kwargs</span><span class="p">[</span><span class="n">attr_key</span><span class="p">])</span>
+
+                    <span class="n">_not_assigned_attrs_index_mask</span><span class="p">[</span>
+                        <span class="n">_class_attributes_name</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">attr_key</span><span class="p">)</span>
+                    <span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+
+                <span class="c1"># attrs not present in config file or instance inputs</span>
+                <span class="c1"># --&gt; self.attr leads to KeyError</span>
+                <span class="c1"># are manually assigned to default value derived</span>
+                <span class="c1"># from __attrs_attrs__</span>
+
+                <span class="k">for</span> <span class="n">attr_key</span> <span class="ow">in</span> <span class="n">array</span><span class="p">(</span><span class="n">_class_attributes_name</span><span class="p">)[</span>
+                        <span class="n">_not_assigned_attrs_index_mask</span>
+                <span class="p">]:</span>
+
+                    <span class="k">try</span><span class="p">:</span>
+
+                        <span class="n">attr</span> <span class="o">=</span> <span class="p">[</span><span class="n">attr</span>
+                                <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__attrs_attrs__</span>
+                                <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">attr_key</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+                    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;KeyError: initializing object has no &#39;</span>
+                                       <span class="sa">f</span><span class="s1">&#39;attribute </span><span class="si">{</span><span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+                    <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;IndexError: initializing object has no &#39;</span>
+                                       <span class="sa">f</span><span class="s1">&#39;attribute </span><span class="si">{</span><span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+                    <span class="k">else</span><span class="p">:</span>
+
+                        <span class="c1"># assign default value</span>
+                        <span class="c1"># try default and factory sabsequently</span>
+                        <span class="c1"># if neither are present</span>
+                        <span class="c1"># assign None</span>
+                        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">attr</span><span class="p">,</span> <span class="s1">&#39;default&#39;</span><span class="p">):</span>
+
+                            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="s1">&#39;factory&#39;</span><span class="p">):</span>
+
+                                <span class="bp">self</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                                                 <span class="n">attr</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">factory</span><span class="p">())</span>
+
+                            <span class="k">else</span><span class="p">:</span>
+
+                                <span class="bp">self</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                                                 <span class="n">attr</span><span class="o">.</span><span class="n">default</span><span class="p">)</span>
+
+                        <span class="k">else</span><span class="p">:</span>
+
+                            <span class="bp">self</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                                             <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+
+            <span class="c1"># no config file is defined</span>
+            <span class="c1"># call generated init</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__attrs_init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: ignore[attr-defined]</span>
+
+        <span class="n">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">__attrs_post_init__</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__attrs_post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+
+        <span class="c1"># reset logging handlers</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+
+        <span class="c1"># checks on data folder path</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_realtimedata_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">()</span> <span class="ow">or</span>
+            <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_realtimedata_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="p">):</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_realtimedata_path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                          <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># add logging file handle</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_path</span> <span class="o">/</span> <span class="s1">&#39;forexdata.log&#39;</span><span class="p">,</span>
+                   <span class="n">level</span><span class="o">=</span><span class="s2">&quot;TRACE&quot;</span><span class="p">,</span>
+                   <span class="n">rotation</span><span class="o">=</span><span class="s2">&quot;5 MB&quot;</span>
+                   <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;pandas&#39;</span><span class="p">:</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span> <span class="o">=</span> <span class="n">pandas_dataframe</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;pyarrow&#39;</span><span class="p">:</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span> <span class="o">=</span> <span class="n">pyarrow_table</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;polars&#39;</span><span class="p">:</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span> <span class="o">=</span> <span class="n">polars_dataframe</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;polars_lazy&#39;</span><span class="p">:</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span> <span class="o">=</span> <span class="n">polars_lazyframe</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_temporary_data_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_realtimedata_path</span> \
+            <span class="o">/</span> <span class="n">TEMP_FOLDER</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clear_temporary_data_folder</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_clear_temporary_data_folder</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+
+        <span class="c1"># delete temporary data path</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_temporary_data_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_temporary_data_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">()</span>
+        <span class="p">):</span>
+
+            <span class="k">try</span><span class="p">:</span>
+
+                <span class="n">rmtree</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_temporary_data_path</span><span class="p">))</span>
+
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Deleting temporary data folder &#39;</span>
+                               <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_temporary_data_path</span><span class="p">)</span><span class="si">}</span><span class="s1"> not successfull: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_getClient</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">provider</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+
+        <span class="k">if</span> <span class="n">provider</span> <span class="o">==</span> <span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">ALPHA_VANTAGE</span><span class="p">:</span>
+
+            <span class="k">return</span> <span class="n">av_forex_client</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">providers_key</span><span class="p">[</span><span class="n">ALPHA_VANTAGE_API_KEY</span><span class="p">])</span>
+
+        <span class="k">elif</span> <span class="n">provider</span> <span class="o">==</span> <span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">POLYGON_IO</span><span class="p">:</span>
+
+            <span class="k">return</span> <span class="n">polygonio_client</span><span class="p">(</span><span class="n">api_key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">providers_key</span><span class="p">[</span><span class="n">POLYGON_IO_API_KEY</span><span class="p">])</span>
+
+<div class="viewcode-block" id="RealtimeManager.tickers_list">
+<a class="viewcode-back" href="../../../forex_data.data_management.html#forex_data.RealtimeManager.tickers_list">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tickers_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                     <span class="n">data_source</span><span class="p">,</span>
+                     <span class="n">asset_class</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+
+        <span class="c1"># return list of symbols for tickers actively treated by data providers</span>
+
+        <span class="n">tickers_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">data_source</span> <span class="o">==</span> <span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">ALPHA_VANTAGE</span><span class="p">:</span>
+
+            <span class="c1"># compose URL for tickers listing request</span>
+            <span class="c1"># decode content</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="k">as</span> <span class="n">s</span><span class="p">:</span>  <span class="c1"># type: ignore[attr-defined]</span>
+                <span class="n">listing_downloaded</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">AV_LIST_URL</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">api_key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_av_api_key</span><span class="p">))</span>  <span class="c1"># type: ignore[attr-defined]</span>
+                <span class="n">decoded_content</span> <span class="o">=</span> <span class="n">listing_downloaded</span><span class="o">.</span><span class="n">content</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+                <span class="n">tickers_df</span> <span class="o">=</span> <span class="n">pandas_read_csv</span><span class="p">(</span><span class="n">StringIO</span><span class="p">(</span><span class="n">decoded_content</span><span class="p">),</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">asset_class</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">asset_class</span> <span class="o">==</span> <span class="n">ASSET_TYPE</span><span class="o">.</span><span class="n">FOREX</span><span class="p">:</span>
+
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;alpha vantage listing not including forex tickers&#39;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span>
+
+                <span class="k">elif</span> <span class="n">asset_class</span> <span class="o">==</span> <span class="n">ASSET_TYPE</span><span class="o">.</span><span class="n">ETF</span><span class="p">:</span>
+
+                    <span class="n">assetType_req_index</span> <span class="o">=</span> <span class="n">tickers_df</span><span class="p">[:,</span> <span class="s1">&#39;assetType&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;ETF&#39;</span>
+
+                <span class="k">elif</span> <span class="n">asset_class</span> <span class="o">==</span> <span class="n">ASSET_TYPE</span><span class="o">.</span><span class="n">STOCK</span><span class="p">:</span>
+
+                    <span class="n">assetType_req_index</span> <span class="o">=</span> <span class="n">tickers_df</span><span class="p">[:,</span> <span class="s1">&#39;assetType&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Stock&#39;</span>
+
+                <span class="n">tickers_list</span> <span class="o">=</span> <span class="n">tickers_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">assetType_req_index</span><span class="p">,</span> <span class="s1">&#39;symbol&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="n">tickers_list</span> <span class="o">=</span> <span class="n">tickers_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;symbol&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+
+        <span class="k">elif</span> <span class="n">data_source</span> <span class="o">==</span> <span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">POLYGON_IO</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="n">asset_class</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">asset_class</span> <span class="o">==</span> <span class="n">ASSET_TYPE</span><span class="o">.</span><span class="n">FOREX</span><span class="p">:</span>
+
+                    <span class="n">poly_asset_class</span> <span class="o">=</span> <span class="s1">&#39;fx&#39;</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="n">poly_asset_class</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="c1"># call function for forex asset_class</span>
+            <span class="n">listing_downloaded</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_poly_reader</span><span class="o">.</span><span class="n">get_exchanges</span><span class="p">(</span>  <span class="c1"># type: ignore[attr-defined]</span>
+                <span class="n">asset_class</span><span class="o">=</span><span class="n">poly_asset_class</span><span class="p">)</span>
+
+            <span class="n">tickers_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">acronym</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">listing_downloaded</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">tickers_list</span></div>
+
+
+<div class="viewcode-block" id="RealtimeManager.get_realtime_quote">
+<a class="viewcode-back" href="../../../forex_data.data_management.html#forex_data.RealtimeManager.get_realtime_quote">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_realtime_quote</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ticker</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_getClient</span><span class="p">(</span><span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">POLYGON_IO</span><span class="p">)</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+
+            <span class="n">to_symbol</span><span class="p">,</span> <span class="n">from_symbol</span> <span class="o">=</span> <span class="n">get_pair_symbols</span><span class="p">(</span><span class="n">ticker</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+
+            <span class="n">poly_resp</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_last_forex_quote</span><span class="p">(</span><span class="n">from_symbol</span><span class="p">,</span>
+                                                    <span class="n">to_symbol</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">poly_resp</span></div>
+
+
+<div class="viewcode-block" id="RealtimeManager.get_daily_close">
+<a class="viewcode-back" href="../../../forex_data.data_management.html#forex_data.RealtimeManager.get_daily_close">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_daily_close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                        <span class="n">ticker</span><span class="p">,</span>
+                        <span class="n">last_close</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                        <span class="n">recent_days_window</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                        <span class="n">day_start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                        <span class="n">day_end</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                        <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieve daily OHLC data for the specified ticker.</span>
+<span class="sd">        </span>
+<span class="sd">        Fetches daily forex data from Alpha Vantage API. Supports three modes of operation:</span>
+<span class="sd">        last close only, recent N days window, or specific date range.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            ticker (str): Currency pair symbol (e.g., &#39;EURUSD&#39;, &#39;GBPUSD&#39;, &#39;USDJPY&#39;).</span>
+<span class="sd">                Case-insensitive.</span>
+<span class="sd">            last_close (bool, optional): If True, returns only the most recent daily close.</span>
+<span class="sd">                Default is False.</span>
+<span class="sd">            recent_days_window (int, optional): Number of recent days to retrieve.</span>
+<span class="sd">                Mutually exclusive with day_start/day_end. Default is None.</span>
+<span class="sd">            day_start (str, optional): Start date for data retrieval in &#39;YYYY-MM-DD&#39; format.</span>
+<span class="sd">                Used with day_end to specify exact date range. Default is None.</span>
+<span class="sd">            day_end (str, optional): End date for data retrieval in &#39;YYYY-MM-DD&#39; format.</span>
+<span class="sd">                Used with day_start to specify exact date range. Default is None.</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            polars.DataFrame | polars.LazyFrame: DataFrame containing daily OHLC data with columns:</span>
+<span class="sd">                - timestamp: datetime column with daily timestamps</span>
+<span class="sd">                - open: Opening price (float32)</span>
+<span class="sd">                - high: Highest price (float32)</span>
+<span class="sd">                - low: Lowest price (float32)</span>
+<span class="sd">                - close: Closing price (float32)</span>
+<span class="sd">                Returns empty DataFrame if API call fails.</span>
+<span class="sd">        </span>
+<span class="sd">        Raises:</span>
+<span class="sd">            AssertionError: If recent_days_window is not an integer when provided</span>
+<span class="sd">            BadResponse: If Alpha Vantage API request fails (handled internally)</span>
+<span class="sd">        </span>
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; manager = RealtimeManager(config=&#39;data_config.yaml&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; </span>
+<span class="sd">            &gt;&gt;&gt; # Get last close only</span>
+<span class="sd">            &gt;&gt;&gt; latest = manager.get_daily_close(ticker=&#39;EURUSD&#39;, last_close=True)</span>
+<span class="sd">            &gt;&gt;&gt; </span>
+<span class="sd">            &gt;&gt;&gt; # Get last 10 days</span>
+<span class="sd">            &gt;&gt;&gt; recent = manager.get_daily_close(ticker=&#39;EURUSD&#39;, recent_days_window=10)</span>
+<span class="sd">            &gt;&gt;&gt; </span>
+<span class="sd">            &gt;&gt;&gt; # Get specific date range</span>
+<span class="sd">            &gt;&gt;&gt; range_data = manager.get_daily_close(</span>
+<span class="sd">            ...     ticker=&#39;EURUSD&#39;,</span>
+<span class="sd">            ...     day_start=&#39;2024-01-01&#39;,</span>
+<span class="sd">            ...     day_end=&#39;2024-01-31&#39;</span>
+<span class="sd">            ... )</span>
+<span class="sd">        </span>
+<span class="sd">        Note:</span>
+<span class="sd">            - Requires valid Alpha Vantage API key in configuration</span>
+<span class="sd">            - Free tier has 25 requests per day limit</span>
+<span class="sd">            - outputsize=&#39;compact&#39; returns ~100 most recent data points</span>
+<span class="sd">            - outputsize=&#39;full&#39; can return several years of data</span>
+<span class="sd">            - Use last_close=True for minimal data transfer</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">to_symbol</span><span class="p">,</span> <span class="n">from_symbol</span> <span class="o">=</span> <span class="n">get_pair_symbols</span><span class="p">(</span><span class="n">ticker</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+
+        <span class="k">try</span><span class="p">:</span>
+
+            <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_getClient</span><span class="p">(</span><span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">ALPHA_VANTAGE</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">last_close</span><span class="p">:</span>
+
+                <span class="n">res</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_currency_exchange_daily</span><span class="p">(</span>
+                    <span class="n">to_symbol</span><span class="p">,</span>
+                    <span class="n">from_symbol</span><span class="p">,</span>
+                    <span class="n">outputsize</span><span class="o">=</span><span class="s1">&#39;compact&#39;</span>
+                <span class="p">)</span>
+
+                <span class="c1"># parse response and return</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_data_daily_alphavantage</span><span class="p">(</span>
+                    <span class="n">res</span><span class="p">,</span>
+                    <span class="n">last_close</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">day_start</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">day_end</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">recent_days_window</span><span class="p">,</span> <span class="nb">int</span><span class="p">),</span> \
+                        <span class="s1">&#39;recent_days_window must be integer&#39;</span>
+
+                <span class="c1"># careful that option &quot;outputsize=&#39;full&#39;&quot; does not have constant day start</span>
+                <span class="c1"># so it is not possible to guarantee a consistent meeting of the</span>
+                <span class="c1"># function input &#39;day_start&#39; and &#39;recent_days_window&#39; when</span>
+                <span class="c1"># they imply a large interval outside of the</span>
+                <span class="c1"># &quot;outputsize=&#39;full&#39;&quot; option</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_currency_exchange_daily</span><span class="p">(</span>
+                    <span class="n">from_symbol</span><span class="p">,</span>
+                    <span class="n">to_symbol</span><span class="p">,</span>
+                    <span class="n">outputsize</span><span class="o">=</span><span class="s1">&#39;full&#39;</span>
+                <span class="p">)</span>
+
+                <span class="c1"># parse response and return</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_data_daily_alphavantage</span><span class="p">(</span>
+                    <span class="n">res</span><span class="p">,</span>
+                    <span class="n">last_close</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">recent_days_window</span><span class="o">=</span><span class="n">recent_days_window</span><span class="p">,</span>
+                    <span class="n">day_start</span><span class="o">=</span><span class="n">day_start</span><span class="p">,</span>
+                    <span class="n">day_end</span><span class="o">=</span><span class="n">day_end</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="n">BadResponse</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span><span class="p">([])</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Raised Exception: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span><span class="p">([])</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_aggs_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_provider</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+
+        <span class="k">if</span> <span class="n">data_provider</span> <span class="o">==</span> <span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">ALPHA_VANTAGE</span><span class="p">:</span>
+
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_data_daily_alphavantage</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">data_provider</span> <span class="o">==</span> <span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">POLYGON_IO</span><span class="p">:</span>
+
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_data_aggs_polygonio</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;data provider </span><span class="si">{</span><span class="n">data_provider</span><span class="si">}</span><span class="s1"> is invalid &#39;</span>
+                         <span class="s1">&#39;- supported providers: </span><span class="si">{REALTIME_DATA_PROVIDER_LIST}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_data_daily_alphavantage</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">daily_data</span><span class="p">,</span>
+        <span class="n">last_close</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">recent_days_window</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">day_start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">day_end</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">last_close</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">recent_days_window</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="c1"># set window as DateOffset str with num and days</span>
+                <span class="n">days_window</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{days_num}</span><span class="s1">d&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">days_num</span><span class="o">=</span><span class="n">recent_days_window</span><span class="p">)</span>
+
+                <span class="n">day_start</span><span class="p">,</span> <span class="n">day_end</span> <span class="o">=</span> <span class="n">get_date_interval</span><span class="p">(</span><span class="n">interval_end_mode</span><span class="o">=</span><span class="s1">&#39;now&#39;</span><span class="p">,</span>
+                                                       <span class="n">interval_timespan</span><span class="o">=</span><span class="n">days_window</span><span class="p">,</span>
+                                                       <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                                       <span class="n">bdays</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="n">day_start</span> <span class="o">=</span> <span class="n">any_date_to_datetime64</span><span class="p">(</span><span class="n">day_start</span><span class="p">)</span>
+                <span class="n">day_end</span> <span class="o">=</span> <span class="n">any_date_to_datetime64</span><span class="p">(</span><span class="n">day_end</span><span class="p">)</span>
+
+        <span class="c1"># parse alpha vantage response from daily api request</span>
+        <span class="n">resp_data_dict</span> <span class="o">=</span> <span class="n">daily_data</span><span class="p">[</span><span class="n">CANONICAL_INDEX</span><span class="o">.</span><span class="n">AV_DF_DATA_INDEX</span><span class="p">]</span>
+
+        <span class="c1"># raw response data to dictionary</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">resp_data_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">data_values</span> <span class="o">=</span> <span class="n">resp_data_dict</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+        <span class="n">open_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;1. open&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data_values</span><span class="p">]</span>
+        <span class="n">high_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;2. high&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data_values</span><span class="p">]</span>
+        <span class="n">low_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;3. low&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data_values</span><span class="p">]</span>
+        <span class="n">close_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;4. close&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data_values</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;pandas&#39;</span><span class="p">:</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas_dataframe</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">OPEN</span><span class="p">:</span> <span class="n">open_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">HIGH</span><span class="p">:</span> <span class="n">high_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">LOW</span><span class="p">:</span> <span class="n">low_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">CLOSE</span><span class="p">:</span> <span class="n">close_data</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="c1"># final cast to standard dtypes</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">astype</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">DTYPE_DICT</span><span class="o">.</span><span class="n">TIME_TF_DTYPE</span><span class="p">)</span>
+
+            <span class="c1"># sort by timestamp</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">sort_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+
+            <span class="c1"># timestamp as column to include it in return data</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">last_close</span><span class="p">:</span>
+
+                <span class="c1"># get most recent line --&gt; lowest num index</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">get_dataframe_row</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">shape_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="c1"># return data based on filter output</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span>
+                    <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">day_start</span><span class="p">)</span> <span class="o">&amp;</span>
+                    <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">day_end</span><span class="p">)</span>
+                <span class="p">]</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;pyarrow&#39;</span><span class="p">:</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pyarrow_table</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">OPEN</span><span class="p">:</span> <span class="n">open_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">HIGH</span><span class="p">:</span> <span class="n">high_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">LOW</span><span class="p">:</span> <span class="n">low_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">CLOSE</span><span class="p">:</span> <span class="n">close_data</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="c1"># final cast to standard dtypes</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">astype</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">PYARROW_DTYPE_DICT</span><span class="o">.</span><span class="n">TIME_TF_DTYPE</span><span class="p">)</span>
+
+            <span class="c1"># sort by timestamp</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">sort_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">last_close</span><span class="p">:</span>
+
+                <span class="n">df</span> <span class="o">=</span> <span class="n">get_dataframe_row</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">shape_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="n">mask</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">and_</span><span class="p">(</span>
+                    <span class="n">pc</span><span class="o">.</span><span class="n">greater</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">],</span>
+                               <span class="n">day_start</span><span class="p">),</span>
+                    <span class="n">pc</span><span class="o">.</span><span class="n">less</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">],</span>
+                            <span class="n">day_end</span><span class="p">)</span>
+                <span class="p">)</span>
+
+                <span class="n">data_df</span> <span class="o">=</span> <span class="n">pyarrow_Table</span><span class="o">.</span><span class="n">from_arrays</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span>
+                                                    <span class="n">schema</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">schema</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;polars&#39;</span><span class="p">:</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">polars_fromdict</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">OPEN</span><span class="p">:</span> <span class="n">open_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">HIGH</span><span class="p">:</span> <span class="n">high_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">LOW</span><span class="p">:</span> <span class="n">low_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">CLOSE</span><span class="p">:</span> <span class="n">close_data</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="c1"># convert timestamp column to datetime data type</span>
+            <span class="n">df</span> <span class="o">=</span> \
+                <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+                    <span class="n">col</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span>
+                        <span class="n">polars_datetime</span><span class="p">(</span><span class="s1">&#39;ms&#39;</span><span class="p">),</span>
+                        <span class="nb">format</span><span class="o">=</span><span class="n">DATE_NO_HOUR_FORMAT</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+            <span class="c1"># final cast to standard dtypes</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">astype</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">POLARS_DTYPE_DICT</span><span class="o">.</span><span class="n">TIME_TF_DTYPE</span><span class="p">)</span>
+
+            <span class="c1"># sort by timestamp</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">sort_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">last_close</span><span class="p">:</span>
+
+                <span class="n">df</span> <span class="o">=</span> <span class="n">get_dataframe_row</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">shape_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="c1"># filter on date</span>
+                <span class="n">df</span> <span class="o">=</span> \
+                    <span class="p">(</span>
+                        <span class="n">df</span>
+                        <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+                            <span class="n">col</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span><span class="o">.</span><span class="n">is_between</span><span class="p">(</span><span class="n">day_start</span><span class="p">,</span>
+                                                                            <span class="n">day_end</span>
+                                                                            <span class="p">)</span>
+                        <span class="p">)</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+                    <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;polars_lazy&#39;</span><span class="p">:</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">polars_lazyframe</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">OPEN</span><span class="p">:</span> <span class="n">open_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">HIGH</span><span class="p">:</span> <span class="n">high_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">LOW</span><span class="p">:</span> <span class="n">low_data</span><span class="p">,</span>
+                    <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">CLOSE</span><span class="p">:</span> <span class="n">close_data</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="c1"># convert timestamp column to datetime data type</span>
+            <span class="n">df</span> <span class="o">=</span> \
+                <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+                    <span class="n">col</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span>
+                        <span class="n">polars_datetime</span><span class="p">(</span><span class="s1">&#39;ms&#39;</span><span class="p">),</span>
+                        <span class="nb">format</span><span class="o">=</span><span class="n">DATE_NO_HOUR_FORMAT</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+            <span class="c1"># final cast to standard dtypes</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">astype</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">POLARS_DTYPE_DICT</span><span class="o">.</span><span class="n">TIME_TF_DTYPE</span><span class="p">)</span>
+
+            <span class="c1"># sort by timestamp</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">sort_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">last_close</span><span class="p">:</span>
+
+                <span class="n">df</span> <span class="o">=</span> <span class="n">get_dataframe_row</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">shape_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="c1"># filter on date</span>
+                <span class="n">df</span> <span class="o">=</span> \
+                    <span class="p">(</span>
+                        <span class="n">df</span>
+                        <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+                            <span class="n">col</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span><span class="o">.</span><span class="n">is_between</span><span class="p">(</span><span class="n">day_start</span><span class="p">,</span>
+                                                                            <span class="n">day_end</span>
+                                                                            <span class="p">)</span>
+                        <span class="p">)</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+                    <span class="p">)</span>
+
+        <span class="c1"># sort by timestamp</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_data_aggs_polygonio</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">engine</span><span class="o">=</span><span class="s1">&#39;polars&#39;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">polars_lazyframe</span><span class="p">,</span> <span class="n">polars_dataframe</span><span class="p">]:</span>
+
+        <span class="k">if</span> <span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;pandas&#39;</span><span class="p">:</span>
+
+            <span class="c1"># parse data and format data as common defined</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas_dataframe</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+            <span class="c1"># keep base data columns</span>
+            <span class="n">extra_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">DATA_COLUMN_NAMES</span><span class="o">.</span><span class="n">TF_DATA</span><span class="p">))</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">extra_columns</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">df</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">any_date_to_datetime64</span><span class="p">(</span>
+                <span class="n">df</span><span class="p">[</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">],</span>
+                <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;ms&#39;</span>
+            <span class="p">)</span>
+
+            <span class="c1"># convert to conventional dtype</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">astype</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">DTYPE_DICT</span><span class="o">.</span><span class="n">TIME_TF_DTYPE</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;pyarrow&#39;</span><span class="p">:</span>
+
+            <span class="c1"># TODO: convert Agg items into dicts</span>
+            <span class="c1">#       call Table.from_pylist and set also</span>
+            <span class="c1">#       schema appropriate</span>
+
+            <span class="n">data_dict_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">polygon_agg_to_dict</span><span class="p">(</span><span class="n">agg</span><span class="p">)</span>
+                              <span class="k">for</span> <span class="n">agg</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pyarrow_Table</span><span class="o">.</span><span class="n">from_pylist</span><span class="p">(</span><span class="n">data_dict_list</span><span class="p">)</span>
+
+            <span class="n">extra_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+                <span class="nb">set</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">column_names</span><span class="p">)</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">DATA_COLUMN_NAMES</span><span class="o">.</span><span class="n">TF_DATA</span><span class="p">))</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop_columns</span><span class="p">(</span><span class="n">extra_columns</span><span class="p">)</span>
+
+            <span class="c1"># convert to conventional dtype</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">astype</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">PYARROW_DTYPE_DICT</span><span class="o">.</span><span class="n">TIME_TF_DTYPE</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;polars&#39;</span><span class="p">:</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">polars_dataframe</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+            <span class="c1"># sort by timestamp</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">sort_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+
+            <span class="n">extra_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">DATA_COLUMN_NAMES</span><span class="o">.</span><span class="n">TF_DATA</span><span class="p">))</span>
+
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">extra_columns</span><span class="p">)</span>
+
+            <span class="c1"># convert timestamp column to datetime data type</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+                <span class="n">from_epoch</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">,</span>
+                           <span class="n">time_unit</span><span class="o">=</span><span class="s1">&#39;ms&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">engine</span> <span class="o">==</span> <span class="s1">&#39;polars_lazy&#39;</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="n">data</span><span class="p">:</span>
+
+                <span class="n">df</span> <span class="o">=</span> <span class="n">polars_lazyframe</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+                <span class="n">extra_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span>
+                    <span class="n">df</span><span class="o">.</span><span class="n">collect_schema</span><span class="p">()</span><span class="o">.</span><span class="n">names</span><span class="p">())</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span>
+                    <span class="n">DATA_COLUMN_NAMES</span><span class="o">.</span><span class="n">TF_DATA</span>
+                <span class="p">)</span>
+                <span class="p">)</span>
+
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">extra_columns</span><span class="p">)</span>
+
+                <span class="c1"># convert timestamp column to datetime data type</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+                    <span class="n">from_epoch</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">,</span>
+                               <span class="n">time_unit</span><span class="o">=</span><span class="s1">&#39;ms&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+                <span class="p">)</span>
+
+                <span class="c1"># convert to conventional dtype</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">astype</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">POLARS_DTYPE_DICT</span><span class="o">.</span><span class="n">TIME_TF_DTYPE</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+
+                <span class="n">df</span> <span class="o">=</span> <span class="n">empty_dataframe</span><span class="p">(</span><span class="s1">&#39;polars_lazy&#39;</span><span class="p">)</span>
+
+        <span class="c1"># sort by timestamp</span>
+        <span class="k">return</span> <span class="n">sort_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">BASE_DATA_COLUMN_NAME</span><span class="o">.</span><span class="n">TIMESTAMP</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RealtimeManager.get_data">
+<a class="viewcode-back" href="../../../forex_data.data_management.html#forex_data.RealtimeManager.get_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">ticker</span><span class="p">,</span>
+                 <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">end</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">timeframe</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">polars_lazyframe</span><span class="p">,</span> <span class="n">polars_dataframe</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieve real-time OHLC data for the specified ticker and timeframe.</span>
+<span class="sd">        </span>
+<span class="sd">        Fetches intraday forex data from Polygon.io API for the specified date range</span>
+<span class="sd">        and timeframe. Data is automatically reframed to the requested timeframe.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            ticker (str): Currency pair symbol (e.g., &#39;EURUSD&#39;, &#39;GBPUSD&#39;, &#39;USDJPY&#39;).</span>
+<span class="sd">                Case-insensitive.</span>
+<span class="sd">            start (str | datetime, optional): Start date for data retrieval. Accepts:</span>
+<span class="sd">                - ISO format: &#39;YYYY-MM-DD&#39; or &#39;YYYY-MM-DD HH:MM:SS&#39;</span>
+<span class="sd">                - datetime object</span>
+<span class="sd">                Default is None.</span>
+<span class="sd">            end (str | datetime, optional): End date for data retrieval. Same format</span>
+<span class="sd">                as start. Must be after start date. Default is None.</span>
+<span class="sd">            timeframe (str, optional): Target timeframe for aggregation. If specified,</span>
+<span class="sd">                minute data will be reframed to this timeframe (e.g., &#39;5m&#39;, &#39;1h&#39;, &#39;1D&#39;).</span>
+<span class="sd">                Default is None (returns minute data).</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:</span>
+<span class="sd">                - timestamp: datetime column with candle timestamps</span>
+<span class="sd">                - open: Opening price (float32)</span>
+<span class="sd">                - high: Highest price (float32)</span>
+<span class="sd">                - low: Lowest price (float32)</span>
+<span class="sd">                - close: Closing price (float32)</span>
+<span class="sd">                Returns empty DataFrame if API call fails.</span>
+<span class="sd">        </span>
+<span class="sd">        Raises:</span>
+<span class="sd">            BadResponse: If Polygon.io API request fails (handled internally, returns empty DataFrame)</span>
+<span class="sd">        </span>
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; manager = RealtimeManager(config=&#39;data_config.yaml&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; # Get hourly data for 5 days</span>
+<span class="sd">            &gt;&gt;&gt; data = manager.get_data(</span>
+<span class="sd">            ...     ticker=&#39;EURUSD&#39;,</span>
+<span class="sd">            ...     start=&#39;2024-01-10&#39;,</span>
+<span class="sd">            ...     end=&#39;2024-01-15&#39;,</span>
+<span class="sd">            ...     timeframe=&#39;1h&#39;</span>
+<span class="sd">            ... )</span>
+<span class="sd">            &gt;&gt;&gt; print(f&quot;Retrieved {len(data)} hourly candles&quot;)</span>
+<span class="sd">            Retrieved 120 hourly candles</span>
+<span class="sd">        </span>
+<span class="sd">        Note:</span>
+<span class="sd">            - Requires valid Polygon.io API key in configuration</span>
+<span class="sd">            - Free tier has rate limits  and historical data restrictions</span>
+<span class="sd">            - Data is fetched at 1-minute resolution and aggregated to requested timeframe</span>
+<span class="sd">            - Failed requests return an empty DataFrame with a warning logged</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">any_date_to_datetime64</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">any_date_to_datetime64</span><span class="p">(</span><span class="n">end</span><span class="p">)</span>
+
+        <span class="c1"># forward request only to polygon-io</span>
+        <span class="c1"># set ticker in polygon format</span>
+
+        <span class="n">ticker_polygonio</span> <span class="o">=</span> <span class="n">to_source_symbol</span><span class="p">(</span>
+            <span class="n">ticker</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span>
+            <span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">POLYGON_IO</span>
+        <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+
+            <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_getClient</span><span class="p">(</span><span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">POLYGON_IO</span><span class="p">)</span>
+
+            <span class="n">poly_aggs</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="c1"># TODO: set up try-except with BadResponse to manage provider</span>
+            <span class="c1"># subcription limitation</span>
+
+            <span class="c1"># using Polygon-io client</span>
+            <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">client</span><span class="o">.</span><span class="n">list_aggs</span><span class="p">(</span><span class="n">ticker</span><span class="o">=</span><span class="n">ticker_polygonio</span><span class="p">,</span>
+                                      <span class="n">multiplier</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                      <span class="n">timespan</span><span class="o">=</span><span class="s1">&#39;minute&#39;</span><span class="p">,</span>
+                                      <span class="n">from_</span><span class="o">=</span><span class="n">start</span><span class="p">,</span>
+                                      <span class="n">to</span><span class="o">=</span><span class="n">end</span><span class="p">,</span>
+                                      <span class="n">adjusted</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                      <span class="n">sort</span><span class="o">=</span><span class="s1">&#39;asc&#39;</span><span class="p">):</span>
+
+                <span class="n">poly_aggs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="n">BadResponse</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+
+            <span class="c1"># to log</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dataframe_type</span><span class="p">([])</span>
+
+        <span class="n">data_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_aggs_data</span><span class="p">(</span><span class="n">REALTIME_DATA_PROVIDER</span><span class="o">.</span><span class="n">POLYGON_IO</span><span class="p">,</span>
+                                        <span class="n">data</span><span class="o">=</span><span class="n">poly_aggs</span><span class="p">,</span>
+                                        <span class="n">engine</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">reframe_data</span><span class="p">(</span><span class="n">data_df</span><span class="p">,</span> <span class="n">timeframe</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Nicola Fiorato.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

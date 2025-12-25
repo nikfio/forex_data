@@ -39,6 +39,9 @@ adbc-driver-sqlite = "^1.6.0"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.3.2"
+sphinx = "^9.0.4"
+sphinx-rtd-theme = "^3.0.2"
+sphinx-autodoc-typehints = "^3.6.0"
 
 [build-system]
 requires = ["poetry-core"]

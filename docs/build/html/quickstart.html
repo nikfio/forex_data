@@ -1,0 +1,635 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Start &mdash; forex_data 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=01f34227"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Configuration" href="configuration.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            forex_data
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#prerequisites">Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#installing-poetry">Installing Poetry</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#installation-steps">Installation Steps</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#clone-the-repository">1. Clone the Repository</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#install-dependencies">2. Install Dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#verify-installation">3. Verify Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#alternative-installation-methods">Alternative Installation Methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#using-pip-not-recommended">Using pip (Not Recommended)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#installation-options">Installation Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#development-installation">Development Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="installation.html#minimal-installation">Minimal Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#basic-concepts">Basic Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#working-with-historical-data">Working with Historical Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#basic-usage">Basic Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#changing-timeframes">Changing Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-custom-timeframes">Adding Custom Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#visualizing-data">Visualizing Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#working-with-real-time-data">Working with Real-time Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Basic Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#get-latest-close-price">Get Latest Close Price</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#get-recent-history">Get Recent History</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#get-intraday-data">Get Intraday Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#complete-example">Complete Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#data-engine-selection">Data Engine Selection</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#polars-recommended">Polars (Recommended)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pyarrow">PyArrow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pandas">Pandas</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#need-help">Need Help?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#configuration-file">Configuration File</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#basic-configuration-file">Basic Configuration File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#configuration-options">Configuration Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#engine">ENGINE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#data-filetype">DATA_FILETYPE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#providers-key">PROVIDERS_KEY</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="configuration.html#getting-api-keys">Getting API Keys</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#using-configuration-in-code">Using Configuration in Code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#automatic-loading">Automatic Loading</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#explicit-configuration-file">Explicit Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#overriding-configuration">Overriding Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#template-configuration-file">Template Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#multiple-configuration-files">Multiple Configuration Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#environment-variables">Environment Variables</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#configuration-best-practices">Configuration Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#example-production-configuration">Example: Production Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#configuration-not-found">Configuration Not Found</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#invalid-api-key">Invalid API Key</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#historical-data-examples">Historical Data Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-1-basic-data-retrieval">Example 1: Basic Data Retrieval</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-2-working-with-multiple-timeframes">Example 2: Working with Multiple Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-3-visualizing-historical-data">Example 3: Visualizing Historical Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-4-multi-year-analysis">Example 4: Multi-Year Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#real-time-data-examples">Real-time Data Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-5-get-latest-market-price">Example 5: Get Latest Market Price</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-6-recent-price-history">Example 6: Recent Price History</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-7-specific-date-range-real-time">Example 7: Specific Date Range (Real-time)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-8-intraday-real-time-data">Example 8: Intraday Real-time Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#combined-examples">Combined Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-9-historical-real-time-combination">Example 9: Historical + Real-time Combination</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-10-multi-currency-analysis">Example 10: Multi-Currency Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#advanced-examples">Advanced Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-11-custom-data-processing-pipeline">Example 11: Custom Data Processing Pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-12-error-handling-and-validation">Example 12: Error Handling and Validation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-13-performance-optimization">Example 13: Performance Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-14-export-to-different-formats">Example 14: Export to Different Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#testing-examples">Testing Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples.html#example-15-running-the-test-suite">Example 15: Running the Test Suite</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#tips-and-best-practices">Tips and Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">forex_data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="forex_data.html">forex_data package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="forex_data.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.config.html">forex_data.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.data_management.html">forex_data.data_management package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="forex_data.html#module-forex_data">Module contents</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.read_config_file"><code class="docutils literal notranslate"><span class="pre">read_config_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.read_config_string"><code class="docutils literal notranslate"><span class="pre">read_config_string()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.read_config_folder"><code class="docutils literal notranslate"><span class="pre">read_config_folder()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.HistoricalManagerDB"><code class="docutils literal notranslate"><span class="pre">HistoricalManagerDB</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.RealtimeManager"><code class="docutils literal notranslate"><span class="pre">RealtimeManager</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.BASE_DATA_COLUMN_NAME"><code class="docutils literal notranslate"><span class="pre">BASE_DATA_COLUMN_NAME</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.DATA_FILE_COLUMN_INDEX"><code class="docutils literal notranslate"><span class="pre">DATA_FILE_COLUMN_INDEX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.DEFAULT_PATHS"><code class="docutils literal notranslate"><span class="pre">DEFAULT_PATHS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.empty_dataframe"><code class="docutils literal notranslate"><span class="pre">empty_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.is_empty_dataframe"><code class="docutils literal notranslate"><span class="pre">is_empty_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.shape_dataframe"><code class="docutils literal notranslate"><span class="pre">shape_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.get_dataframe_column"><code class="docutils literal notranslate"><span class="pre">get_dataframe_column()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.get_dataframe_row"><code class="docutils literal notranslate"><span class="pre">get_dataframe_row()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.get_dataframe_element"><code class="docutils literal notranslate"><span class="pre">get_dataframe_element()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.get_attrs_names"><code class="docutils literal notranslate"><span class="pre">get_attrs_names()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.any_date_to_datetime64"><code class="docutils literal notranslate"><span class="pre">any_date_to_datetime64()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.get_db_key_elements"><code class="docutils literal notranslate"><span class="pre">get_db_key_elements()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.check_timeframe_str"><code class="docutils literal notranslate"><span class="pre">check_timeframe_str()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.DatabaseConnector"><code class="docutils literal notranslate"><span class="pre">DatabaseConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.DuckDBConnector"><code class="docutils literal notranslate"><span class="pre">DuckDBConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.LocalDBConnector"><code class="docutils literal notranslate"><span class="pre">LocalDBConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.validator_list_timeframe"><code class="docutils literal notranslate"><span class="pre">validator_list_timeframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.concat_data"><code class="docutils literal notranslate"><span class="pre">concat_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.validator_dir_path"><code class="docutils literal notranslate"><span class="pre">validator_dir_path()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.TickerNotFoundError"><code class="docutils literal notranslate"><span class="pre">TickerNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.TickerDataNotFoundError"><code class="docutils literal notranslate"><span class="pre">TickerDataNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.TickerDataBadTypeException"><code class="docutils literal notranslate"><span class="pre">TickerDataBadTypeException</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.TickerDataInvalidException"><code class="docutils literal notranslate"><span class="pre">TickerDataInvalidException</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.get_histdata_tickers"><code class="docutils literal notranslate"><span class="pre">get_histdata_tickers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="forex_data.html#forex_data.POLARS_DTYPE_DICT"><code class="docutils literal notranslate"><span class="pre">POLARS_DTYPE_DICT</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#getting-started">Getting Started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#development-setup">Development Setup</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#code-standards">Code Standards</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#python-style-guide">Python Style Guide</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#linting-and-formatting">Linting and Formatting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#testing">Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#writing-tests">Writing Tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#running-tests">Running Tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#continuous-integration">Continuous Integration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#documentation">Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#building-documentation">Building Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#docstring-format">Docstring Format</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#adding-documentation-pages">Adding Documentation Pages</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#contribution-workflow">Contribution Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#making-changes">Making Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#submitting-a-pull-request">Submitting a Pull Request</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#what-to-contribute">What to Contribute</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#features">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#bug-fixes">Bug Fixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#id1">Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#tests">Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#development-priorities">Development Priorities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#current-focus-areas">Current Focus Areas</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#code-review-process">Code Review Process</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#what-reviewers-look-for">What Reviewers Look For</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#getting-help">Getting Help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#community-guidelines">Community Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#be-respectful">Be Respectful</a></li>
+<li class="toctree-l3"><a class="reference internal" href="contributing.html#code-of-conduct">Code of Conduct</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#recognition">Recognition</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#thank-you">Thank You!</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#version-0-1-0-current">Version 0.1.0 (Current)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#added">Added</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="changelog.html#core-features">Core Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="changelog.html#data-management">Data Management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="changelog.html#developer-experience">Developer Experience</a></li>
+<li class="toctree-l4"><a class="reference internal" href="changelog.html#documentation">Documentation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#known-issues">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#future-releases">Future Releases</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#planned-for-v0-2-0">Planned for v0.2.0</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="changelog.html#database-integration">Database Integration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="changelog.html#enhanced-features">Enhanced Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="changelog.html#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#planned-for-v0-3-0">Planned for v0.3.0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#how-to-upgrade">How to Upgrade</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#from-development-to-v0-1-0">From Development to v0.1.0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#migration-notes">Migration Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#v0-1-0-breaking-changes">v0.1.0 Breaking Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#deprecation-warnings">Deprecation Warnings</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#version-history-details">Version History Details</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="changelog.html#development-pre-release">Development (Pre-release)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#contributing-to-changelog">Contributing to Changelog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">forex_data</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Quick Start</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/quickstart.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="quick-start">
+<h1>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h1>
+<p>This guide will help you get started with forex_data in just a few minutes.</p>
+<section id="basic-concepts">
+<h2>Basic Concepts<a class="headerlink" href="#basic-concepts" title="Link to this heading"></a></h2>
+<p>The forex_data package provides two main types of data managers:</p>
+<ol class="arabic simple">
+<li><p><strong>Historical Data Manager</strong>: For accessing historical Forex data (20+ years)</p></li>
+<li><p><strong>Real-time Data Manager</strong>: For accessing current and recent market data</p></li>
+</ol>
+<p>Both managers provide a consistent interface and return data in the standard OHLC format:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">timestamp</span></code> - Date and time of the candle</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">open</span></code> - Opening price</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">high</span></code> - Highest price</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">low</span></code> - Lowest price</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">close</span></code> - Closing price</p></li>
+</ul>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<p>Before using the package, it’s recommended to create a configuration file.</p>
+<p>Create a file ending with <code class="docutils literal notranslate"><span class="pre">data_config.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">ENGINE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">polars</span><span class="w">          </span><span class="c1"># Options: polars, pyarrow, pandas</span>
+<span class="nt">DATA_FILETYPE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parquet</span><span class="w">       </span><span class="c1"># Options: parquet, csv</span>
+
+<span class="nt">PROVIDERS_KEY</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ALPHAVANTAGE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_api_key_here</span>
+<span class="w">  </span><span class="nt">POLYGON</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_api_key_here</span>
+</pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Use <strong>parquet</strong> for better performance and <strong>polars</strong> for the fastest data processing!</p>
+</div>
+</section>
+<section id="working-with-historical-data">
+<h2>Working with Historical Data<a class="headerlink" href="#working-with-historical-data" title="Link to this heading"></a></h2>
+<p>The historical data manager gives you access to years of Forex data.</p>
+<section id="basic-usage">
+<h3>Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">forex_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">HistoricalManagerDB</span>
+
+<span class="c1"># Create a manager instance</span>
+<span class="n">hist_manager</span> <span class="o">=</span> <span class="n">HistoricalManagerDB</span><span class="p">(</span>
+    <span class="n">config</span><span class="o">=</span><span class="s1">&#39;data_config.yaml&#39;</span>
+<span class="p">)</span>
+
+<span class="c1"># Get data for a specific period</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">hist_manager</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;EURUSD&#39;</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;1h&#39;</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="s1">&#39;2020-01-01&#39;</span><span class="p">,</span>
+    <span class="n">end</span><span class="o">=</span><span class="s1">&#39;2020-01-31&#39;</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This will return a DataFrame with hourly EURUSD data for January 2020.</p>
+</section>
+<section id="changing-timeframes">
+<h3>Changing Timeframes<a class="headerlink" href="#changing-timeframes" title="Link to this heading"></a></h3>
+<p>You can easily work with different timeframes:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get daily data</span>
+<span class="n">daily_data</span> <span class="o">=</span> <span class="n">hist_manager</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;EURUSD&#39;</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;1D&#39;</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="s1">&#39;2019-01-01&#39;</span><span class="p">,</span>
+    <span class="n">end</span><span class="o">=</span><span class="s1">&#39;2019-12-31&#39;</span>
+<span class="p">)</span>
+
+<span class="c1"># Get 15-minute data</span>
+<span class="n">intraday_data</span> <span class="o">=</span> <span class="n">hist_manager</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;EURUSD&#39;</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;15m&#39;</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="s1">&#39;2020-06-01 00:00:00&#39;</span><span class="p">,</span>
+    <span class="n">end</span><span class="o">=</span><span class="s1">&#39;2020-06-07 23:59:59&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Supported timeframes include: <code class="docutils literal notranslate"><span class="pre">1m</span></code>, <code class="docutils literal notranslate"><span class="pre">5m</span></code>, <code class="docutils literal notranslate"><span class="pre">15m</span></code>, <code class="docutils literal notranslate"><span class="pre">30m</span></code>, <code class="docutils literal notranslate"><span class="pre">1h</span></code>, <code class="docutils literal notranslate"><span class="pre">4h</span></code>, <code class="docutils literal notranslate"><span class="pre">1D</span></code>, <code class="docutils literal notranslate"><span class="pre">1W</span></code>, <code class="docutils literal notranslate"><span class="pre">1M</span></code></p>
+</section>
+<section id="adding-custom-timeframes">
+<h3>Adding Custom Timeframes<a class="headerlink" href="#adding-custom-timeframes" title="Link to this heading"></a></h3>
+<p>You can create and cache custom timeframes:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Add a weekly timeframe</span>
+<span class="n">hist_manager</span><span class="o">.</span><span class="n">add_timeframe</span><span class="p">(</span><span class="s1">&#39;1W&#39;</span><span class="p">)</span>
+
+<span class="c1"># Now you can use it</span>
+<span class="n">weekly_data</span> <span class="o">=</span> <span class="n">hist_manager</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;EURUSD&#39;</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;1W&#39;</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="s1">&#39;2020-01-01&#39;</span><span class="p">,</span>
+    <span class="n">end</span><span class="o">=</span><span class="s1">&#39;2020-12-31&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="visualizing-data">
+<h3>Visualizing Data<a class="headerlink" href="#visualizing-data" title="Link to this heading"></a></h3>
+<p>Plot candlestick charts directly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hist_manager</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;EURUSD&#39;</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;1D&#39;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s1">&#39;2020-01-01&#39;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s1">&#39;2020-06-30&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This will generate an interactive candlestick chart.</p>
+</section>
+</section>
+<section id="working-with-real-time-data">
+<h2>Working with Real-time Data<a class="headerlink" href="#working-with-real-time-data" title="Link to this heading"></a></h2>
+<p>The real-time data manager provides access to current market data.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>You need API keys from Alpha Vantage and/or Polygon.io to use real-time data.
+Add them to your <code class="docutils literal notranslate"><span class="pre">appconfig.yaml</span></code> file.</p>
+</div>
+<section id="id1">
+<h3>Basic Usage<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">forex_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">RealtimeManager</span>
+
+<span class="c1"># Create a real-time manager</span>
+<span class="n">rt_manager</span> <span class="o">=</span> <span class="n">RealtimeManager</span><span class="p">(</span>
+    <span class="n">config</span><span class="o">=</span><span class="s1">&#39;data_config.yaml&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="get-latest-close-price">
+<h3>Get Latest Close Price<a class="headerlink" href="#get-latest-close-price" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the most recent daily close</span>
+<span class="n">latest</span> <span class="o">=</span> <span class="n">rt_manager</span><span class="o">.</span><span class="n">get_daily_close</span><span class="p">(</span><span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;GBPUSD&#39;</span><span class="p">,</span> <span class="n">last_close</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">latest</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="get-recent-history">
+<h3>Get Recent History<a class="headerlink" href="#get-recent-history" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get last 10 days of data</span>
+<span class="n">recent_data</span> <span class="o">=</span> <span class="n">rt_manager</span><span class="o">.</span><span class="n">get_daily_close</span><span class="p">(</span><span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;GBPUSD&#39;</span><span class="p">,</span> <span class="n">recent_days_window</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">recent_data</span><span class="p">)</span>
+
+<span class="c1"># Get specific date range</span>
+<span class="n">range_data</span> <span class="o">=</span> <span class="n">rt_manager</span><span class="o">.</span><span class="n">get_daily_close</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;GBPUSD&#39;</span><span class="p">,</span>
+    <span class="n">day_start</span><span class="o">=</span><span class="s1">&#39;2024-01-01&#39;</span><span class="p">,</span>
+    <span class="n">day_end</span><span class="o">=</span><span class="s1">&#39;2024-01-31&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="get-intraday-data">
+<h3>Get Intraday Data<a class="headerlink" href="#get-intraday-data" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get hourly data</span>
+<span class="n">intraday</span> <span class="o">=</span> <span class="n">rt_manager</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="s1">&#39;GBPUSD&#39;</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;1h&#39;</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="s1">&#39;2024-01-15&#39;</span><span class="p">,</span>
+    <span class="n">end</span><span class="o">=</span><span class="s1">&#39;2024-01-20&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="complete-example">
+<h2>Complete Example<a class="headerlink" href="#complete-example" title="Link to this heading"></a></h2>
+<p>Here’s a complete example combining historical and real-time data:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">forex_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">HistoricalManagerDB</span><span class="p">,</span> <span class="n">RealtimeManager</span>
+
+<span class="c1"># Setup</span>
+<span class="n">ticker</span> <span class="o">=</span> <span class="s1">&#39;NZDUSD&#39;</span>
+<span class="n">config</span> <span class="o">=</span> <span class="s1">&#39;data_config.yaml&#39;</span>
+
+<span class="c1"># Get historical data</span>
+<span class="n">hist</span> <span class="o">=</span> <span class="n">HistoricalManagerDB</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+<span class="n">historical_data</span> <span class="o">=</span> <span class="n">hist</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="n">ticker</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;1D&#39;</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="s1">&#39;2020-01-01&#39;</span><span class="p">,</span>
+    <span class="n">end</span><span class="o">=</span><span class="s1">&#39;2023-12-31&#39;</span>
+<span class="p">)</span>
+
+<span class="c1"># Get recent real-time data</span>
+<span class="n">rt</span> <span class="o">=</span> <span class="n">RealtimeManager</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+<span class="n">recent_data</span> <span class="o">=</span> <span class="n">rt</span><span class="o">.</span><span class="n">get_daily_close</span><span class="p">(</span><span class="n">ticker</span><span class="o">=</span><span class="n">ticker</span><span class="p">,</span> <span class="n">recent_days_window</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+
+<span class="c1"># Combine them for a complete dataset</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Historical data: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">historical_data</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recent data: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">recent_data</span><span class="p">)</span><span class="si">}</span><span class="s2"> rows&quot;</span><span class="p">)</span>
+
+<span class="c1"># Plot recent data</span>
+<span class="n">hist</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">ticker</span><span class="o">=</span><span class="n">ticker</span><span class="p">,</span>
+    <span class="n">timeframe</span><span class="o">=</span><span class="s1">&#39;1D&#39;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s1">&#39;2023-12-01&#39;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s1">&#39;2023-12-31&#39;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="data-engine-selection">
+<h2>Data Engine Selection<a class="headerlink" href="#data-engine-selection" title="Link to this heading"></a></h2>
+<p>The package supports multiple data processing engines:</p>
+<section id="polars-recommended">
+<h3>Polars (Recommended)<a class="headerlink" href="#polars-recommended" title="Link to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">DATA_ENGINE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">polars</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>✅ Fastest performance</p></li>
+<li><p>✅ Modern API</p></li>
+<li><p>✅ Great for large datasets</p></li>
+<li><p>✅ Best memory efficiency</p></li>
+</ul>
+</section>
+<section id="pyarrow">
+<h3>PyArrow<a class="headerlink" href="#pyarrow" title="Link to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">ENGINE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pyarrow</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>✅ Very fast</p></li>
+<li><p>✅ Columnar format</p></li>
+<li><p>✅ Great for analytics</p></li>
+</ul>
+</section>
+<section id="pandas">
+<h3>Pandas<a class="headerlink" href="#pandas" title="Link to this heading"></a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">ENGINE</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>⚠️ Slower performance</p></li>
+<li><p>✅ Most familiar API</p></li>
+<li><p>✅ Widest ecosystem</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Pandas is significantly slower than Polars and PyArrow, especially for large datasets.
+Use Polars for the best performance.</p>
+</div>
+</section>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<p>Now that you know the basics:</p>
+<ul class="simple">
+<li><p>Learn more about <a class="reference internal" href="configuration.html"><span class="doc">Configuration</span></a> options</p></li>
+<li><p>Explore detailed <a class="reference internal" href="examples.html"><span class="doc">Examples</span></a></p></li>
+<li><p>Check the <a class="reference internal" href="modules.html"><span class="doc">API reference</span></a> for all available methods</p></li>
+</ul>
+</section>
+<section id="need-help">
+<h2>Need Help?<a class="headerlink" href="#need-help" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Check the <a class="reference internal" href="examples.html"><span class="doc">Examples</span></a> for more use cases</p></li>
+<li><p>Visit the <a class="reference external" href="https://github.com/nikfio/forex_data">GitHub repository</a></p></li>
+<li><p>Report issues on <a class="reference external" href="https://github.com/nikfio/forex_data/issues">GitHub Issues</a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="configuration.html" class="btn btn-neutral float-right" title="Configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Nicola Fiorato.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

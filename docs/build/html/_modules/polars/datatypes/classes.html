@@ -1,0 +1,1383 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>polars.datatypes.classes &mdash; forex_data 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            forex_data
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#prerequisites">Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#installing-poetry">Installing Poetry</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#installation-steps">Installation Steps</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#clone-the-repository">1. Clone the Repository</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#install-dependencies">2. Install Dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#verify-installation">3. Verify Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#alternative-installation-methods">Alternative Installation Methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#using-pip-not-recommended">Using pip (Not Recommended)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#installation-options">Installation Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#development-installation">Development Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../installation.html#minimal-installation">Minimal Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../installation.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#basic-concepts">Basic Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#working-with-historical-data">Working with Historical Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#basic-usage">Basic Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#changing-timeframes">Changing Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#adding-custom-timeframes">Adding Custom Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#visualizing-data">Visualizing Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#working-with-real-time-data">Working with Real-time Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#id1">Basic Usage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#get-latest-close-price">Get Latest Close Price</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#get-recent-history">Get Recent History</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#get-intraday-data">Get Intraday Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#complete-example">Complete Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#data-engine-selection">Data Engine Selection</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#polars-recommended">Polars (Recommended)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#pyarrow">PyArrow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../quickstart.html#pandas">Pandas</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#next-steps">Next Steps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../quickstart.html#need-help">Need Help?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#configuration-file">Configuration File</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#basic-configuration-file">Basic Configuration File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#configuration-options">Configuration Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#engine">ENGINE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#data-filetype">DATA_FILETYPE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#providers-key">PROVIDERS_KEY</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../configuration.html#getting-api-keys">Getting API Keys</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#using-configuration-in-code">Using Configuration in Code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#automatic-loading">Automatic Loading</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#explicit-configuration-file">Explicit Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#overriding-configuration">Overriding Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#advanced-configuration">Advanced Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#template-configuration-file">Template Configuration File</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#multiple-configuration-files">Multiple Configuration Files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#environment-variables">Environment Variables</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#configuration-best-practices">Configuration Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#example-production-configuration">Example: Production Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#troubleshooting">Troubleshooting</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#configuration-not-found">Configuration Not Found</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../configuration.html#invalid-api-key">Invalid API Key</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../configuration.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#historical-data-examples">Historical Data Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-1-basic-data-retrieval">Example 1: Basic Data Retrieval</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-2-working-with-multiple-timeframes">Example 2: Working with Multiple Timeframes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-3-visualizing-historical-data">Example 3: Visualizing Historical Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-4-multi-year-analysis">Example 4: Multi-Year Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#real-time-data-examples">Real-time Data Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-5-get-latest-market-price">Example 5: Get Latest Market Price</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-6-recent-price-history">Example 6: Recent Price History</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-7-specific-date-range-real-time">Example 7: Specific Date Range (Real-time)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-8-intraday-real-time-data">Example 8: Intraday Real-time Data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#combined-examples">Combined Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-9-historical-real-time-combination">Example 9: Historical + Real-time Combination</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-10-multi-currency-analysis">Example 10: Multi-Currency Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#advanced-examples">Advanced Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-11-custom-data-processing-pipeline">Example 11: Custom Data Processing Pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-12-error-handling-and-validation">Example 12: Error Handling and Validation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-13-performance-optimization">Example 13: Performance Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-14-export-to-different-formats">Example 14: Export to Different Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#testing-examples">Testing Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../examples.html#example-15-running-the-test-suite">Example 15: Running the Test Suite</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#tips-and-best-practices">Tips and Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../examples.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">forex_data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../forex_data.html">forex_data package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../forex_data.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.config.html">forex_data.config package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.data_management.html">forex_data.data_management package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../forex_data.html#module-forex_data">Module contents</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.read_config_file"><code class="docutils literal notranslate"><span class="pre">read_config_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.read_config_string"><code class="docutils literal notranslate"><span class="pre">read_config_string()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.read_config_folder"><code class="docutils literal notranslate"><span class="pre">read_config_folder()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.HistoricalManagerDB"><code class="docutils literal notranslate"><span class="pre">HistoricalManagerDB</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.RealtimeManager"><code class="docutils literal notranslate"><span class="pre">RealtimeManager</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.BASE_DATA_COLUMN_NAME"><code class="docutils literal notranslate"><span class="pre">BASE_DATA_COLUMN_NAME</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DATA_FILE_COLUMN_INDEX"><code class="docutils literal notranslate"><span class="pre">DATA_FILE_COLUMN_INDEX</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DEFAULT_PATHS"><code class="docutils literal notranslate"><span class="pre">DEFAULT_PATHS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.empty_dataframe"><code class="docutils literal notranslate"><span class="pre">empty_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.is_empty_dataframe"><code class="docutils literal notranslate"><span class="pre">is_empty_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.shape_dataframe"><code class="docutils literal notranslate"><span class="pre">shape_dataframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_dataframe_column"><code class="docutils literal notranslate"><span class="pre">get_dataframe_column()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_dataframe_row"><code class="docutils literal notranslate"><span class="pre">get_dataframe_row()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_dataframe_element"><code class="docutils literal notranslate"><span class="pre">get_dataframe_element()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_attrs_names"><code class="docutils literal notranslate"><span class="pre">get_attrs_names()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.any_date_to_datetime64"><code class="docutils literal notranslate"><span class="pre">any_date_to_datetime64()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_db_key_elements"><code class="docutils literal notranslate"><span class="pre">get_db_key_elements()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.check_timeframe_str"><code class="docutils literal notranslate"><span class="pre">check_timeframe_str()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DatabaseConnector"><code class="docutils literal notranslate"><span class="pre">DatabaseConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.DuckDBConnector"><code class="docutils literal notranslate"><span class="pre">DuckDBConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.LocalDBConnector"><code class="docutils literal notranslate"><span class="pre">LocalDBConnector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.validator_list_timeframe"><code class="docutils literal notranslate"><span class="pre">validator_list_timeframe()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.concat_data"><code class="docutils literal notranslate"><span class="pre">concat_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.validator_dir_path"><code class="docutils literal notranslate"><span class="pre">validator_dir_path()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerNotFoundError"><code class="docutils literal notranslate"><span class="pre">TickerNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerDataNotFoundError"><code class="docutils literal notranslate"><span class="pre">TickerDataNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerDataBadTypeException"><code class="docutils literal notranslate"><span class="pre">TickerDataBadTypeException</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.TickerDataInvalidException"><code class="docutils literal notranslate"><span class="pre">TickerDataInvalidException</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.get_histdata_tickers"><code class="docutils literal notranslate"><span class="pre">get_histdata_tickers()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../forex_data.html#forex_data.POLARS_DTYPE_DICT"><code class="docutils literal notranslate"><span class="pre">POLARS_DTYPE_DICT</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributing.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#getting-started">Getting Started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#development-setup">Development Setup</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#code-standards">Code Standards</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#python-style-guide">Python Style Guide</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#linting-and-formatting">Linting and Formatting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#testing">Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#writing-tests">Writing Tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#running-tests">Running Tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#continuous-integration">Continuous Integration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#documentation">Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#building-documentation">Building Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#docstring-format">Docstring Format</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#adding-documentation-pages">Adding Documentation Pages</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#contribution-workflow">Contribution Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#making-changes">Making Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#submitting-a-pull-request">Submitting a Pull Request</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#what-to-contribute">What to Contribute</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#features">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#bug-fixes">Bug Fixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#id1">Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#tests">Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#development-priorities">Development Priorities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#current-focus-areas">Current Focus Areas</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#code-review-process">Code Review Process</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#what-reviewers-look-for">What Reviewers Look For</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#getting-help">Getting Help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#community-guidelines">Community Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#be-respectful">Be Respectful</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../contributing.html#code-of-conduct">Code of Conduct</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#recognition">Recognition</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../contributing.html#thank-you">Thank You!</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#version-0-1-0-current">Version 0.1.0 (Current)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#added">Added</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#core-features">Core Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#data-management">Data Management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#developer-experience">Developer Experience</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#documentation">Documentation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#known-issues">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#future-releases">Future Releases</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#planned-for-v0-2-0">Planned for v0.2.0</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#database-integration">Database Integration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#enhanced-features">Enhanced Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../changelog.html#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#planned-for-v0-3-0">Planned for v0.3.0</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#planned-for-v0-4-0">Planned for v0.4.0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#how-to-upgrade">How to Upgrade</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#from-development-to-v0-1-0">From Development to v0.1.0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#migration-notes">Migration Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#v0-1-0-breaking-changes">v0.1.0 Breaking Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#deprecation-warnings">Deprecation Warnings</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#version-history-details">Version History Details</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../changelog.html#development-pre-release">Development (Pre-release)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#contributing-to-changelog">Contributing to Changelog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../changelog.html#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">forex_data</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">polars.datatypes.classes</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for polars.datatypes.classes</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">tzinfo</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">inspect</span><span class="w"> </span><span class="kn">import</span> <span class="n">isclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">polars._reexport</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">polars.datatypes</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">polars.functions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">F</span>
+
+<span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">ImportError</span><span class="p">):</span>  <span class="c1"># Module not available when building docs</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">polars.polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plr</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">polars.polars</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype_str_repr</span> <span class="k">as</span> <span class="n">_dtype_str_repr</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Sequence</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="kn">import</span> <span class="n">Series</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">polars._typing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">CategoricalOrdering</span><span class="p">,</span>
+        <span class="n">PolarsDataType</span><span class="p">,</span>
+        <span class="n">PythonDataType</span><span class="p">,</span>
+        <span class="n">SchemaDict</span><span class="p">,</span>
+        <span class="n">TimeUnit</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">classinstmethod</span><span class="p">(</span><span class="nb">classmethod</span><span class="p">):</span>  <span class="c1"># type: ignore[type-arg]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decorator that allows a method to be called from the class OR instance.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__get__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">type_</span><span class="p">:</span> <span class="nb">type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="n">get</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__get__</span> <span class="k">if</span> <span class="n">instance</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__func__</span><span class="o">.</span><span class="fm">__get__</span>
+        <span class="k">return</span> <span class="n">get</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">type_</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DataTypeClass</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Metaclass for nicely printing DataType classes.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_string_repr</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_dtype_str_repr</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+
+    <span class="c1"># Methods below defined here in signature only to satisfy mypy</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">base_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DataTypeClass</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_numeric</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_decimal</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_integer</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_object</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_signed_integer</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_unsigned_integer</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_float</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_temporal</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_nested</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_python</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">py_type</span><span class="p">:</span> <span class="n">PythonDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PolarsDataType</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_python</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonDataType</span><span class="p">:</span>  <span class="c1"># noqa: D102</span>
+        <span class="o">...</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DataType</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">DataTypeClass</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for all Polars data types.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_string_repr</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_dtype_str_repr</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">base_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DataTypeClass</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return this DataType&#39;s fundamental/root type class.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.Datetime(&quot;ns&quot;).base_type()</span>
+<span class="sd">        Datetime</span>
+<span class="sd">        &gt;&gt;&gt; pl.List(pl.Int32).base_type()</span>
+<span class="sd">        List</span>
+<span class="sd">        &gt;&gt;&gt; pl.Struct([pl.Field(&quot;a&quot;, pl.Int64), pl.Field(&quot;b&quot;, pl.Boolean)]).base_type()</span>
+<span class="sd">        Struct</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span>
+
+    <span class="nd">@classinstmethod</span>  <span class="c1"># type: ignore[arg-type]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check if this DataType is the same as another DataType.</span>
+
+<span class="sd">        This is a stricter check than `self == other`, as it enforces an exact</span>
+<span class="sd">        match of all dtype attributes for nested and/or uninitialised dtypes.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        other</span>
+<span class="sd">            the other Polars dtype to compare with.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.List == pl.List(pl.Int32)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; pl.List.is_(pl.List(pl.Int32))</span>
+<span class="sd">        False</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">other</span> <span class="ow">and</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">==</span> <span class="nb">hash</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_numeric</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is a numeric type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">NumericType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_decimal</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is a decimal type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_integer</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is an integer type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">IntegerType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_object</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is an object type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ObjectType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_signed_integer</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is a signed integer type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">SignedIntegerType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_unsigned_integer</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is an unsigned integer type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">UnsignedIntegerType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_float</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is a floating point type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">FloatType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_temporal</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is a temporal type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">TemporalType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_nested</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether the data type is a nested type.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">NestedType</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_python</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">py_type</span><span class="p">:</span> <span class="n">PythonDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PolarsDataType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the Polars data type corresponding to a given Python type.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Not every Python type has a corresponding Polars data type; in general</span>
+<span class="sd">        you should declare Polars data types explicitly to exactly specify</span>
+<span class="sd">        the desired type and its properties (such as scale/unit).</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.DataType.from_python(int)</span>
+<span class="sd">        Int64</span>
+<span class="sd">        &gt;&gt;&gt; pl.DataType.from_python(float)</span>
+<span class="sd">        Float64</span>
+<span class="sd">        &gt;&gt;&gt; from datetime import tzinfo</span>
+<span class="sd">        &gt;&gt;&gt; pl.DataType.from_python(tzinfo)  # doctest: +SKIP</span>
+<span class="sd">        TypeError: cannot parse input &lt;class &#39;datetime.tzinfo&#39;&gt; into Polars data type</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">polars.datatypes._parse</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_into_dtype</span>
+
+        <span class="k">return</span> <span class="n">parse_into_dtype</span><span class="p">(</span><span class="n">py_type</span><span class="p">)</span>
+
+    <span class="nd">@classinstmethod</span>  <span class="c1"># type: ignore[arg-type]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_python</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonDataType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the Python type corresponding to this Polars data type.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.Int16().to_python()</span>
+<span class="sd">        &lt;class &#39;int&#39;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; pl.Float32().to_python()</span>
+<span class="sd">        &lt;class &#39;float&#39;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; pl.Array(pl.Date(), 10).to_python()</span>
+<span class="sd">        &lt;class &#39;list&#39;&gt;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">polars.datatypes</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype_to_py_type</span>
+
+        <span class="k">return</span> <span class="n">dtype_to_py_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">NumericType</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for numeric data types.&quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a literal expression representing the maximum value of this data type.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.select(pl.Int8.max() == 127)</span>
+<span class="sd">        shape: (1, 1)</span>
+<span class="sd">        ┌─────────┐</span>
+<span class="sd">        │ literal │</span>
+<span class="sd">        │ ---     │</span>
+<span class="sd">        │ bool    │</span>
+<span class="sd">        ╞═════════╡</span>
+<span class="sd">        │ true    │</span>
+<span class="sd">        └─────────┘</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="o">.</span><span class="n">_from_pyexpr</span><span class="p">(</span><span class="n">plr</span><span class="o">.</span><span class="n">_get_dtype_max</span><span class="p">(</span><span class="bp">cls</span><span class="p">))</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a literal expression representing the minimum value of this data type.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.select(pl.Int8.min() == -128)</span>
+<span class="sd">        shape: (1, 1)</span>
+<span class="sd">        ┌─────────┐</span>
+<span class="sd">        │ literal │</span>
+<span class="sd">        │ ---     │</span>
+<span class="sd">        │ bool    │</span>
+<span class="sd">        ╞═════════╡</span>
+<span class="sd">        │ true    │</span>
+<span class="sd">        └─────────┘</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="o">.</span><span class="n">_from_pyexpr</span><span class="p">(</span><span class="n">plr</span><span class="o">.</span><span class="n">_get_dtype_min</span><span class="p">(</span><span class="bp">cls</span><span class="p">))</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegerType</span><span class="p">(</span><span class="n">NumericType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for integer data types.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SignedIntegerType</span><span class="p">(</span><span class="n">IntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for signed integer data types.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">UnsignedIntegerType</span><span class="p">(</span><span class="n">IntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for unsigned integer data types.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">FloatType</span><span class="p">(</span><span class="n">NumericType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for float data types.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">TemporalType</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for temporal data types.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">NestedType</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for nested data types.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ObjectType</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for object data types.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Int8</span><span class="p">(</span><span class="n">SignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;8-bit signed integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Int16</span><span class="p">(</span><span class="n">SignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;16-bit signed integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Int32</span><span class="p">(</span><span class="n">SignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;32-bit signed integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Int64</span><span class="p">(</span><span class="n">SignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;64-bit signed integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Int128</span><span class="p">(</span><span class="n">SignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    128-bit signed integer type.</span>
+
+<span class="sd">    .. warning::</span>
+<span class="sd">        This functionality is considered **unstable**.</span>
+<span class="sd">        It is a work-in-progress feature and may not always work as expected.</span>
+<span class="sd">        It may be changed at any point without it being considered a breaking change.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">UInt8</span><span class="p">(</span><span class="n">UnsignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;8-bit unsigned integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">UInt16</span><span class="p">(</span><span class="n">UnsignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;16-bit unsigned integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">UInt32</span><span class="p">(</span><span class="n">UnsignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;32-bit unsigned integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">UInt64</span><span class="p">(</span><span class="n">UnsignedIntegerType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;64-bit unsigned integer type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Float32</span><span class="p">(</span><span class="n">FloatType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;32-bit floating point type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Float64</span><span class="p">(</span><span class="n">FloatType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;64-bit floating point type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Decimal</span><span class="p">(</span><span class="n">NumericType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Decimal 128-bit type with an optional precision and non-negative scale.</span>
+
+<span class="sd">    .. warning::</span>
+<span class="sd">        This functionality is considered **unstable**.</span>
+<span class="sd">        It is a work-in-progress feature and may not always work as expected.</span>
+<span class="sd">        It may be changed at any point without it being considered a breaking change.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    precision</span>
+<span class="sd">        Maximum number of digits in each number.</span>
+<span class="sd">        If set to `None` (default), the precision is inferred.</span>
+<span class="sd">    scale</span>
+<span class="sd">        Number of digits to the right of the decimal point in each number.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">precision</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">scale</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">precision</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">scale</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Issuing the warning on `__init__` does not trigger when the class is used</span>
+        <span class="c1"># without being instantiated, but it&#39;s better than nothing</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">polars._utils.unstable</span><span class="w"> </span><span class="kn">import</span> <span class="n">issue_unstable_warning</span>
+
+        <span class="n">issue_unstable_warning</span><span class="p">(</span>
+            <span class="s2">&quot;the Decimal data type is considered unstable.&quot;</span>
+            <span class="s2">&quot; It is a work-in-progress feature and may not always work as expected.&quot;</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="o">=</span> <span class="n">precision</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(precision=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="si">}</span><span class="s2">, scale=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># allow comparing object instances to class</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">precision</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">scale</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">precision</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">))</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Boolean</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Boolean type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">String</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;UTF-8 encoded string type.&quot;&quot;&quot;</span>
+
+
+<span class="c1"># Allow Utf8 as an alias for String</span>
+<span class="n">Utf8</span> <span class="o">=</span> <span class="n">String</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Binary</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Binary type.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Date</span><span class="p">(</span><span class="n">TemporalType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data type representing a calendar date.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The underlying representation of this type is a 32-bit signed integer.</span>
+<span class="sd">    The integer indicates the number of days since the Unix epoch (1970-01-01).</span>
+<span class="sd">    The number can be negative to indicate dates before the epoch.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Time</span><span class="p">(</span><span class="n">TemporalType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data type representing the time of day.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The underlying representation of this type is a 64-bit signed integer.</span>
+<span class="sd">    The integer indicates the number of nanoseconds since midnight.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">max</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a literal expression representing the maximum value of this data type.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.select(pl.Time.max() == 86_399_999_999_999)</span>
+<span class="sd">        shape: (1, 1)</span>
+<span class="sd">        ┌─────────┐</span>
+<span class="sd">        │ literal │</span>
+<span class="sd">        │ ---     │</span>
+<span class="sd">        │ bool    │</span>
+<span class="sd">        ╞═════════╡</span>
+<span class="sd">        │ true    │</span>
+<span class="sd">        └─────────┘</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="o">.</span><span class="n">_from_pyexpr</span><span class="p">(</span><span class="n">plr</span><span class="o">.</span><span class="n">_get_dtype_max</span><span class="p">(</span><span class="bp">cls</span><span class="p">))</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">min</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a literal expression representing the minimum value of this data type.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; pl.select(pl.Time.min() == 0)</span>
+<span class="sd">        shape: (1, 1)</span>
+<span class="sd">        ┌─────────┐</span>
+<span class="sd">        │ literal │</span>
+<span class="sd">        │ ---     │</span>
+<span class="sd">        │ bool    │</span>
+<span class="sd">        ╞═════════╡</span>
+<span class="sd">        │ true    │</span>
+<span class="sd">        └─────────┘</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="o">.</span><span class="n">_from_pyexpr</span><span class="p">(</span><span class="n">plr</span><span class="o">.</span><span class="n">_get_dtype_min</span><span class="p">(</span><span class="bp">cls</span><span class="p">))</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Datetime</span><span class="p">(</span><span class="n">TemporalType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data type representing a calendar date and time of day.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    time_unit : {&#39;us&#39;, &#39;ns&#39;, &#39;ms&#39;}</span>
+<span class="sd">        Unit of time. Defaults to `&#39;us&#39;` (microseconds).</span>
+<span class="sd">    time_zone</span>
+<span class="sd">        Time zone string, as defined in zoneinfo (to see valid strings run</span>
+<span class="sd">        `import zoneinfo; zoneinfo.available_timezones()` for a full list).</span>
+<span class="sd">        When used to match dtypes, can set this to &quot;*&quot; to check for Datetime</span>
+<span class="sd">        columns that have any (non-null) timezone.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The underlying representation of this type is a 64-bit signed integer.</span>
+<span class="sd">    The integer indicates the number of time units since the Unix epoch</span>
+<span class="sd">    (1970-01-01 00:00:00). The number can be negative to indicate datetimes before the</span>
+<span class="sd">    epoch.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">time_unit</span><span class="p">:</span> <span class="n">TimeUnit</span>
+    <span class="n">time_zone</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">time_unit</span><span class="p">:</span> <span class="n">TimeUnit</span> <span class="o">=</span> <span class="s2">&quot;us&quot;</span><span class="p">,</span> <span class="n">time_zone</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">tzinfo</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">time_unit</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;ms&quot;</span><span class="p">,</span> <span class="s2">&quot;us&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;invalid `time_unit`&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">Expected one of </span><span class="se">{{</span><span class="s2">&#39;ns&#39;,&#39;us&#39;,&#39;ms&#39;</span><span class="se">}}</span><span class="s2">, got </span><span class="si">{</span><span class="n">time_unit</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">time_zone</span><span class="p">,</span> <span class="n">tzinfo</span><span class="p">):</span>
+            <span class="n">time_zone</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">time_zone</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span> <span class="o">=</span> <span class="n">time_unit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_zone</span> <span class="o">=</span> <span class="n">time_zone</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># allow comparing object instances to class</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Datetime</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Datetime</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">time_unit</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_zone</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">time_zone</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_zone</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">class_name</span><span class="si">}</span><span class="s2">(time_unit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span><span class="si">!r}</span><span class="s2">, time_zone=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">time_zone</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Duration</span><span class="p">(</span><span class="n">TemporalType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data type representing a time duration.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    time_unit : {&#39;us&#39;, &#39;ns&#39;, &#39;ms&#39;}</span>
+<span class="sd">        Unit of time. Defaults to `&#39;us&#39;` (microseconds).</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The underlying representation of this type is a 64-bit signed integer.</span>
+<span class="sd">    The integer indicates an amount of time units and can be negative to indicate</span>
+<span class="sd">    negative time offsets.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">time_unit</span><span class="p">:</span> <span class="n">TimeUnit</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_unit</span><span class="p">:</span> <span class="n">TimeUnit</span> <span class="o">=</span> <span class="s2">&quot;us&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">time_unit</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;ms&quot;</span><span class="p">,</span> <span class="s2">&quot;us&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;invalid `time_unit`&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">Expected one of </span><span class="se">{{</span><span class="s2">&#39;ns&#39;,&#39;us&#39;,&#39;ms&#39;</span><span class="se">}}</span><span class="s2">, got </span><span class="si">{</span><span class="n">time_unit</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span> <span class="o">=</span> <span class="n">time_unit</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># allow comparing object instances to class</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Duration</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Duration</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">time_unit</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">class_name</span><span class="si">}</span><span class="s2">(time_unit=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">time_unit</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Categorical</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A categorical encoding of a set of strings.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ordering : {&#39;lexical&#39;, &#39;physical&#39;}</span>
+<span class="sd">        Ordering by order of appearance (`&#39;physical&#39;`, default)</span>
+<span class="sd">        or string value (`&#39;lexical&#39;`).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">ordering</span><span class="p">:</span> <span class="n">CategoricalOrdering</span> <span class="o">|</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">ordering</span><span class="p">:</span> <span class="n">CategoricalOrdering</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;physical&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ordering</span> <span class="o">=</span> <span class="n">ordering</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(ordering=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ordering</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># allow comparing object instances to class</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Categorical</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Categorical</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ordering</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">ordering</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ordering</span><span class="p">))</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Enum</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A fixed categorical encoding of a unique set of strings.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    categories</span>
+<span class="sd">        The categories in the dataset; must be a unique set of strings, or an</span>
+<span class="sd">        existing Python string-valued enum.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Explicitly define enumeration categories:</span>
+
+<span class="sd">    &gt;&gt;&gt; pl.Enum([&quot;north&quot;, &quot;south&quot;, &quot;east&quot;, &quot;west&quot;])</span>
+<span class="sd">    Enum(categories=[&#39;north&#39;, &#39;south&#39;, &#39;east&#39;, &#39;west&#39;])</span>
+
+<span class="sd">    Initialise from an existing Python enumeration:</span>
+
+<span class="sd">    &gt;&gt;&gt; from http import HTTPMethod</span>
+<span class="sd">    &gt;&gt;&gt; pl.Enum(HTTPMethod)</span>
+<span class="sd">    Enum(categories=[&#39;CONNECT&#39;, &#39;DELETE&#39;, &#39;GET&#39;, &#39;HEAD&#39;, &#39;OPTIONS&#39;, &#39;PATCH&#39;, &#39;POST&#39;, &#39;PUT&#39;, &#39;TRACE&#39;])</span>
+<span class="sd">    &quot;&quot;&quot;</span>  <span class="c1"># noqa: W505</span>
+
+    <span class="n">categories</span><span class="p">:</span> <span class="n">Series</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">categories</span><span class="p">:</span> <span class="n">Series</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">type</span><span class="p">[</span><span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">isclass</span><span class="p">(</span><span class="n">categories</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">categories</span><span class="p">,</span> <span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">enum_subclass</span> <span class="ow">in</span> <span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">Flag</span><span class="p">,</span> <span class="n">enum</span><span class="o">.</span><span class="n">IntEnum</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">categories</span><span class="p">,</span> <span class="n">enum_subclass</span><span class="p">):</span>
+                    <span class="n">enum_type_name</span> <span class="o">=</span> <span class="n">categories</span><span class="o">.</span><span class="vm">__name__</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Enum categories must be strings; `</span><span class="si">{</span><span class="n">enum_type_name</span><span class="si">}</span><span class="s2">` values are integers&quot;</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+            <span class="n">enum_values</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">categories</span><span class="o">.</span><span class="n">__members__</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="p">]</span>
+            <span class="n">categories</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">enum_values</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">categories</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+            <span class="n">categories</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">categories</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">categories</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">categories</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;category&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">String</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">categories</span><span class="o">.</span><span class="n">has_nulls</span><span class="p">():</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Enum categories must not contain null values&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">dtype</span> <span class="o">:=</span> <span class="n">categories</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="o">!=</span> <span class="n">String</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Enum categories must be strings; found data of type </span><span class="si">{</span><span class="n">dtype</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">categories</span><span class="o">.</span><span class="n">n_unique</span><span class="p">()</span> <span class="o">!=</span> <span class="n">categories</span><span class="o">.</span><span class="n">len</span><span class="p">():</span>
+            <span class="n">duplicate</span> <span class="o">=</span> <span class="n">categories</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">categories</span><span class="o">.</span><span class="n">is_duplicated</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Enum categories must be unique; found duplicate </span><span class="si">{</span><span class="n">duplicate</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">categories</span> <span class="o">=</span> <span class="n">categories</span><span class="o">.</span><span class="n">rechunk</span><span class="p">()</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;category&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># allow comparing object instances to class</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">categories</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">categories</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">categories</span><span class="p">)))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">class_name</span><span class="si">}</span><span class="s2">(categories=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">categories</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">union</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Enum</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Enum</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Union of two Enums.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Enum</span><span class="p">(</span>
+            <span class="n">F</span><span class="o">.</span><span class="n">concat</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">categories</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">categories</span><span class="p">))</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">maintain_order</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="fm">__or__</span> <span class="o">=</span> <span class="n">union</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Object</span><span class="p">(</span><span class="n">ObjectType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Data type for wrapping arbitrary Python objects.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Null</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Data type representing null values.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Unknown</span><span class="p">(</span><span class="n">DataType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Type representing DataType values that could not be determined statically.&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">List</span><span class="p">(</span><span class="n">NestedType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Variable length list type.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    inner</span>
+<span class="sd">        The `DataType` of the values within each list.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; df = pl.DataFrame(</span>
+<span class="sd">    ...     {</span>
+<span class="sd">    ...         &quot;integer_lists&quot;: [[1, 2], [3, 4]],</span>
+<span class="sd">    ...         &quot;float_lists&quot;: [[1.0, 2.0], [3.0, 4.0]],</span>
+<span class="sd">    ...     }</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &gt;&gt;&gt; df</span>
+<span class="sd">    shape: (2, 2)</span>
+<span class="sd">    ┌───────────────┬─────────────┐</span>
+<span class="sd">    │ integer_lists ┆ float_lists │</span>
+<span class="sd">    │ ---           ┆ ---         │</span>
+<span class="sd">    │ list[i64]     ┆ list[f64]   │</span>
+<span class="sd">    ╞═══════════════╪═════════════╡</span>
+<span class="sd">    │ [1, 2]        ┆ [1.0, 2.0]  │</span>
+<span class="sd">    │ [3, 4]        ┆ [3.0, 4.0]  │</span>
+<span class="sd">    └───────────────┴─────────────┘</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">inner</span><span class="p">:</span> <span class="n">PolarsDataType</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inner</span><span class="p">:</span> <span class="n">PolarsDataType</span> <span class="o">|</span> <span class="n">PythonDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inner</span> <span class="o">=</span> <span class="n">polars</span><span class="o">.</span><span class="n">datatypes</span><span class="o">.</span><span class="n">parse_into_dtype</span><span class="p">(</span><span class="n">inner</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># This equality check allows comparison of type classes and type instances.</span>
+        <span class="c1"># If a parent type is not specific about its inner type, we infer it as equal:</span>
+        <span class="c1"># &gt; list[i64] == list[i64] -&gt; True</span>
+        <span class="c1"># &gt; list[i64] == list[f32] -&gt; False</span>
+        <span class="c1"># &gt; list[i64] == list      -&gt; True</span>
+
+        <span class="c1"># allow comparing object instances to class</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">List</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">List</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">inner</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">inner</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">inner</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">class_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">inner</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Array</span><span class="p">(</span><span class="n">NestedType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fixed length list type.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    inner</span>
+<span class="sd">        The `DataType` of the values within each array.</span>
+<span class="sd">    shape</span>
+<span class="sd">        The shape of the arrays.</span>
+<span class="sd">    width</span>
+<span class="sd">        The length of the arrays.</span>
+
+<span class="sd">        .. deprecated:: 0.20.31</span>
+<span class="sd">            The `width` parameter for `Array` is deprecated. Use `shape` instead.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; s = pl.Series(&quot;a&quot;, [[1, 2], [4, 3]], dtype=pl.Array(pl.Int64, 2))</span>
+<span class="sd">    &gt;&gt;&gt; s</span>
+<span class="sd">    shape: (2,)</span>
+<span class="sd">    Series: &#39;a&#39; [array[i64, 2]]</span>
+<span class="sd">    [</span>
+<span class="sd">            [1, 2]</span>
+<span class="sd">            [4, 3]</span>
+<span class="sd">    ]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">inner</span><span class="p">:</span> <span class="n">PolarsDataType</span>
+    <span class="n">size</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inner</span><span class="p">:</span> <span class="n">PolarsDataType</span> <span class="o">|</span> <span class="n">PythonDataType</span><span class="p">,</span>
+        <span class="n">shape</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">polars._utils.deprecation</span><span class="w"> </span><span class="kn">import</span> <span class="n">issue_deprecation_warning</span>
+
+            <span class="n">issue_deprecation_warning</span><span class="p">(</span>
+                <span class="s2">&quot;the `width` parameter for `Array` is deprecated. Use `shape` instead.&quot;</span><span class="p">,</span>
+                <span class="n">version</span><span class="o">=</span><span class="s2">&quot;0.20.31&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">shape</span> <span class="o">=</span> <span class="n">width</span>
+        <span class="k">elif</span> <span class="n">shape</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Array constructor is missing the required argument `shape`&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">inner_parsed</span> <span class="o">=</span> <span class="n">polars</span><span class="o">.</span><span class="n">datatypes</span><span class="o">.</span><span class="n">parse_into_dtype</span><span class="p">(</span><span class="n">inner</span><span class="p">)</span>
+        <span class="n">inner_shape</span> <span class="o">=</span> <span class="n">inner_parsed</span><span class="o">.</span><span class="n">shape</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inner_parsed</span><span class="p">,</span> <span class="n">Array</span><span class="p">)</span> <span class="k">else</span> <span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">inner</span> <span class="o">=</span> <span class="n">inner_parsed</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">shape</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">shape</span><span class="p">,)</span> <span class="o">+</span> <span class="n">inner_shape</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>  <span class="c1"># type: ignore[redundant-expr]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">inner_parsed</span> <span class="o">=</span> <span class="n">Array</span><span class="p">(</span><span class="n">inner_parsed</span><span class="p">,</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">inner</span> <span class="o">=</span> <span class="n">inner_parsed</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span> <span class="o">+</span> <span class="n">inner_shape</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;invalid input for shape: </span><span class="si">{</span><span class="n">shape</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># This equality check allows comparison of type classes and type instances.</span>
+        <span class="c1"># If a parent type is not specific about its inner type, we infer it as equal:</span>
+        <span class="c1"># &gt; array[i64] == array[i64] -&gt; True</span>
+        <span class="c1"># &gt; array[i64] == array[f32] -&gt; False</span>
+        <span class="c1"># &gt; array[i64] == array      -&gt; True</span>
+
+        <span class="c1"># allow comparing object instances to class</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="n">DataTypeClass</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Array</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Array</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">inner</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">inner</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">inner</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="c1"># Get leaf type</span>
+        <span class="n">dtype</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inner</span>
+        <span class="k">while</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">Array</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">inner</span>
+
+        <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">class_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">dtype</span><span class="si">!r}</span><span class="s2">, shape=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">width</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The size of the Array.&quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">polars._utils.deprecation</span><span class="w"> </span><span class="kn">import</span> <span class="n">issue_deprecation_warning</span>
+
+        <span class="n">issue_deprecation_warning</span><span class="p">(</span>
+            <span class="s2">&quot;the `width` attribute for `Array` is deprecated. Use `size` instead.&quot;</span><span class="p">,</span>
+            <span class="n">version</span><span class="o">=</span><span class="s2">&quot;0.20.31&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Field</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Definition of a single field within a `Struct` DataType.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    name</span>
+<span class="sd">        The name of the field within its parent `Struct`.</span>
+<span class="sd">    dtype</span>
+<span class="sd">        The `DataType` of the field&#39;s values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">PolarsDataType</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">polars</span><span class="o">.</span><span class="n">datatypes</span><span class="o">.</span><span class="n">parse_into_dtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">class_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Struct</span><span class="p">(</span><span class="n">NestedType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Struct composite type.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    fields</span>
+<span class="sd">        The fields that make up the struct. Can be either a sequence of Field</span>
+<span class="sd">        objects or a mapping of column names to data types.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Initialize using a dictionary:</span>
+
+<span class="sd">    &gt;&gt;&gt; dtype = pl.Struct({&quot;a&quot;: pl.Int8, &quot;b&quot;: pl.List(pl.String)})</span>
+<span class="sd">    &gt;&gt;&gt; dtype</span>
+<span class="sd">    Struct({&#39;a&#39;: Int8, &#39;b&#39;: List(String)})</span>
+
+<span class="sd">    Initialize using a list of Field objects:</span>
+
+<span class="sd">    &gt;&gt;&gt; dtype = pl.Struct([pl.Field(&quot;a&quot;, pl.Int8), pl.Field(&quot;b&quot;, pl.List(pl.String))])</span>
+<span class="sd">    &gt;&gt;&gt; dtype</span>
+<span class="sd">    Struct({&#39;a&#39;: Int8, &#39;b&#39;: List(String)})</span>
+
+<span class="sd">    When initializing a Series, Polars can infer a struct data type from the data.</span>
+
+<span class="sd">    &gt;&gt;&gt; s = pl.Series([{&quot;a&quot;: 1, &quot;b&quot;: [&quot;x&quot;, &quot;y&quot;]}, {&quot;a&quot;: 2, &quot;b&quot;: [&quot;z&quot;]}])</span>
+<span class="sd">    &gt;&gt;&gt; s</span>
+<span class="sd">    shape: (2,)</span>
+<span class="sd">    Series: &#39;&#39; [struct[2]]</span>
+<span class="sd">    [</span>
+<span class="sd">            {1,[&quot;x&quot;, &quot;y&quot;]}</span>
+<span class="sd">            {2,[&quot;z&quot;]}</span>
+<span class="sd">    ]</span>
+<span class="sd">    &gt;&gt;&gt; s.dtype</span>
+<span class="sd">    Struct({&#39;a&#39;: Int64, &#39;b&#39;: List(String)})</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">|</span> <span class="n">SchemaDict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fields</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">fields</span><span class="o">.</span><span class="n">items</span><span class="p">()]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">PolarsDataType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># type: ignore[override]</span>
+        <span class="c1"># The comparison allows comparing objects to classes, and specific</span>
+        <span class="c1"># inner types to those without (eg: inner=None). if one of the</span>
+        <span class="c1"># arguments is not specific about its inner type we infer it</span>
+        <span class="c1"># as being equal. (See the List type for more info).</span>
+        <span class="k">if</span> <span class="n">isclass</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Struct</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Struct</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">fields</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">)))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PolarsDataType</span><span class="p">]]:</span>
+        <span class="k">for</span> <span class="n">fld</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">fld</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">fld</span><span class="o">.</span><span class="n">dtype</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__reversed__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PolarsDataType</span><span class="p">]]:</span>
+        <span class="k">for</span> <span class="n">fld</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">):</span>
+            <span class="k">yield</span> <span class="n">fld</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">fld</span><span class="o">.</span><span class="n">dtype</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">class_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PolarsDataType</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return Struct dtype as a schema dict.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Nicola Fiorato.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
