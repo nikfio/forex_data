@@ -366,16 +366,73 @@ export POLYGON_IO_API_KEY="your_polygon_io_key"
 
 ## PYTEST and pipeline implementation
 
+The project uses **pytest** for testing and **CircleCI** for continuous integration. The pipeline automatically runs on every commit to ensure code quality and functionality.
 
+### Testing with Pytest
 
-## Performance considerations
+To run tests locally:
 
-Pandas is way too slow compared to PyArrow and Polars, by far.
-Especially working with csv files and performing in-dataframe operations like the groupby on along timestamp column.
+```bash
+# Run all tests
+poetry run pytest
 
-*Soon time based benchmarks will be provided to explictly show how much polars and pyarrow overcome pandas*
+# Run tests with flake8 linting (same as CI)
+poetry run pytest --flake8
 
-The battle between polars and pyarrow is still on.
-Any suggestion on why one should choose pyarrow over polars or viceversa is welcome.
+# Run tests with verbose output
+poetry run pytest -v
 
-Or, a further data engine suggested could be taken into consideration to be integrated in the package.
+# Run specific test file
+poetry run pytest tests/test_file.py
+```
+
+### CircleCI Pipeline
+
+The CI/CD pipeline is configured via `.circleci/config.yml` and automatically runs on every push to the repository.
+
+#### Pipeline Configuration
+
+**Version:** CircleCI 2.1
+
+**Docker Image:** `cimg/python:3.12.12`
+
+**Workflow:** `unit-tests`
+
+#### Pipeline Steps
+
+The pipeline executes the following steps for Python 3.12:
+
+1. **Checkout**: Clone the repository code
+2. **Install Poetry**: Install the Poetry package manager (`pip install poetry`)
+3. **Restore Cache**: Restore dependencies from cache if available (cache key based on `poetry.lock` checksum)
+4. **Install Dependencies**: Install project dependencies using `poetry install`
+5. **Save Cache**: Cache the installed dependencies for faster future builds
+6. **Run Tests**: Execute tests with flake8 linting using `poetry run pytest --flake8`
+
+#### Caching Strategy
+
+The pipeline uses CircleCI's caching mechanism to speed up builds:
+
+- **Cache Key**: `v1-dependencies-{{ checksum "poetry.lock" }}`
+- **Fallback**: `v1-dependencies-` (if no exact match)
+- **Cached Paths**: `./repo` directory
+
+This ensures that dependencies are only reinstalled when `poetry.lock` changes, significantly reducing build times.
+
+#### Environment Variables
+
+The pipeline supports the following environment variables (configured in CircleCI project settings):
+
+- `DATABASE_URL`: Database connection string (if needed)
+- `API_KEY`: API keys for external services (if needed for integration tests)
+
+#### Jobs
+
+- **py312**: Runs the complete test suite on Python 3.12
+
+#### Workflow
+
+The `unit-tests` workflow triggers on every commit and runs the `py312` job to validate:
+- Code functionality through pytest
+- Code quality and style through flake8 integration
+```
