@@ -496,32 +496,34 @@ class RealtimeManager:
 
         Returns:
             polars.DataFrame | polars.LazyFrame: DataFrame containing daily OHLC data with columns:
+
                 - timestamp: datetime column with daily timestamps
                 - open: Opening price (float32)
                 - high: Highest price (float32)
                 - low: Lowest price (float32)
                 - close: Closing price (float32)
-                Returns empty DataFrame if API call fails.
+
+            Returns empty DataFrame if API call fails.
 
         Raises:
             AssertionError: If recent_days_window is not an integer when provided
             BadResponse: If Alpha Vantage API request fails (handled internally)
 
-        Example:
-            >>> manager = RealtimeManager(config='data_config.yaml')
-            >>>
-            >>> # Get last close only
-            >>> latest = manager.get_daily_close(ticker='EURUSD', last_close=True)
-            >>>
-            >>> # Get last 10 days
-            >>> recent = manager.get_daily_close(ticker='EURUSD', recent_days_window=10)
-            >>>
-            >>> # Get specific date range
-            >>> range_data = manager.get_daily_close(
-            ...     ticker='EURUSD',
-            ...     day_start='2024-01-01',
-            ...     day_end='2024-01-31'
-            ... )
+        Example::
+
+            # Get last close only
+            manager = RealtimeManager(config='data_config.yaml')
+            latest = manager.get_daily_close(ticker='EURUSD', last_close=True)
+
+            # Get last 10 days
+            recent = manager.get_daily_close(ticker='EURUSD', recent_days_window=10)
+
+            # Get specific date range
+            range_data = manager.get_daily_close(
+                ticker='EURUSD',
+                day_start='2024-01-01',
+                day_end='2024-01-31'
+            )
 
         Note:
             - Requires valid Alpha Vantage API key in configuration
@@ -529,6 +531,7 @@ class RealtimeManager:
             - outputsize='compact' returns ~100 most recent data points
             - outputsize='full' can return several years of data
             - Use last_close=True for minimal data transfer
+
         """
 
         to_symbol, from_symbol = get_pair_symbols(ticker.upper())
@@ -914,33 +917,37 @@ class RealtimeManager:
 
         Returns:
             polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:
+
                 - timestamp: datetime column with candle timestamps
                 - open: Opening price (float32)
                 - high: Highest price (float32)
                 - low: Lowest price (float32)
                 - close: Closing price (float32)
-                Returns empty DataFrame if API call fails.
+
+            Returns empty DataFrame if API call fails.
 
         Raises:
             BadResponse: If Polygon.io API request fails (handled internally, returns empty DataFrame)
 
-        Example:
-            >>> manager = RealtimeManager(config='data_config.yaml')
-            >>> # Get hourly data for 5 days
-            >>> data = manager.get_data(
-            ...     ticker='EURUSD',
-            ...     start='2024-01-10',
-            ...     end='2024-01-15',
-            ...     timeframe='1h'
-            ... )
-            >>> print(f"Retrieved {len(data)} hourly candles")
-            Retrieved 120 hourly candles
+        Example::
+
+            # Get hourly data for 5 days
+            manager = RealtimeManager(config='data_config.yaml')
+            data = manager.get_data(
+                ticker='EURUSD',
+                start='2024-01-10',
+                end='2024-01-15',
+                timeframe='1h'
+            )
+            print(f"Retrieved {len(data)} hourly candles")
+            # Output: Retrieved 120 hourly candles
 
         Note:
             - Requires valid Polygon.io API key in configuration
             - Free tier has rate limits  and historical data restrictions
             - Data is fetched at 1-minute resolution and aggregated to requested timeframe
             - Failed requests return an empty DataFrame with a warning logged
+
         """
 
         start = any_date_to_datetime64(start)

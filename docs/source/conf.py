@@ -50,11 +50,28 @@ html_theme_options = {
     'includehidden': True,
     'titles_only': False,
     'style_external_links': True,
+    'prev_next_buttons_location': 'both',
+    'style_nav_header_background': 'linear-gradient(135deg, #2c5aa0 0%, #1a8cff 100%)',
+    'logo_only': False,
 }
 
 # Add any paths that contain custom static files (such as style sheets)
-html_logo = None
-html_favicon = None
+html_logo = '_static/logo.png'
+html_favicon = '_static/favicon.png'
+
+# Custom CSS files
+html_css_files = [
+    'custom.css',
+]
+
+# Additional HTML context
+html_context = {
+    'display_github': True,
+    'github_user': 'nikfio',
+    'github_repo': 'forex_data',
+    'github_version': 'master',
+    'conf_py_path': '/docs/source/',
+}
 
 # If true, the reST sources are included in the HTML build as _sources
 html_show_sourcelink = True
@@ -105,3 +122,35 @@ intersphinx_mapping = {
 
 # -- Options for todo extension ----------------------------------------------
 todo_include_todos = True
+
+# -- Suppress warnings ---------------------------------------------
+# Suppress warnings for optional dependencies and type hints
+suppress_warnings = [
+    'ref.python',  # Duplicate exceptions
+    'sphinx_autodoc_typehints.guarded_import',  # Optional deps
+    'sphinx_autodoc_typehints.forward_reference',  # Forward refs
+]
+
+# Autodoc configuration for handling inherited docstrings
+autodoc_inherit_docstrings = True
+
+# -- SEO and Meta information ------------------------------------------------
+html_title = 'forex_data - Forex Data Aggregation Library'
+html_short_title = 'forex_data'
+
+# Meta tags for SEO
+html_meta = {
+    'description': (
+        'Professional Forex data aggregation library supporting '
+        'historical and real-time data with Polars, Pandas, and PyArrow.'
+    ),
+    'keywords': (
+        'forex, data, OHLC, trading, polars, pandas, pyarrow, '
+        'historical data, real-time data'
+    ),
+    'author': 'Nicola Fiorato',
+    'og:title': 'forex_data Documentation',
+    'og:description': 'Comprehensive Forex data aggregation library for Python',
+    'og:type': 'website',
+    'twitter:card': 'summary',
+}

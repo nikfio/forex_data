@@ -1,0 +1,341 @@
+/* Custom CSS for forex_data documentation */
+
+/* Brand Colors */
+:root {
+    --primary-color: #2c5aa0;
+    --secondary-color: #1a8cff;
+    --accent-color: #00c9a7;
+    --dark-bg: #1e2124;
+    --light-text: white;
+}
+
+/* Banner Image on Homepage */
+.documentation-banner {
+    margin: 1.5em 0 2em 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-width: 100%;
+    height: auto;
+}
+
+/* Ensure banner looks good on mobile */
+@media screen and (max-width: 768px) {
+    .documentation-banner {
+        border-radius: 4px;
+        margin: 1em 0 1.5em 0;
+    }
+}
+
+/* Improve the header/navigation bar */
+.wy-side-nav-search {
+    background: var(--dark-bg);
+    color: white !important;
+}
+
+.wy-side-nav-search input[type=text] {
+    border-color: rgba(255, 255, 255, 0.3);
+    background-color: var(--dark-bg);
+    color: white;
+}
+
+.wy-side-nav-search input[type=text]:focus {
+    border-color: var(--accent-color);
+    background-color: var(--dark-bg);
+}
+
+/* Project title styling */
+.wy-side-nav-search>a {
+    color: #fff;
+    font-size: 1.4em;
+    font-weight: 700;
+    margin-bottom: 0.75em;
+}
+
+/* Sidebar navigation - Dark background with white text */
+.wy-nav-side {
+    background-color: var(--dark-bg) !important;
+}
+
+.wy-side-scroll {
+    background-color: var(--dark-bg) !important;
+}
+
+.wy-menu-vertical {
+    background-color: var(--dark-bg) !important;
+}
+
+.wy-menu-vertical a {
+    color: white !important;
+    background-color: linear-gradient(135deg, var(--dark-bg) 0%, var(--secondary-color) 100%) !important;
+}
+
+.wy-menu-vertical a:hover {
+    background-color: var(--secondary-color) !important;
+    color: white !important;
+}
+
+.wy-menu-vertical li {
+    background-color: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%) !important;
+    border: none;
+    color: white !important;
+    font-weight: 600;
+}
+
+.wy-menu-vertical li.current>a {
+    background-color: var(--secondary-color) !important;
+    border: none;
+    color: white !important;
+    font-weight: 600;
+}
+
+/* Highlight current page in TOC */
+.wy-menu-vertical li.toctree-l1.current>a {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+.wy-menu-vertical li.toctree-l2.current>a {
+    background-color: rgba(26, 140, 255, 0.3) !important;
+    color: white !important;
+}
+
+/* Ensure all sidebar text is white */
+.wy-nav-side,
+.wy-nav-side *,
+.wy-menu-vertical li {
+    color: white !important;
+}
+
+/* Code blocks */
+.highlight {
+    background: #f8f9fa;
+    border-left: 4px solid var(--accent-color);
+    border-radius: 4px;
+}
+
+pre {
+    padding: 16px;
+    overflow-x: auto;
+    line-height: 1.5;
+}
+
+code {
+    color: #e83e8c;
+    background-color: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* Admonitions (notes, warnings, etc.) */
+.admonition {
+    border-radius: 6px;
+    border-left: 4px solid;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admonition.note {
+    border-left-color: #2196F3;
+    background-color: #e3f2fd;
+}
+
+.admonition.warning {
+    border-left-color: #ff9800;
+    background-color: #fff3e0;
+}
+
+.admonition.tip {
+    border-left-color: var(--accent-color);
+    background-color: #e0f7f4;
+}
+
+.admonition-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+/* Tables */
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+    white-space: normal;
+}
+
+table.docutils {
+    border: none;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+table.docutils thead {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+}
+
+table.docutils thead th {
+    border: none;
+    font-weight: 600;
+}
+
+table.docutils tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+/* Links */
+a {
+    color: var(--secondary-color);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+
+/* Headers */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+h1 {
+    border-bottom: 3px solid var(--accent-color);
+    padding-bottom: 12px;
+}
+
+h2 {
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 8px;
+}
+
+/* Improve version badge */
+.wy-side-nav-search>div.version {
+    color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+}
+
+/* Footer */
+.rst-footer-buttons {
+    margin-top: 2em;
+}
+
+.btn {
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+/* Previous and Next navigation buttons - White text */
+.btn-neutral {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+.btn-neutral:visited {
+    color: white !important;
+}
+
+.btn-neutral:hover {
+    background-color: var(--secondary-color) !important;
+    color: white !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-neutral:focus,
+.btn-neutral:active {
+    color: white !important;
+}
+
+/* Ensure link text inside buttons is white */
+.btn-neutral a,
+.btn-neutral span {
+    color: white !important;
+}
+
+/* Breadcrumbs */
+.wy-breadcrumbs li a {
+    color: var(--secondary-color);
+}
+
+/* Mobile improvements */
+@media screen and (max-width: 768px) {
+    .wy-nav-content {
+        padding: 1.618em 1em;
+    }
+
+    .wy-side-nav-search>a {
+        font-size: 1.2em;
+    }
+}
+
+/* Scrollbar styling (webkit browsers) */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--secondary-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--secondary-color);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
+}
+
+/* Improve content max-width for readability */
+.wy-nav-content {
+    max-width: 1000px;
+}
+
+/* API documentation improvements */
+dl.class,
+dl.function,
+dl.method {
+    margin-bottom: 2em;
+    border-left: 3px solid var(--accent-color);
+    padding-left: 1em;
+    background-color: #fafafa;
+    border-radius: 4px;
+    padding: 1em;
+}
+
+dt {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+/* Search results */
+.search li {
+    border-bottom: 1px solid #e0e0e0;
+    padding: 12px 0;
+}
+
+.search li:last-child {
+    border-bottom: none;
+}
+
+/* Badge-style labels */
+.guilabel,
+.menuselection {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+}
