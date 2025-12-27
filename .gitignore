@@ -5,3 +5,8 @@ issues/
 notes/
 *data_config.yaml
 *DS_Store*
+
+# Documentation guide files
+docs/*.md
+# Sphinx build output (generated files)
+docs/build/

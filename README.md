@@ -1,5 +1,12 @@
 # <span style="font-size:1.5em;">FOREX DATA</span>
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue?style=for-the-badge&logo=read-the-docs)](https://nikfio.github.io/forex_data/)
+[![CI Status](https://img.shields.io/circleci/build/github/nikfio/forex_data/master?style=for-the-badge&logo=circleci)](https://circleci.com/gh/nikfio/forex_data)
+[![Python Version](https://img.shields.io/badge/python-3.12-blue?style=for-the-badge&logo=python)](https://www.python.org/)
+[![Poetry](https://img.shields.io/badge/Poetry-Package%20Manager-blue?style=for-the-badge&logo=poetry)](https://python-poetry.org/)
+
+> 📚 **[View Full Documentation](https://nikfio.github.io/forex_data/)** | 🚀 **[Quick Start](#installation)** | 💡 **[Examples](#examples)**
+
 The forex_data package offers ways to aggregate data from the Forex market into a dataframe having the the essential OHLC information, so the ouput will always have the columns:
 
 * timestamp
@@ -73,6 +80,20 @@ poetry install
 ```
 poetry run pytest
 ```
+
+## DOCUMENTATION
+
+📖 **Comprehensive documentation is available at [nikfio.github.io/forex_data](https://nikfio.github.io/forex_data/)**
+
+The full documentation includes:
+
+- **[Installation Guide](https://nikfio.github.io/forex_data/installation.html)** - Detailed setup instructions
+- **[Quick Start Tutorial](https://nikfio.github.io/forex_data/quickstart.html)** - Get started in minutes
+- **[Configuration Reference](https://nikfio.github.io/forex_data/configuration.html)** - All configuration options explained
+- **[API Reference](https://nikfio.github.io/forex_data/forex_data.html)** - Complete API documentation with type hints
+- **[Code Examples](https://nikfio.github.io/forex_data/examples.html)** - 15+ comprehensive examples
+- **[Contributing Guide](https://nikfio.github.io/forex_data/contributing.html)** - How to contribute to the project
+- **[Changelog](https://nikfio.github.io/forex_data/changelog.html)** - Version history and updates
 
 ## CONFIGURATION FILE
 
