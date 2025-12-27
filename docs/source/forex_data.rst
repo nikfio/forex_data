@@ -1,4 +1,4 @@
-forex\_data package
+forex\_data_aggregator package
 ===================
 
 Subpackages

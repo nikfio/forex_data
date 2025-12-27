@@ -31,11 +31,39 @@ Or on Windows PowerShell:
 
    (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
 
-Installation Steps
+Quick Installation
 ==================
 
-1. Clone the Repository
+Using pip or Poetry (Recommended)
 -----------------------
+
+The easiest way to install forex_data is from PyPI:
+
+.. code-block:: bash
+
+   pip install forex-data-aggregator
+
+Or using Poetry:
+
+.. code-block:: bash
+
+   poetry add forex-data-aggregator
+
+This will install the latest stable version with all dependencies.
+
+.. note::
+   After installation, you can import the package as ``import forex_data``
+
+Installing from Source
+======================
+
+For Development or Latest Features
+-----------------------------------
+
+If you want to contribute to development or use the latest features:
+
+1. Clone the Repository
+^^^^^^^^^^^^^^^^^^^^^^^
 
 First, clone the forex_data repository:
 
@@ -44,8 +72,23 @@ First, clone the forex_data repository:
    git clone https://github.com/nikfio/forex_data.git -b master forex-data
    cd forex-data
 
-2. Install Dependencies
------------------------
+2. Install Poetry
+^^^^^^^^^^^^^^^^^
+
+Ensure you have Poetry installed:
+
+.. code-block:: bash
+
+   curl -sSL https://install.python-poetry.org | python3 -
+
+Or on Windows PowerShell:
+
+.. code-block:: powershell
+
+   (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+
+3. Install Dependencies
+^^^^^^^^^^^^^^^^^^^^^^^
 
 Use Poetry to install the package and all its dependencies:
 
@@ -59,8 +102,8 @@ This will:
 * Install all required dependencies
 * Install the package in development mode
 
-3. Verify Installation
------------------------
+4. Verify Installation
+^^^^^^^^^^^^^^^^^^^^^^
 
 Run the test suite to ensure everything is working correctly:
 
@@ -70,13 +113,10 @@ Run the test suite to ensure everything is working correctly:
 
 If all tests pass, your installation is successful! ✅
 
-Alternative Installation Methods
-=================================
+Alternative: Using pip from Source
+-----------------------------------
 
-Using pip (Not Recommended)
-----------------------------
-
-While Poetry is recommended, you can also install using pip:
+You can also install directly from the source directory:
 
 .. code-block:: bash
 
