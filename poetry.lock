@@ -621,19 +621,12 @@ name = "dotty-dict"
 version = "1.3.1"
 description = "Dictionary wrapper for quick access to deeply nested keys."
 optional = false
-python-versions = ">=3.9,<4.0"
+python-versions = ">=3.5,<4.0"
 groups = ["main"]
-files = []
-develop = false
-
-[package.dependencies]
-pandas = "^2.1.4"
-
-[package.source]
-type = "git"
-url = "https://github.com/nikfio/dotty_dict.git"
-reference = "HEAD"
-resolved_reference = "cd803c33d50a0757a0580452d8f5c191f4a260f1"
+files = [
+    {file = "dotty_dict-1.3.1-py3-none-any.whl", hash = "sha256:5022d234d9922f13aa711b4950372a06a6d64cb6d6db9ba43d0ba133ebfce31f"},
+    {file = "dotty_dict-1.3.1.tar.gz", hash = "sha256:4b016e03b8ae265539757a53eba24b9bfda506fb94fbce0bee843c6f05541a15"},
+]
 
 [[package]]
 name = "duckdb"
@@ -2891,4 +2884,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "d46e059221432df6610d34d3ad1d2636c86fae18ef7079d13dd13a60c793e3ba"
+content-hash = "e9a04b46c2b338dcba9928fe83180b74b73ebacf98c142f92b770d19155a9b9d"
