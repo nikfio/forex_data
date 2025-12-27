@@ -52,8 +52,8 @@ workflows:
   version: 1
   unit-tests:
     jobs:
-      - py312
-        filters:
-          branches:
-            only:
-              - master
+      - py312:
+          filters:
+            branches:
+              only:
+                - master
