@@ -16,6 +16,14 @@
    :target: https://circleci.com/gh/nikfio/forex_data
    :alt: CI Status
 
+.. image:: https://img.shields.io/badge/GitHub-nikfio%2Fforex__data-blue?style=for-the-badge&logo=github
+   :target: https://github.com/nikfio/forex_data
+   :alt: GitHub Repository
+
+.. image::  https://img.shields.io/pypi/v/forex-data-aggregator?style=for-the-badge&logo=pypi
+   :target: https://pypi.org/project/forex-data-aggregator/
+   :alt: PyPI package version
+
 |
 
 **forex_data** is a powerful, professional-grade Python library for aggregating and managing Forex market data in standardized OHLC (Open, High, Low, Close) format.

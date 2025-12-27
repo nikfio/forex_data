@@ -2,6 +2,7 @@
 
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue?style=for-the-badge&logo=read-the-docs)](https://nikfio.github.io/forex_data/)
 [![CI Status](https://img.shields.io/circleci/build/github/nikfio/forex_data/master?style=for-the-badge&logo=circleci)](https://circleci.com/gh/nikfio/forex_data)
+[![PyPI version](https://img.shields.io/pypi/v/forex-data-aggregator?style=for-the-badge&logo=pypi)](https://pypi.org/project/forex-data-aggregator/)
 [![Python Version](https://img.shields.io/badge/python-3.12-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Poetry](https://img.shields.io/badge/Poetry-Package%20Manager-blue?style=for-the-badge&logo=poetry)](https://python-poetry.org/)
 
@@ -62,22 +63,36 @@ Concluding, the combination of historical and real-time source gives a 1-minute 
 
 ## INSTALLATION
 
-The package is managed with Poetry, which is required to install the package.
-Follow here for [installing Poetry](https://python-poetry.org/docs/).
+### From PyPI (Recommended)
 
-Now, these steps should lead you to run the examples or any other package usage:
+The easiest way to install forex_data is via pip:
 
-1. Open a shell (on Windows use [powershell7](https://learn.microsoft.com/it-it/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.4#msi)), clone the repository in a folder called `forex-data` (for example):
+```bash
+pip install forex-data-aggregator
 ```
+
+Or with Poetry:
+
+```bash
+poetry add forex-data-aggregator
+```
+
+### From Source
+
+If you want to install from source or contribute to development:
+
+1. Ensure you have [Poetry](https://python-poetry.org/docs/) installed
+2. Clone the repository:
+```bash
 git clone https://github.com/nikfio/forex_data.git -b master forex-data
 cd forex-data
 ```
-2. Run poetry for package installation
-```
+3. Install dependencies:
+```bash
 poetry install
 ```
-3. Run pytest to check everything is working fine
-```
+4. Run tests to verify installation:
+```bash
 poetry run pytest
 ```
 
