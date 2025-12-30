@@ -10,3 +10,6 @@ notes/
 docs/*.md
 # Sphinx build output (generated files)
 docs/build/
+
+# package build files
+dist/

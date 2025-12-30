@@ -255,6 +255,51 @@ Let's walk through the [example for historical data source](examples/histdata_db
 
 <br>
 
+6. **Conditional Data Retrieval**
+
+    You can filter data directly during retrieval using SQL-like conditions.
+
+    ```python
+    from forex_data import (
+        HistoricalManagerDB, 
+        BASE_DATA_COLUMN_NAME, 
+        SQL_COMPARISON_OPERATORS
+    )
+
+    # 1. Simple condition: OPEN < 1.13
+    data = histmanager.get_data(
+        ticker='EURUSD',
+        timeframe='1D',
+        start='2018-01-01',
+        end='2018-12-31',
+        comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+        check_level=1.13,
+        comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN
+    )
+
+    # 2. Multiple conditions (OR): HIGH > 1.145 OR LOW < 1.12
+    from forex_data import SQL_CONDITION_AGGREGATION_MODES
+
+    data = histmanager.get_data(
+        ticker='EURUSD',
+        timeframe='1D',
+        start='2019-01-01',
+        end='2019-12-31',
+        comparison_column_name=[
+            BASE_DATA_COLUMN_NAME.HIGH, 
+            BASE_DATA_COLUMN_NAME.LOW
+        ],
+        check_level=[1.145, 1.12],
+        comparison_operator=[
+            SQL_COMPARISON_OPERATORS.GREATER_THAN, 
+            SQL_COMPARISON_OPERATORS.LESS_THAN
+        ],
+        aggregation_mode=SQL_CONDITION_AGGREGATION_MODES.OR
+    )
+    ```
+
+<br>
+
 #### Real-Time data
 
 Let's walk through the [example for real-time data source](examples/realtime_data_manager.py):

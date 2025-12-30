@@ -63,6 +63,8 @@ from .common import (
     DATA_TYPE,
     SUPPORTED_DATA_FILES,
     SUPPORTED_DATA_ENGINES,
+    SUPPORTED_BASE_DATA_COLUMN_NAME,
+    SUPPORTED_SQL_COMPARISON_OPERATORS,
     get_attrs_names,
     validator_dir_path,
     is_empty_dataframe,
@@ -1081,7 +1083,12 @@ class LocalDBConnector(DatabaseConnector):
 
         return ticker_years_list
 
-    def write_data(self, target_table: str, dataframe: Union[polars_dataframe, polars_lazyframe], clean: bool = False) -> None:
+    def write_data(
+        self,
+        target_table: str,
+        dataframe: Union[polars_dataframe, polars_lazyframe],
+        clean: bool = False
+    ) -> None:
 
         items = self._get_items_from_db_key(target_table)
 
@@ -1133,8 +1140,53 @@ class LocalDBConnector(DatabaseConnector):
                   ticker: str,
                   timeframe: str,
                   start: datetime,
-                  end: datetime
+                  end: datetime,
+                  comparison_column_name: List[str] | str | None = None,
+                  check_level: List[int | float] | int | float | None = None,
+                  comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
+                  comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
                   ) -> polars_lazyframe:
+
+        comparisons_len = 0
+
+        # Validate and normalize condition parameters if provided
+        if comparison_column_name is not None or check_level is not None or comparison_operator is not None:
+            comparisons_len = len(comparison_column_name)
+
+            if isinstance(comparison_column_name, str):
+                comparison_column_name = [comparison_column_name]
+
+            if isinstance(check_level, (int, float)):
+                check_level = [check_level]
+
+            if isinstance(comparison_operator, str):
+                comparison_operator = [comparison_operator]
+
+            if any([col not in list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__) for col in comparison_column_name]):
+                logger.error(f'comparison_column_name must be a supported column name: {list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
+                raise ValueError('comparison_column_name must be a supported column name')
+
+            if any([cond not in list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__) for cond in comparison_operator]):
+                logger.error(f'comparison_operator must be a supported SQL comparison operator: {list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)}')
+                raise ValueError('comparison_operator must be a supported SQL comparison operator')
+
+            if (
+                (
+                    comparison_aggregation_mode is not None
+                    and
+                    comparisons_len > 1
+                )
+                and
+                comparison_aggregation_mode not in list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)
+            ):
+                logger.error(f'comparison_aggregation_mode must be a supported SQL condition aggregation mode: {list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)}')
+                raise ValueError('comparison_aggregation_mode must be a supported SQL condition aggregation mode')
+
+            if len(comparison_column_name) != len(check_level) or len(comparison_column_name) != len(comparison_operator):
+                logger.error('comparison_column_name, check_level and comparison_operator must have the same length')
+                raise ValueError('comparison_column_name, check_level and comparison_operator must have the same length')
+
+            comparisons_len = len(comparison_column_name)
 
         dataframe = polars_lazyframe()
 
@@ -1178,12 +1230,42 @@ class LocalDBConnector(DatabaseConnector):
                 start_str = start.isoformat()
                 end_str = end.isoformat()
 
+                # Build base query with timestamp filter
                 query = f'''SELECT * FROM self
-                             WHERE
-                             {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_str}'
-                             AND
-                             {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_str}'
-                             ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}'''
+                        WHERE
+                        {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_str}'
+                        AND
+                        {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_str}'
+                        '''
+                # Aggregate conditional filters if provided
+                # with the aggregation mode specified
+                if comparisons_len > 0:
+
+                    if comparisons_len == 1:
+                        # only one condition
+                        query += f'''AND
+                                 {comparison_column_name[0]} {comparison_operator[0]} {check_level[0]}
+                                 '''
+                    else:
+                        # multiple conditions
+                        # wrap all conditions in parentheses with aggregation mode between them
+                        query += f'''AND
+                                 ({comparison_column_name[0]} {comparison_operator[0]} {check_level[0]}
+                                 '''
+                        for col, level, cond, index in zip(comparison_column_name[1:], check_level[1:], comparison_operator[1:], range(1, comparisons_len)):
+
+                            if index == comparisons_len - 1:
+                                # closing conditions needs closing bracket
+                                query += f'''{comparison_aggregation_mode}
+                                    {col} {cond} {level})
+                                    '''
+                            else:
+                                # intermediate conditions
+                                query += f'''{comparison_aggregation_mode}
+                                    {col} {cond} {level}
+                                    '''
+                # Close query with timestamp ordering
+                query += f'ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}'
                 dataframe = dataframe.sql(query)
 
             except Exception as e:
