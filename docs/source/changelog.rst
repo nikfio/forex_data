@@ -7,10 +7,10 @@ All notable changes to the forex_data project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-Version 0.1.0 (Current)
+Version 0.1.1 (Current)
 =======================
 
-*Release Date: TBD*
+*Release Date: 30/12/2025*
 
 Initial release of the forex_data package.
 
@@ -138,10 +138,10 @@ Planned for v0.4.0
 How to Upgrade
 ==============
 
-From Development to v0.1.0
+From Development to v0.1.1
 --------------------------
 
-When v0.1.0 is released, update with Poetry:
+When v0.1.1 is released, update with Poetry:
 
 .. code-block:: bash
 
@@ -156,7 +156,7 @@ Or with pip:
 Migration Notes
 ===============
 
-v0.1.0 Breaking Changes
+v0.1.1 Breaking Changes
 -----------------------
 
 *When released*
