@@ -1018,8 +1018,17 @@ class HistoricalManagerDB:
             self._tf_list.extend(set(tf_list).difference(self._tf_list))
             self._update_db()
 
-    def get_data(self, ticker, timeframe, start, end,
-                 add_timeframe: bool = True) -> Union[polars_dataframe, polars_lazyframe]:
+    def get_data(
+        self,
+        ticker,
+        timeframe,
+        start,
+        end,
+        comparison_column_name: List[str] | str | None = None,
+        check_level: List[int | float] | int | float | None = None,
+        comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
+        aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None,
+    ) -> Union[polars_dataframe, polars_lazyframe]:
         """
         Retrieve OHLC historical data for the specified ticker and timeframe.
 
@@ -1037,8 +1046,10 @@ class HistoricalManagerDB:
                 - datetime object
             end (str | datetime): End date for data retrieval. Same format as start.
                 Must be after start date.
-            add_timeframe (bool, optional): If True, automatically creates and caches
-                the requested timeframe if it doesn't exist. Default is True.
+            comparison_column_name (List[str] | str | None): Column names to retrieve. Default is None.
+            check_level (List[int | float] | int | float | None): Check level for conditions. Default is None.
+            comparison_operator (List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None): Condition for data retrieval. Default is None.
+            aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None): Aggregation mode for data retrieval. Default is None.
 
         Returns:
             polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:
@@ -1149,51 +1160,54 @@ class HistoricalManagerDB:
 
         # at this point all data requested have been aggregated to the database
 
-        # we can proceed by just executing a query from the database
-        # meaning read_data()
-
+        # execute a read query on database
         return self._db_connector.read_data(
             market='forex',
             ticker=ticker,
             timeframe=timeframe,
             start=start,
-            end=end
+            end=end,
+            comparison_column_name=comparison_column_name,
+            check_level=check_level,
+            comparison_operator=comparison_operator,
+            comparison_aggregation_mode=aggregation_mode
         )
 
-    def plot(self,
-             ticker,
-             timeframe,
-             start_date,
-             end_date
-             ) -> None:
+    def plot(
+        self,
+        ticker,
+        timeframe,
+        start_date,
+        end_date
+    ) -> None:
         """
-    Plot candlestick chart for the specified ticker and date range.
+        Plot candlestick chart for the specified ticker and date range.
 
-    Generates an interactive candlestick chart using mplfinance, displaying
-    OHLC (Open, High, Low, Close) data for the specified time period.
+        Generates an interactive candlestick chart using mplfinance, displaying
+        OHLC (Open, High, Low, Close) data for the specified time period.
 
-    Args:
-        ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD')
-        timeframe (str): Candle timeframe (e.g., '1m', '5m', '1h', '1D', '1W')
-        start_date (str): Start date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
-        end_date (str): End date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+        Args:
+            ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD')
+            timeframe (str): Candle timeframe (e.g., '1m', '5m', '1h', '1D', '1W')
+            start_date (str): Start date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+            end_date (str): End date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
 
-    Returns:
-        None: Displays the chart using matplotlib
+        Returns:
+            None: Displays the chart using matplotlib
 
-    Example:
-        >>> manager = HistoricalManagerDB(config='data_config.yaml')
-        >>> manager.plot(
-        ...     ticker='EURUSD',
-        ...     timeframe='1D',
-        ...     start_date='2020-01-01',
-        ...     end_date='2020-12-31'
-        ... )
+        Example:
+            >>> manager = HistoricalManagerDB(config='data_config.yaml')
+            >>> manager.plot(
+            ...     ticker='EURUSD',
+            ...     timeframe='1D',
+            ...     start_date='2020-01-01',
+            ...     end_date='2020-12-31'
+            ... )
 
-    Note:
-        The chart will be displayed in a matplotlib window. The data is automatically
-        fetched using get_data() and converted to the appropriate format for plotting.
-    """
+        Note:
+            The chart will be displayed in a matplotlib window. The data is automatically
+            fetched using get_data() and converted to the appropriate format for plotting.
+        """
 
         logger.info(f'''Chart request:
                     ticker {ticker}
@@ -1204,8 +1218,7 @@ class HistoricalManagerDB:
         chart_data = self.get_data(ticker=ticker,
                                    timeframe=timeframe,
                                    start=start_date,
-                                   end=end_date,
-                                   add_timeframe=True)
+                                   end=end_date)
 
         chart_data = to_pandas_dataframe(chart_data)
 
@@ -1217,9 +1230,7 @@ class HistoricalManagerDB:
             chart_data.index = to_datetime(chart_data.index)
 
         else:
-            logger.trace(
-                f'Chart data already has {
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
+            logger.trace(f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
 
         # candlestick chart type
         # use mplfinance

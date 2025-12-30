@@ -153,6 +153,55 @@ Analyze data across multiple years:
    
    print(f"Highest weekly close: {max_close}")
    print(f"Lowest weekly close: {min_close}")
+   
+Example 5: Conditional Data Filtering
+-------------------------------------
+
+Filter data based on price conditions directly during retrieval:
+
+.. code-block:: python
+
+   from forex_data import (
+         HistoricalManagerDB,
+         BASE_DATA_COLUMN_NAME,
+         SQL_COMPARISON_OPERATORS,
+         SQL_CONDITION_AGGREGATION_MODES
+      )
+
+   manager = HistoricalManagerDB(config='appconfig.yaml')
+
+   # 1. Simple Filter: Get days where Close >= 1.12
+   high_close_data = manager.get_data(
+      ticker='EURUSD',
+      timeframe='1D',
+         start='2020-06-01',
+         end='2020-06-30',
+         comparison_column_name=BASE_DATA_COLUMN_NAME.CLOSE,
+         check_level=1.12,
+         comparison_operator=SQL_COMPARISON_OPERATORS.GREATER_THAN_OR_EQUAL
+      )
+      
+   print(f"Days with Close >= 1.12: {len(high_close_data)}")
+
+   # 2. Complex Filter: Get days where High > 1.145 OR Low < 1.12
+   volatile_days = manager.get_data(
+      ticker='EURUSD',
+      timeframe='1D',
+         start='2019-01-01',
+         end='2019-12-31',
+         comparison_column_name=[
+            BASE_DATA_COLUMN_NAME.HIGH,
+            BASE_DATA_COLUMN_NAME.LOW
+         ],
+         check_level=[1.145, 1.12],
+         comparison_operator=[
+            SQL_COMPARISON_OPERATORS.GREATER_THAN,
+            SQL_COMPARISON_OPERATORS.LESS_THAN
+         ],
+         aggregation_mode=SQL_CONDITION_AGGREGATION_MODES.OR
+      )
+
+   print(f"Volatile days found: {len(volatile_days)}")
 
 Real-time Data Examples
 =======================

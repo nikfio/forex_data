@@ -25,6 +25,9 @@ from forex_data import (
     TickerNotFoundError,
     is_empty_dataframe,
     get_histdata_tickers,
+    BASE_DATA_COLUMN_NAME,
+    SQL_COMPARISON_OPERATORS,
+    SQL_CONDITION_AGGREGATION_MODES,
     YEARS,
     POLARS_DTYPE_DICT
 )
@@ -156,33 +159,39 @@ class TestHistoricalManagerDB(unittest.TestCase):
             self.assertGreaterEqual(min_date, start)
             self.assertLessEqual(max_date, end)
 
-    def test_08_get_data_with_add_timeframe_flag(self):
-        """Test get_data with add_timeframe parameter."""
+    def test_08_get_data_with_weekly_timeframe(self):
+        """Test get_data with weekly (1W) timeframe."""
         ticker = 'EURJPY'
-        timeframe = '1D'
-        start = datetime(2018, 10, 4)
+        timeframe = '1W'
+        start = datetime(2018, 5, 4)
         end = datetime(2018, 11, 1)
 
-        # Test with add_timeframe=True (default)
-        data_with_tf = self.hist_manager.get_data(
+        data = self.hist_manager.get_data(
             ticker=ticker,
             timeframe=timeframe,
             start=start,
-            end=end,
-            add_timeframe=True
+            end=end
         )
 
-        # Test with add_timeframe=False
-        data_without_tf = self.hist_manager.get_data(
-            ticker=ticker,
-            timeframe=timeframe,
-            start=start,
-            end=end,
-            add_timeframe=False
-        )
+        self.assertIsNotNone(data)
 
-        self.assertIsNotNone(data_with_tf)
-        self.assertIsNotNone(data_without_tf)
+        if isinstance(data, polars_lazyframe):
+            data = data.collect()
+
+        # assert that between two consecutive candles the timestamp
+        # difference is 7 days
+        random_candles = data.head(2)
+        # random_candles is already sorted by timestamp
+        self.assertEqual(
+            (
+                random_candles[1]['timestamp'][0]
+                - random_candles[0]['timestamp'][0]
+            ).days,
+            7,
+            msg=f"Between two random consecutive candles the timestamp difference "
+                f"is not 7 days: {random_candles[1]['timestamp'][0]} - "
+                f"{random_candles[0]['timestamp'][0]}"
+        )
 
     def test_09_data_columns_present(self):
         """Test that retrieved data has expected columns."""
@@ -435,6 +444,182 @@ class TestHistoricalManagerDB(unittest.TestCase):
         for ticker in tickers[:10]:  # Check first 10 for performance
             self.assertTrue(ticker.isupper(), msg=f"Ticker {ticker} is not uppercase")
             self.assertGreaterEqual(len(ticker), 6, msg=f"Ticker {ticker} is too short")
+
+    def test_20_get_data_with_single_condition_less_than(self):
+        """Test get_data with single condition filtering (OPEN < threshold)."""
+        ticker = 'EURUSD'
+        timeframe = '1D'
+        start = datetime(2018, 1, 1)
+        end = datetime(2018, 12, 31)
+        min_open_value = 1.13
+
+        # Get data with condition: open < 1.13
+        filtered_data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end,
+            comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+            check_level=min_open_value,
+            comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN
+        )
+
+        self.assertIsNotNone(filtered_data)
+        self.assertIsInstance(filtered_data, (polars_dataframe, polars_lazyframe))
+
+        if isinstance(filtered_data, polars_lazyframe):
+            filtered_data = filtered_data.collect()
+
+        # Verify all returned rows have OPEN < threshold
+        if len(filtered_data) > 0:
+            max_open = filtered_data['open'].max()
+            self.assertLess(
+                max_open,
+                min_open_value,
+                msg=f"Found OPEN value {max_open} >= threshold {min_open_value}"
+            )
+
+    def test_21_get_data_with_multiple_conditions_or(self):
+        """Test get_data with multiple conditions using OR aggregation."""
+        ticker = 'EURUSD'
+        timeframe = '1D'
+        start = datetime(2019, 1, 1)
+        end = datetime(2019, 12, 31)
+        high_threshold = 1.145
+        low_threshold = 1.12
+
+        # Get data with multiple conditions: HIGH < threshold OR LOW < threshold
+        filtered_data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end,
+            comparison_column_name=[
+                BASE_DATA_COLUMN_NAME.HIGH,
+                BASE_DATA_COLUMN_NAME.LOW
+            ],
+            check_level=[high_threshold, low_threshold],
+            comparison_operator=[
+                SQL_COMPARISON_OPERATORS.GREATER_THAN,
+                SQL_COMPARISON_OPERATORS.LESS_THAN
+            ],
+            aggregation_mode=SQL_CONDITION_AGGREGATION_MODES.OR
+        )
+
+        self.assertIsNotNone(filtered_data)
+        self.assertIsInstance(filtered_data, (polars_dataframe, polars_lazyframe))
+
+        if isinstance(filtered_data, polars_lazyframe):
+            filtered_data = filtered_data.collect()
+
+        # Verify at least one condition is met for each row
+        if len(filtered_data) > 0:
+            for row in filtered_data.iter_rows(named=True):
+                high_condition = row['high'] > high_threshold
+                low_condition = row['low'] < low_threshold
+                self.assertTrue(
+                    high_condition or low_condition,
+                    msg=f"Row does not satisfy OR condition: "
+                        f"HIGH={row['high']}, LOW={row['low']}"
+                )
+
+    def test_22_get_data_with_multiple_conditions_and(self):
+        """Test get_data with multiple conditions using AND aggregation."""
+        ticker = 'EURUSD'
+        timeframe = '1D'
+        start = datetime(2019, 1, 1)
+        end = datetime(2019, 12, 31)
+        high_threshold = 1.145
+        low_threshold = 1.12
+
+        # Get data with multiple conditions: HIGH < threshold AND LOW < threshold
+        filtered_data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end,
+            comparison_column_name=[
+                BASE_DATA_COLUMN_NAME.HIGH,
+                BASE_DATA_COLUMN_NAME.LOW
+            ],
+            check_level=[high_threshold, low_threshold],
+            comparison_operator=[
+                SQL_COMPARISON_OPERATORS.LESS_THAN,
+                SQL_COMPARISON_OPERATORS.GREATER_THAN
+            ],
+            aggregation_mode=SQL_CONDITION_AGGREGATION_MODES.AND
+        )
+
+        self.assertIsNotNone(filtered_data)
+        self.assertIsInstance(filtered_data, (polars_dataframe, polars_lazyframe))
+
+        if isinstance(filtered_data, polars_lazyframe):
+            filtered_data = filtered_data.collect()
+
+        # Verify both conditions are met for each row
+        if len(filtered_data) > 0:
+            for row in filtered_data.iter_rows(named=True):
+                self.assertLess(
+                    row['high'],
+                    high_threshold,
+                    msg=f"HIGH={row['high']} not less than {high_threshold}"
+                )
+                self.assertGreater(
+                    row['low'],
+                    low_threshold,
+                    msg=f"LOW={row['low']} not greater than {low_threshold}"
+                )
+
+    def test_23_get_data_with_condition_greater_than_or_equal(self):
+        """Test get_data with GREATER_THAN_OR_EQUAL condition."""
+        ticker = 'EURUSD'
+        timeframe = '1D'
+        start = datetime(2020, 6, 1)
+        end = datetime(2020, 6, 30)
+        close_threshold = 1.12
+
+        # Get all data (no filter)
+        all_data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end
+        )
+
+        # Get filtered data (close >= threshold)
+        filtered_data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end,
+            comparison_column_name=BASE_DATA_COLUMN_NAME.CLOSE,
+            check_level=close_threshold,
+            comparison_operator=SQL_COMPARISON_OPERATORS.GREATER_THAN_OR_EQUAL
+        )
+
+        self.assertIsNotNone(all_data)
+        self.assertIsNotNone(filtered_data)
+
+        if isinstance(all_data, polars_lazyframe):
+            all_data = all_data.collect()
+        if isinstance(filtered_data, polars_lazyframe):
+            filtered_data = filtered_data.collect()
+
+        # Verify filtered data is subset of all data
+        self.assertLessEqual(
+            len(filtered_data),
+            len(all_data),
+            msg="Filtered data has more rows than unfiltered data"
+        )
+
+        # Verify all rows meet the condition
+        if len(filtered_data) > 0:
+            min_close = filtered_data['close'].min()
+            self.assertGreaterEqual(
+                min_close,
+                close_threshold,
+                msg=f"Found CLOSE value {min_close} < threshold {close_threshold}"
+            )
 
 
 if __name__ == '__main__':

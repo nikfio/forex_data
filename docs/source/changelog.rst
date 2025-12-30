@@ -114,6 +114,7 @@ Enhanced Features
 * Improved real-time data caching
   * store data in same database used for historical data
 * API call distribution across providers
+* Functionalities to ease data elaboration and visualization
 
 Performance
 ^^^^^^^^^^^
