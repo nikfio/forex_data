@@ -1454,24 +1454,6 @@ def reframe_data(dataframe, tf):
                          f'or {DATA_COLUMN_NAMES.TF_DATA}')
             raise ValueError
 
-# TODO: function to return filter data with inputs:
-        # column to filter on
-        # start interval value
-        # end interval value
-        # option to return specific row index
-
-
-def filter_data(
-    dataframe,
-    tf,
-    filter_column=None,
-    start=None,
-    end=None,
-    index=None
-):
-
-    pass
-
 # UTILS FOR DOTTY DICTIONARY
 
 
@@ -1727,8 +1709,8 @@ def list_remove_duplicates(list_in):
 
     return list(dict.fromkeys(list_in))
 
+# HISTDATA data provider utilities
 
-# HISTDATA utilities
 
 # Analyze the Histdata Forex download base page
 # https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes
@@ -1743,6 +1725,8 @@ def get_histdata_tickers() -> List[str]:
         List of all available tickers (e.g., ['EURUSD', 'GBPUSD', ...]).
     """
     url = "https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes"
+
+    # TODO: test connection with url, if fails return empty list and log error
 
     try:
         response = requests.get(url)

@@ -107,6 +107,7 @@ Database Integration
 ^^^^^^^^^^^^^^^^^^^^
 
 * DuckDB integration
+* Cache data in AWS S3 storage and other major cloud providers persistent storage service
 
 Enhanced Features
 ^^^^^^^^^^^^^^^^^

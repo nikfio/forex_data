@@ -35,7 +35,7 @@ Quick Installation
 ==================
 
 Using pip or Poetry (Recommended)
------------------------
+---------------------------------
 
 The easiest way to install forex_data is from PyPI:
 

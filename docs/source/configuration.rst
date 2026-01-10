@@ -7,7 +7,10 @@ This guide covers all configuration options for the forex_data package.
 Configuration File
 ==================
 
-The forex_data package uses a YAML configuration file to manage settings. By default, it looks for a file named ``appconfig.yaml`` in your project directory.
+The forex_data package uses a YAML configuration file to manage settings. 
+You can pass directly the absolute path to the YAML file or also a folder.
+In the second case, it will look for the configuration file ending with `data_config.yaml` in the specified folder.
+Furthermore, any parameter value can be overridden by explicit assignment in object instantion.
 
 Basic Configuration File
 ------------------------
@@ -151,17 +154,19 @@ Getting API Keys
 Using Configuration in Code
 ============================
 
-Automatic Loading
------------------
+Specify Configuration File folder
+---------------------------------
 
-The package automatically looks for ``appconfig.yaml`` in the current directory:
+You can specify the folder where the configuration file is located, in this case it will automatically loaded the file ending with `data_config.yaml`.
 
 .. code-block:: python
 
    from forex_data import HistoricalManagerDB
    
    # Automatically uses configuration file ending with data_config.yaml if found
-   manager = HistoricalManagerDB()
+   manager = HistoricalManagerDB(
+      config='path/to/data_config_folder/
+   )
 
 Explicit Configuration File
 ----------------------------
@@ -182,7 +187,7 @@ You can override any configuration parameter in code:
 .. code-block:: python
 
    manager = HistoricalManagerDB(
-       config='appconfig.yaml',
+       config='path/to/data_config.yaml',
        engine='polars'  # Overrides ENGINE from config file
    )
 
@@ -205,23 +210,7 @@ You can copy this template and customize it:
 .. code-block:: bash
 
    cp appconfig/appconfig_template.yaml appconfig.yaml
-   # Edit appconfig.yaml with your settings
-
-Multiple Configuration Files
------------------------------
-
-For different environments (development, testing, production):
-
-.. code-block:: python
-
-   import os
-   
-   env = os.getenv('ENVIRONMENT', 'development')
-   config_file = f'appconfig.{env}.yaml'
-   
-   manager = HistoricalManagerDB(
-       config=config_file
-   )
+   # Edit appconfig.yaml with your custom settings
 
 Environment Variables
 ---------------------
@@ -277,7 +266,7 @@ Configuration Not Found
 
 **Error**: ``Configuration file not found``
 
-**Solution**: Ensure ``appconfig.yaml`` is in the current working directory or provide full path:
+**Solution**: Ensure you pass the absolute path of file ``appconfig.yaml``:
 
 .. code-block:: python
 

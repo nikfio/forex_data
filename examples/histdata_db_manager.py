@@ -15,10 +15,9 @@ from forex_data import (
 )
 
 from loguru import logger
-from sys import stderr
+from sys import stdout
 from time import time
 from random import choice
-
 
 # Use a runtime defined config yaml file
 test_config_yaml = '''
@@ -30,15 +29,14 @@ ENGINE: 'polars_lazy'
 
 def main():
 
-    # TODO: look for config file and get reference
-
     # instance data manager
     histmanager = HistoricalManagerDB(
         config=test_config_yaml
     )
 
-    # add logging to stderr
-    logger.add(stderr, level="TRACE")
+    # add verbose to standard output
+    logger.add(stdout,
+               level='TRACE')
 
     # example parameters
     # get a random choice for ex_ticker picking from list

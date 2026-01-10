@@ -1,5 +1,5 @@
 forex\_data_aggregator package
-===================
+==============================
 
 Subpackages
 -----------

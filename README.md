@@ -115,7 +115,9 @@ The full documentation includes:
 A configuration file can be passed in order to group fixed parameters values.
 In repository folder clone, look for [appconfig folder](appconfig) to see the [example template file](appconfig/appconfig_template.yaml).
 
-In data managers instantiation, you can pass the YAML configuration file ending with `data_config.yaml` but any parameter value can be overridden by explicit assignment in object instantion.
+In data managers instantiation, you can pass directly the absolute path to the YAML file or also a folder.
+In the second case, it will look for the configuration file ending with `data_config.yaml` in the specified folder.
+Furthermore, any parameter value can be overridden by explicit assignment in object instantion.
 The feature will be more clear following the [examples section](#examples).
 
 #### ENGINE
