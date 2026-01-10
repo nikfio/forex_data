@@ -91,6 +91,25 @@ BASE CONNECTOR
 @define(kw_only=True, slots=True)
 class DatabaseConnector:
 
+    data_folder: str = field(default='',
+                             validator=validators.instance_of(str))
+
+    def __init__(self, **kwargs: Any) -> None:
+
+        pass
+
+    def __attrs_post_init__(self) -> None:
+
+        # create data folder if not exists
+        if (
+            not Path(self.data_folder).exists()
+            or
+            not Path(self.data_folder).is_dir()
+        ):
+
+            Path(self.data_folder).mkdir(parents=True,
+                                         exist_ok=True)
+
     def connect(self) -> Any:
         """Connect to database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement connect")
@@ -144,12 +163,10 @@ DUCKDB CONNECTOR:
 @define(kw_only=True, slots=True)
 class DuckDBConnector(DatabaseConnector):
 
-    duckdb_filepath: str = field(default='',
-                                 validator=validators.instance_of(str))
+    _duckdb_filepath = field(default='',
+                             validator=validators.instance_of(str))
 
     def __init__(self, **kwargs: Any) -> None:
-
-        # super().__init__(**kwargs)
 
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
@@ -255,11 +272,13 @@ class DuckDBConnector(DatabaseConnector):
 
                         logger.warning('KeyError: initializing object has no '
                                        f'attribute {attr.name}')
+                        raise
 
                     except IndexError:
 
                         logger.warning('IndexError: initializing object has no '
                                        f'attribute {attr.name}')
+                        raise
 
                     else:
 
@@ -298,6 +317,15 @@ class DuckDBConnector(DatabaseConnector):
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
+        super().__attrs_post_init__(**kwargs)
+
+        # set up log sink for DuckDB
+        logger.add(Path(self.data_folder) / 'log' / 'duckdb.log',
+                   level="TRACE",
+                   rotation="5 MB",
+                   filter=lambda record: ('duckdb' == record['extra'].get('target') and
+                                          bool(record["extra"].get('target'))))
+
         # create duck file path if not exists
         if (
                 not Path(self.duckdb_filepath).exists() or
@@ -307,7 +335,8 @@ class DuckDBConnector(DatabaseConnector):
             Path(self.duckdb_filepath).parent.mkdir(parents=True,
                                                     exist_ok=True)
         else:
-            logger.trace(f'DuckDB file {self.duckdb_filepath} already exists')
+
+            logger.bind(target='duckdb').trace(f'DuckDB file {self.duckdb_filepath} already exists')
 
         # set autovacuum
         conn = self.connect()
@@ -327,7 +356,7 @@ class DuckDBConnector(DatabaseConnector):
 
         except Exception as e:
 
-            logger.error(f'ADBC-SQLITE: connection error: {e}')
+            logger.bind(target='duckdb').error(f'ADBC-SQLITE: connection error: {e}')
             raise
 
         else:
@@ -348,11 +377,11 @@ class DuckDBConnector(DatabaseConnector):
 
         except Exception as e:
 
-            logger.error(f'Error during connection to {self.duckdb_filepath}')
+            logger.bind(target='duckdb').error(f'Error during connection to {self.duckdb_filepath}')
 
         else:
 
-            logger.trace(f'{info}')
+            logger.bind(target='duckdb').trace(f'{info}')
 
             out_check_connection = not is_empty_dataframe(info)
 
@@ -398,7 +427,7 @@ class DuckDBConnector(DatabaseConnector):
             duckdb_columns_dict = dict(o_dict)
 
         else:
-            logger.trace(f'Timestamp is already the first column in {duckdb_columns_dict.keys()}')
+            logger.bind(target='duckdb').trace(f'Timestamp is already the first column in {duckdb_columns_dict.keys()}')
 
         return duckdb_columns_dict
 
@@ -415,7 +444,7 @@ class DuckDBConnector(DatabaseConnector):
 
         except Exception as e:
 
-            logger.error(f'Error list tables for {self.duckdb_filepath}: {e}')
+            logger.bind(target='duckdb').error(f'Error list tables for {self.duckdb_filepath}: {e}')
 
         else:
 
@@ -533,7 +562,7 @@ class DuckDBConnector(DatabaseConnector):
 
             except Exception as e:
 
-                logger.error(f'Error querying table {table}: {e}')
+                logger.bind(target='duckdb').error(f'Error querying table {table}: {e}')
                 raise
 
             else:
@@ -653,7 +682,7 @@ class DuckDBConnector(DatabaseConnector):
 
             except Exception as e:
 
-                logger.error(f'executing query {query} failed: {e}')
+                logger.bind(target='duckdb').error(f'executing query {query} failed: {e}')
 
             else:
 
@@ -704,8 +733,8 @@ LOCAL DATA FILES MANAGER
 @define(kw_only=True, slots=True)
 class LocalDBConnector(DatabaseConnector):
 
-    local_data_folder: str = field(default='',
-                                   validator=validators.instance_of(str))
+    data_folder: str = field(default='',
+                             validator=validators.instance_of(str))
     data_type: str = field(default='parquet',
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
@@ -716,8 +745,6 @@ class LocalDBConnector(DatabaseConnector):
         validator=validator_dir_path(create_if_missing=False))
 
     def __init__(self, **kwargs: Any) -> None:
-
-        # super().__init__(**kwargs)
 
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
@@ -761,10 +788,11 @@ class LocalDBConnector(DatabaseConnector):
 
                 else:
 
-                    logger.critical('invalid config type '
-                                    f'{kwargs["config"]}: '
-                                    'required str or Path, got '
-                                    f'{type(kwargs["config"])}')
+                    logger.bind(target='localdb').critical(
+                        'invalid config type '
+                        f'{kwargs["config"]}: '
+                        'required str or Path, got '
+                        f'{type(kwargs["config"])}')
                     raise TypeError
 
                 # check consistency of config_args
@@ -773,8 +801,9 @@ class LocalDBConnector(DatabaseConnector):
                     not bool(config_args)
                 ):
 
-                    logger.critical(f'config {kwargs["config"]} '
-                                    'has no valid yaml formatted data')
+                    logger.bind(target='localdb').critical(
+                        f'config {kwargs["config"]} '
+                        'has no valid yaml formatted data')
                     raise TypeError
 
                 # set args from config file
@@ -821,13 +850,15 @@ class LocalDBConnector(DatabaseConnector):
 
                     except KeyError:
 
-                        logger.warning('KeyError: initializing object has no '
-                                       f'attribute {attr.name}')
+                        logger.error('KeyError: initializing object has no '
+                                     f'attribute {attr.name}')
+                        raise
 
                     except IndexError:
 
-                        logger.warning('IndexError: initializing object has no '
-                                       f'attribute {attr.name}')
+                        logger.error('IndexError: initializing object has no '
+                                     f'attribute {attr.name}')
+                        raise
 
                     else:
 
@@ -853,6 +884,7 @@ class LocalDBConnector(DatabaseConnector):
                                              None)
 
             else:
+
                 logger.trace(f'config {kwargs["config"]} is empty, using default configuration')
 
         else:
@@ -867,18 +899,16 @@ class LocalDBConnector(DatabaseConnector):
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
-        # create duck file path if not exists
-        if (
-                not Path(self.local_data_folder).exists() or
-            not Path(self.local_data_folder).is_dir()
-        ):
+        super().__attrs_post_init__()
 
-            Path(self.local_data_folder).mkdir(parents=True,
-                                               exist_ok=True)
-        else:
-            logger.trace(f'Local data folder {self.local_data_folder} already exists')
+        # set up log sink for LocalDB
+        logger.add(Path(self.data_folder) / 'log' / 'localdb.log',
+                   level="TRACE",
+                   rotation="5 MB",
+                   filter=lambda record: ('localdb' == record['extra'].get('target') and
+                                          bool(record["extra"].get('target'))))
 
-        self._local_path = Path(self.local_data_folder)
+        self._local_path = Path(self.data_folder)
 
     def _db_key(self,
                 market: str,
@@ -926,7 +956,7 @@ class LocalDBConnector(DatabaseConnector):
                 isinstance(filename, str)
         ):
 
-            logger.error('filename {filename} invalid type: required str')
+            logger.bind(target='localdb').error('filename {filename} invalid type: required str')
             raise TypeError(f'filename {filename} invalid type: required str')
 
         file_items = self._get_items_from_db_key(filename)
@@ -999,10 +1029,10 @@ class LocalDBConnector(DatabaseConnector):
                         if search(filter, file.stem, IGNORECASE):
                             file.unlink(missing_ok=True)
                 else:
-                    logger.info(f'No data files found in {self._local_path} with filter {filter}')
+                    logger.bind(target='localdb').info(f'No data files found in {self._local_path} with filter {filter}')
 
             else:
-                logger.error(f'Filter {filter} invalid type: required str')
+                logger.bind(target='localdb').error(f'Filter {filter} invalid type: required str')
 
         else:
 
@@ -1071,7 +1101,7 @@ class LocalDBConnector(DatabaseConnector):
 
             except Exception as e:
 
-                logger.error(f'Error querying table {table}: {e}')
+                logger.bind(target='localdb').error(f'Error querying table {table}: {e}')
                 raise
 
             else:
@@ -1079,7 +1109,7 @@ class LocalDBConnector(DatabaseConnector):
                 ticker_years_list = [int(row[0]) for row in read.collect().iter_rows()]
 
         else:
-            logger.warning(f'Expected 1 file for {ticker} - {timeframe}, found {len(files)}')
+            logger.bind(target='localdb').warning(f'Expected 1 file for {ticker} - {timeframe}, found {len(files)}')
 
         return ticker_years_list
 
@@ -1163,11 +1193,11 @@ class LocalDBConnector(DatabaseConnector):
                 comparison_operator = [comparison_operator]
 
             if any([col not in list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__) for col in comparison_column_name]):
-                logger.error(f'comparison_column_name must be a supported column name: {list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
+                logger.bind(target='localdb').error(f'comparison_column_name must be a supported column name: {list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
                 raise ValueError('comparison_column_name must be a supported column name')
 
             if any([cond not in list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__) for cond in comparison_operator]):
-                logger.error(f'comparison_operator must be a supported SQL comparison operator: {list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)}')
+                logger.bind(target='localdb').error(f'comparison_operator must be a supported SQL comparison operator: {list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)}')
                 raise ValueError('comparison_operator must be a supported SQL comparison operator')
 
             if (
@@ -1179,11 +1209,11 @@ class LocalDBConnector(DatabaseConnector):
                 and
                 comparison_aggregation_mode not in list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)
             ):
-                logger.error(f'comparison_aggregation_mode must be a supported SQL condition aggregation mode: {list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)}')
+                logger.bind(target='localdb').error(f'comparison_aggregation_mode must be a supported SQL condition aggregation mode: {list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)}')
                 raise ValueError('comparison_aggregation_mode must be a supported SQL condition aggregation mode')
 
             if len(comparison_column_name) != len(check_level) or len(comparison_column_name) != len(comparison_operator):
-                logger.error('comparison_column_name, check_level and comparison_operator must have the same length')
+                logger.bind(target='localdb').error('comparison_column_name, check_level and comparison_operator must have the same length')
                 raise ValueError('comparison_column_name, check_level and comparison_operator must have the same length')
 
             comparisons_len = len(comparison_column_name)
@@ -1209,7 +1239,7 @@ class LocalDBConnector(DatabaseConnector):
 
         else:
 
-            logger.error(f'Engine {self.engine} or data type {self.data_type} not supported')
+            logger.bind(target='localdb').error(f'Engine {self.engine} or data type {self.data_type} not supported')
             raise ValueError(f'Engine {self.engine} or data type {self.data_type} not supported')
 
         if (
@@ -1286,7 +1316,7 @@ class LocalDBConnector(DatabaseConnector):
 
         else:
 
-            logger.critical(f'file {filepath} not found')
+            logger.bind(target='localdb').critical(f'file {filepath} not found')
             raise FileNotFoundError("file {filepath} not found")
 
         return dataframe

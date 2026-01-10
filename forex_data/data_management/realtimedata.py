@@ -289,13 +289,15 @@ class RealtimeManager:
 
                     except KeyError:
 
-                        logger.warning('KeyError: initializing object has no '
-                                       f'attribute {attr.name}')
+                        logger.error('KeyError: initializing object has no '
+                                     f'attribute {attr.name}')
+                        raise
 
                     except IndexError:
 
-                        logger.warning('IndexError: initializing object has no '
-                                       f'attribute {attr.name}')
+                        logger.error('IndexError: initializing object has no '
+                                     f'attribute {attr.name}')
+                        raise
 
                     else:
 
@@ -332,9 +334,12 @@ class RealtimeManager:
 
     def __attrs_post_init__(self) -> None:
 
-        # reset logging handlers
-        logger.remove()
-
+        # set up log sink for historical manager
+        logger.add(self._data_path / 'log' / 'forexrtdata.log',
+                   level="TRACE",
+                   rotation="5 MB",
+                   filter=lambda record: ('rtmanager' == record['extra'].get('target') and
+                                          bool(record["extra"].get('target'))))
         # checks on data folder path
         if (
             not self._realtimedata_path.is_dir() or
@@ -343,12 +348,6 @@ class RealtimeManager:
 
             self._realtimedata_path.mkdir(parents=True,
                                           exist_ok=True)
-
-        # add logging file handle
-        logger.add(self._data_path / 'forexdata.log',
-                   level="TRACE",
-                   rotation="5 MB"
-                   )
 
         if self.engine == 'pandas':
 

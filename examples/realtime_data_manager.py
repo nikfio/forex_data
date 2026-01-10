@@ -29,7 +29,7 @@ from forex_data import (
     shape_dataframe
 )
 
-from sys import stderr
+from sys import stdout, stderr
 from os import getenv
 
 # Use a runtime defined config yaml file
@@ -59,8 +59,9 @@ def main():
         config=test_config_yaml
     )
 
-    # add logging to stderr
-    logger.add(stderr, level="TRACE")
+    # add verbose to standard output
+    logger.add(stdout,
+               level='TRACE')
 
     # example parameters
     ex_ticker = 'EURCAD'

@@ -19,7 +19,7 @@ from forex_data import (
 )
 
 from loguru import logger
-from sys import stderr
+from sys import stdout
 from time import time
 
 
@@ -38,8 +38,9 @@ def main():
         config=test_config_yaml
     )
 
-    # Add logging to stderr
-    logger.add(stderr, level="TRACE")
+    # Add logging to stdout
+    logger.add(stdout,
+               level="TRACE")
 
     # Example 1: Get data with a single condition (open price < threshold)
     ex_ticker = 'EURUSD'

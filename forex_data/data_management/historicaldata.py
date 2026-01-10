@@ -140,7 +140,8 @@ class HistoricalManagerDB:
                 config_path = Path(kwargs['config'])
 
                 if (
-                    config_path.exists() and
+                    config_path.exists()
+                    and
                     config_path.is_dir()
                 ):
 
@@ -180,7 +181,8 @@ class HistoricalManagerDB:
 
                 # check consistency of config_args
                 if (
-                        not isinstance(config_args, dict) or
+                    not isinstance(config_args, dict)
+                    or
                     not bool(config_args)
                 ):
 
@@ -234,11 +236,13 @@ class HistoricalManagerDB:
 
                         logger.warning('KeyError: initializing object has no '
                                        f'attribute {attr.name}')
+                        raise
 
                     except IndexError:
 
                         logger.warning('IndexError: initializing object has no '
                                        f'attribute {attr.name}')
+                        raise
 
                     else:
 
@@ -264,9 +268,9 @@ class HistoricalManagerDB:
                                              None)
 
             else:
+
                 logger.trace(
-                    f'config {
-                        kwargs["config"]} is empty, using default configuration')
+                    f'config {kwargs["config"]} is empty, using default configuration')
 
         else:
 
@@ -280,14 +284,12 @@ class HistoricalManagerDB:
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
-        # reset logging handlers
-        logger.remove()
-
-        # add logging file handle
-        logger.add(self._data_path / 'forexdata.log',
+        # set up log sink for historical manager
+        logger.add(self._data_path / 'log' / 'forexhistdata.log',
                    level="TRACE",
-                   rotation="5 MB"
-                   )
+                   rotation="5 MB",
+                   filter=lambda record: ('histmanager' == record['extra'].get('target') and
+                                          bool(record["extra"].get('target'))))
 
         # set up dataframe engine internal var based on config selection
         if self.engine == 'pandas':
@@ -308,7 +310,7 @@ class HistoricalManagerDB:
 
         else:
 
-            logger.error(f'Engine {self.engine} not supported')
+            logger.bind(target='histmanager').error(f'Engine {self.engine} not supported')
             raise ValueError(f'Engine {self.engine} not supported')
 
         self._temporary_data_path = self._histdata_path \
@@ -329,15 +331,14 @@ class HistoricalManagerDB:
 
             self._db_connector = \
                 LocalDBConnector(
-                    local_data_folder=str(self._histdata_path /
-                                          'LocalDB'),
+                    data_folder=str(self._histdata_path / 'LocalDB'),
                     data_type=self.data_type,
                     engine=self.engine
                 )
 
         else:
 
-            logger.error(f'Data type {self.data_type} not supported')
+            logger.bind(target='histmanager').error(f'Data type {self.data_type} not supported')
             raise ValueError(f'Data type {self.data_type} not supported')
 
     def _clear_temporary_data_folder(self) -> None:
@@ -354,11 +355,12 @@ class HistoricalManagerDB:
 
             except Exception as e:
 
-                logger.warning('Deleting temporary data folder '
-                               f'{str(self._temporary_data_path)} not successfull: {e}')
+                logger.bind(target='histmanager').warning(
+                    'Deleting temporary data folder '
+                    f'{str(self._temporary_data_path)} not successfull: {e}')
 
         else:
-            logger.trace(
+            logger.bind(target='histmanager').trace(
                 f'Temporary data folder {
                     self._temporary_data_path} does not exist')
 
@@ -440,17 +442,18 @@ class HistoricalManagerDB:
                 # REDO THE CHECK FOR CONSISTENCY
                 if set(years_tick).difference(ticker_years_list):
 
-                    logger.critical(f'ticker {ticker}: {tf} timeframe completing'
-                                    ' operation FAILED')
+                    logger.bind(target='histmanager').critical(
+                        f'ticker {ticker}: {tf} timeframe completing'
+                        ' operation FAILED')
 
                     raise KeyError
 
                 else:
-                    logger.trace(
+                    logger.bind(target='histmanager').trace(
                         f'ticker {ticker}: {tf} timeframe completing operation successful')
 
             else:
-                logger.trace(f'ticker {ticker}: no complete timeframe found')
+                logger.bind(target='histmanager').trace(f'ticker {ticker}: no complete timeframe found')
 
     def _update_db(self) -> None:
 
@@ -488,10 +491,11 @@ class HistoricalManagerDB:
         try:
             token = search('id="tk" value="(.*?)"', r.text).groups()[0]
         except AttributeError:
-            logger.critical(f'token value was not found scraping '
-                            f'url {url}: {ticker} not existing or'
-                            f'not supported by histdata.com: {ticker} - '
-                            f'{year}-{MONTHS[month_num - 1]}')
+            logger.bind(target='histmanager').critical(
+                f'token value was not found scraping '
+                f'url {url}: {ticker} not existing or'
+                f'not supported by histdata.com: {ticker} - '
+                f'{year}-{MONTHS[month_num - 1]}')
 
         # If exception was caught, token will still be None
         if token is None:
@@ -521,7 +525,7 @@ class HistoricalManagerDB:
         }
 
         # logger trace ticker year and month specifed are being downloaded
-        logger.trace(f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
+        logger.bind(target='histmanager').trace(f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
         r = session.request(
             HISTDATA_BASE_DOWNLOAD_METHOD,
             HISTDATA_BASE_DOWNLOAD_URL,
@@ -542,7 +546,7 @@ class HistoricalManagerDB:
         except BadZipFile as e:
 
             # here will be a warning log
-            logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: {e}')
+            logger.bind(target='histmanager').error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: {e}')
             raise TickerDataBadTypeException(
                 f"Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}")
 
@@ -552,8 +556,9 @@ class HistoricalManagerDB:
             try:
                 ExtFile = zf.open(zf.namelist()[0])
             except Exception as e:
-                logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
-                             f'not found or invalid download: {e}')
+                logger.bind(target='histmanager').error(
+                    f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
+                    f'not found or invalid download: {e}')
                 raise TickerDataNotFoundError(
                     f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
 
@@ -561,8 +566,9 @@ class HistoricalManagerDB:
                 if isinstance(ExtFile, ZipExtFile):
                     return ExtFile
                 else:
-                    logger.error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
-                                 f'data type not expected')
+                    logger.bind(target='histmanager').error(
+                        f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
+                        f'data type not expected')
                     raise TickerDataBadTypeException(
                         f"Data {ticker} - {year} - {MONTHS[month_num - 1]} type not expected")
 
@@ -847,7 +853,7 @@ class HistoricalManagerDB:
 
         else:
 
-            logger.error(f'Engine {engine} is not supported')
+            logger.bind(target='histmanager').error(f'Engine {engine} is not supported')
             raise TypeError
 
         # return dataframe
@@ -870,6 +876,7 @@ class HistoricalManagerDB:
                 ticker=ticker.lower(),
                 year=year,
                 month_num=month_num)
+            # TODO: test connection with url, if fails raise connection error
 
             file = self._download_month_raw(
                 ticker,
@@ -901,7 +908,7 @@ class HistoricalManagerDB:
 
             else:
 
-                logger.critical(
+                logger.bind(target='histmanager').critical(
                     f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} data not found or invalid")
                 raise TickerDataInvalidException(
                     f"Ticker {ticker} - {year} - {MONTHS[month_num - 1]} data not found or invalid: generic error")
@@ -917,19 +924,20 @@ class HistoricalManagerDB:
             isinstance(years, list)
         ):
 
-            logger.error('years {years} invalid, must be list type')
+            logger.bind(target='histmanager').error('years {years} invalid, must be list type')
             raise TypeError
 
         if not (
             set(years).issubset(YEARS)
         ):
 
-            logger.error(f'requestedyears{years} not available. '
-                         f'Years must be limited to: {YEARS}')
+            logger.bind(target='histmanager').error(
+                f'requestedyears{years} not available. '
+                f'Years must be limited to: {YEARS}')
             raise ValueError
 
         else:
-            logger.trace(f'Requested years {years} are valid')
+            logger.bind(target='histmanager').trace(f'Requested years {years} are valid')
 
         # convert to list of int
         if not all(isinstance(year, int) for year in years):
@@ -952,7 +960,7 @@ class HistoricalManagerDB:
                 self._db_connector.write_data(tick_key,
                                               year_tick_df)
             else:
-                logger.warning(
+                logger.bind(target='histmanager').warning(
                     f'Year tick dataframe for {tick_key} is empty, skipping database write')
 
         # update manager database
@@ -995,7 +1003,7 @@ class HistoricalManagerDB:
         if not hasattr(self, '_tf_list'):
             self._tf_list = []
         else:
-            logger.trace('_tf_list already exists')
+            logger.bind(target='histmanager').trace('_tf_list already exists')
 
         if isinstance(timeframe, str):
 
@@ -1006,7 +1014,7 @@ class HistoricalManagerDB:
             all([isinstance(tf, str) for tf in timeframe])
         ):
 
-            logger.error('timeframe invalid: str or list required')
+            logger.bind(target='histmanager').error('timeframe invalid: str or list required')
             raise TypeError
 
         tf_list = [check_timeframe_str(tf) for tf in timeframe]
@@ -1083,8 +1091,12 @@ class HistoricalManagerDB:
 
         # check ticker exists in available tickers
         # from histdata database
-        if ticker.upper() not in get_histdata_tickers():
-            logger.error(f'ticker {ticker.upper()} not found in database')
+        if (
+                ticker.upper() not in get_histdata_tickers()
+                and
+                ticker.lower() not in self._get_ticker_list()
+        ):
+            logger.bind(target='histmanager').error(f'ticker {ticker.upper()} not found in database')
             raise TickerNotFoundError(f'ticker {ticker} not found in database')
 
         # force ticker parameter to lower case
@@ -1092,7 +1104,7 @@ class HistoricalManagerDB:
 
         if not check_timeframe_str(timeframe):
 
-            logger.error(f'timeframe request {timeframe} invalid')
+            logger.bind(target='histmanager').error(f'timeframe request {timeframe} invalid')
             raise ValueError
 
         else:
@@ -1102,8 +1114,9 @@ class HistoricalManagerDB:
 
         if end < start:
 
-            logger.error('date interval not coherent, '
-                         'start must be older than end')
+            logger.bind(target='histmanager').error(
+                'date interval not coherent, '
+                'start must be older than end')
             return self._dataframe_type([])
 
         # get years including interval requested
@@ -1140,7 +1153,7 @@ class HistoricalManagerDB:
                 self.add_timeframe(timeframe)
 
             else:
-                logger.trace(f'Timeframe {timeframe} already in _tf_list')
+                logger.bind(target='histmanager').trace(f'Timeframe {timeframe} already in _tf_list')
 
             # get all keys referring to specific ticker
             ticker_keys = self._get_ticker_keys(ticker)
@@ -1150,12 +1163,13 @@ class HistoricalManagerDB:
 
             if not set(years_interval_req).issubset(ticker_years_list):
 
-                logger.critical(f'processing year data completion for '
-                                f'{years_interval_req} not ok')
+                logger.bind(target='histmanager').critical(
+                    f'processing year data completion for '
+                    f'{years_interval_req} not ok')
                 raise ValueError
 
             else:
-                logger.trace(
+                logger.bind(target='histmanager').trace(
                     f'Year data completion for {years_interval_req} successful')
 
         # at this point all data requested have been aggregated to the database
@@ -1209,7 +1223,7 @@ class HistoricalManagerDB:
             fetched using get_data() and converted to the appropriate format for plotting.
         """
 
-        logger.info(f'''Chart request:
+        logger.bind(target='histmanager').info(f'''Chart request:
                     ticker {ticker}
                     timeframe {timeframe}
                     from {start_date}
@@ -1230,7 +1244,7 @@ class HistoricalManagerDB:
             chart_data.index = to_datetime(chart_data.index)
 
         else:
-            logger.trace(f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
+            logger.bind(target='histmanager').trace(f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
 
         # candlestick chart type
         # use mplfinance

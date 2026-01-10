@@ -30,7 +30,7 @@ install_deps:
 run_tests:
   &run_tests
   name: run tests
-  command: poetry run pytest --flake8 
+  command: poetry run pytest --flake8 -vv
   
 jobs:
   py312:
