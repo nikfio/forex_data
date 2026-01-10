@@ -29,7 +29,7 @@ from forex_data import (
     shape_dataframe
 )
 
-from sys import stdout, stderr
+from sys import stdout
 from os import getenv
 
 # Use a runtime defined config yaml file
