@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "forex_data_aggregator"
-version = "0.1.1"
+version = "0.1.2"
 description = "Data aggregation for forex market data"
 authors = ["Nicola Fiorato <fiorato.nicola@gmail.com>"]
 license = "MIT"
