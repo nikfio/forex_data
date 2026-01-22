@@ -73,7 +73,6 @@ __all__ = [
     'to_source_symbol',
     'get_date_interval',
     'polygon_agg_to_dict',
-    'validator_list_timeframe',
     'get_histdata_tickers',
     'TickerNotFoundError',
     'TickerDataNotFoundError',
@@ -86,7 +85,8 @@ from loguru import logger
 from re import (
     fullmatch,
     findall,
-    search
+    search,
+    IGNORECASE
 )
 
 from typing import (
@@ -273,6 +273,8 @@ TIME_WINDOW_COMPONENTS_PATTERN_STR = '^[-+]?[0-9]+|[A-Za-z]{1,}$'
 TIME_WINDOW_UNIT_PATTERN_STR = '[A-Za-z]{1,}$'
 GET_YEAR_FROM_TICK_KEY_PATTERN_STR = '^[A-Za-z].Y[0-9].TICK'
 YEAR_FIELD_PATTERN_STR = '^Y([0-9]{4,})$'
+POLARS_DURATION_PATTERN_STR = '^[0-9]+(ns|us|ms|s|m|h|d|w|mo|q|y|i)$'
+PYARROW_DURATION_PATTERN_STR = '^[0-9]+(ns|us|ms|s|m|h|d|w|mo|q|y|i)$'
 
 # auxiliary CONSTANT DEFINITIONS
 
@@ -490,41 +492,80 @@ def infer_date_from_format_dt(s, date_format='ISO8601', unit=None, utc=False):
 # https://pandas.pydata.org/docs/user_guide/timeseries.html#dateoffset-objects
 # add compatibility to polars frequency string
 
-def check_timeframe_str(tf):
-
-    check = False
+def check_timeframe_str(tf: str | Timedelta | DateOffset, engine: Literal['pandas', 'polars', 'polars_lazy', 'pyarrow'] = 'pandas'):
 
     if tf == 'TICK':
 
-        check = True
+        return tf
 
-    else:
+    elif isinstance(tf, Timedelta):
 
+        '''
+        Timedelta type is acceptd by all engines supported
+        '''
+        return tf
+
+    elif engine == 'pandas':
+
+        '''
+        timeframe value check for pandas engine
+        '''
         try:
 
-            check = (
-                isinstance(to_offset(tf), DateOffset) or
-                isinstance(Timedelta(tf).to_pytimedelta(),
-                           timedelta)
-            )
+            if isinstance(to_offset(tf), DateOffset):
+
+                return tf
+
+            else:
+
+                logger.critical(f"Type check: Invalid timeframe for pandas: {tf}")
+                raise ValueError
 
         except ValueError:
 
-            logger.critical(f"Type check: Invalid timeframe: {tf}")
+            logger.critical(f"Type check: Invalid timeframe for pandas: {tf}")
             raise
 
-    if check:
+    elif (
+            engine == 'polars'
+            or
+            engine == 'polars_lazy'
+            or
+            engine == 'pyarrow'
+    ):
 
-        return tf
+        '''
+        timeframe value check for polars engine
+        '''
+
+        if isinstance(tf, str):
+
+            if fullmatch(POLARS_DURATION_PATTERN_STR, tf, flags=IGNORECASE):
+
+                return tf
+
+            else:
+
+                logger.critical(f"Type check: Invalid timeframe for polars: {tf}")
+                raise ValueError
+
+        elif isinstance(tf, timedelta):
+
+            return tf
+
+        else:
+
+            logger.critical(f"Type check: Invalid timeframe for polars: {tf}")
+            raise ValueError
 
     else:
 
-        logger.critical(f"Type check: Invalid timeframe "
-                        f"conversion to timedelta: {tf}")
+        logger.critical(f"Type check: Invalid engine: {engine}")
         raise ValueError
 
-
 # PAIR symbol functions
+
+
 def get_pair_symbols(ticker):
 
     components = findall(SINGLE_CURRENCY_PATTERN_STR, ticker)
@@ -1285,11 +1326,11 @@ def reframe_data(dataframe, tf):
     if isinstance(dataframe, pandas_dataframe):
 
         # assert timeframe input value
-        tf = check_timeframe_str(tf)
+        tf = check_timeframe_str(tf, engine='pandas')
 
         if tf == TICK_TIMEFRAME:
 
-            logger.warning(f'reframe not possible wih target {TICK_TIMEFRAME}')
+            logger.warning(f'reframe not possible with target {TICK_TIMEFRAME}')
 
             return dataframe
 
@@ -1351,8 +1392,10 @@ def reframe_data(dataframe, tf):
 
     elif isinstance(dataframe, Table):
 
-        '''
+        # assert timeframe input value
+        tf = check_timeframe_str(tf, engine='pyarrow')
 
+        '''
             use pyarrow functions to reframe data on pyarrow Table
             could not find easy way to filter an arrow table
             based on time interval
@@ -1385,6 +1428,9 @@ def reframe_data(dataframe, tf):
         return reframe_data(dataframe, tf).to_arrow()
 
     elif isinstance(dataframe, polars_dataframe):
+
+        # assert timeframe input value
+        tf = check_timeframe_str(tf, engine='polars')
 
         tf = tf.lower()
 
@@ -1637,27 +1683,6 @@ def validator_dir_path(create_if_missing=False):
     return validate_or_create_dir
 
 
-def validator_list_timeframe(instance, attribute, value):
-
-    if not isinstance(value, list):
-
-        logger.error(f'Required type list for argument {attribute}')
-        raise TypeError
-
-    if not all([
-        check_timeframe_str(val)
-        for val in value
-    ]):
-
-        fails = [
-            val for val in value
-            if not check_timeframe_str(val)
-        ]
-
-        return ValueError('Values are not timeframe compatible: '
-                          f'{fails}')
-
-
 def validator_list_ge(min_value):
 
     def validator_list_values(instance, attribute, value):
@@ -1726,7 +1751,11 @@ def get_histdata_tickers() -> List[str]:
     """
     url = "https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes"
 
-    # TODO: test connection with url, if fails return empty list and log error
+    try:
+        requests.head(url, timeout=5)
+    except requests.RequestException:
+        logger.error(f'Failed to connect to {url}')
+        return []
 
     try:
         response = requests.get(url)

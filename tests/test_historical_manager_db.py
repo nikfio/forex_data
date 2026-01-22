@@ -10,10 +10,12 @@ the functionality of the historical data manager including:
 - Data validation
 """
 
-
 import unittest
 import random
-from datetime import datetime, timedelta
+from datetime import (
+    datetime,
+    timedelta
+)
 
 from polars import (
     DataFrame as polars_dataframe,

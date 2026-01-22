@@ -93,8 +93,6 @@ from .common import (
     validator_file_path,
     validator_dir_path,
     get_attrs_names,
-    check_time_offset_str,
-    check_timeframe_str,
     any_date_to_datetime64,
     empty_dataframe,
     is_empty_dataframe,
@@ -119,7 +117,6 @@ from .common import (
     to_source_symbol,
     get_date_interval,
     polygon_agg_to_dict,
-    validator_list_timeframe,
     AV_LIST_URL,
     PAIR_ALPHAVANTAGE_FORMAT,
     PAIR_POLYGON_FORMAT
@@ -161,8 +158,6 @@ class RealtimeManager:
     _db_dict = field(factory=dotty,
                      validator=validators.instance_of(Dotty))
     _dataframe_type = field(default=pandas_dataframe)
-    _data_path = field(default=Path(DEFAULT_PATHS.BASE_PATH),
-                       validator=validator_dir_path(create_if_missing=True))
     _realtimedata_path = field(
         default=Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.REALTIME_DATA_FOLDER,
         validator=validator_dir_path(create_if_missing=True)
@@ -335,7 +330,7 @@ class RealtimeManager:
     def __attrs_post_init__(self) -> None:
 
         # set up log sink for historical manager
-        logger.add(self._data_path / 'log' / 'forexrtdata.log',
+        logger.add(self._realtimedata_path / 'log' / 'forexrtdata.log',
                    level="TRACE",
                    rotation="5 MB",
                    filter=lambda record: ('rtmanager' == record['extra'].get('target') and
@@ -985,6 +980,9 @@ class RealtimeManager:
             # to log
             logger.warning(e)
             return self._dataframe_type([])
+
+        # clear temporary data folder
+        self._clear_temporary_data_folder()
 
         data_df = self._parse_aggs_data(REALTIME_DATA_PROVIDER.POLYGON_IO,
                                         data=poly_aggs,

@@ -105,8 +105,6 @@ class HistoricalManagerDB:
     _db_connector = field(factory=DatabaseConnector)
     _tf_list = field(factory=list, validator=validators.instance_of(list))
     _dataframe_type = field(default=pandas_dataframe)
-    _data_path = field(default=Path(DEFAULT_PATHS.BASE_PATH),
-                       validator=validator_dir_path(create_if_missing=True))
     _histdata_path = field(
         default=Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.HIST_DATA_FOLDER,
         validator=validator_dir_path(create_if_missing=True))
@@ -285,7 +283,7 @@ class HistoricalManagerDB:
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
         # set up log sink for historical manager
-        logger.add(self._data_path / 'log' / 'forexhistdata.log',
+        logger.add(self._histdata_path / 'log' / 'forexhistdata.log',
                    level="TRACE",
                    rotation="5 MB",
                    filter=lambda record: ('histmanager' == record['extra'].get('target') and
@@ -359,11 +357,6 @@ class HistoricalManagerDB:
                     'Deleting temporary data folder '
                     f'{str(self._temporary_data_path)} not successfull: {e}')
 
-        else:
-            logger.bind(target='histmanager').trace(
-                f'Temporary data folder {
-                    self._temporary_data_path} does not exist')
-
     def _get_ticker_list(self) -> List[str]:
 
         # return list of tickers elements as str
@@ -391,9 +384,14 @@ class HistoricalManagerDB:
         return self._db_connector.get_ticker_years_list(ticker,
                                                         timeframe=timeframe)
 
-    def _complete_timeframe(self) -> None:
+    def _update_db(self, ticker: str = None) -> None:
 
-        for ticker in self._get_ticker_list():
+        if not ticker:
+            ticker_list = self._get_ticker_list()
+        else:
+            ticker_list = [ticker]
+
+        for ticker in ticker_list:
 
             years_tick = self._get_ticker_years_list(ticker)
 
@@ -436,28 +434,21 @@ class HistoricalManagerDB:
                     self._db_connector.write_data(tf_key,
                                                   dataframe_tf)
 
-                ticker_years_list = self._get_ticker_years_list(ticker,
-                                                                timeframe=tf)
+                    ticker_years_list = self._get_ticker_years_list(ticker,
+                                                                    timeframe=tf)
 
-                # REDO THE CHECK FOR CONSISTENCY
-                if set(years_tick).difference(ticker_years_list):
+                    # REDO THE CHECK FOR CONSISTENCY
+                    if set(years_tick).difference(ticker_years_list):
 
-                    logger.bind(target='histmanager').critical(
-                        f'ticker {ticker}: {tf} timeframe completing'
-                        ' operation FAILED')
+                        logger.bind(target='histmanager').critical(
+                            f'ticker {ticker}: {tf} timeframe completing'
+                            ' operation FAILED')
 
-                    raise KeyError
+                        raise KeyError
 
-                else:
-                    logger.bind(target='histmanager').trace(
-                        f'ticker {ticker}: {tf} timeframe completing operation successful')
-
-            else:
-                logger.bind(target='histmanager').trace(f'ticker {ticker}: no complete timeframe found')
-
-    def _update_db(self) -> None:
-
-        self._complete_timeframe()
+                    else:
+                        logger.bind(target='histmanager').trace(
+                            f'ticker {ticker}: {tf} timeframe completing operation successful for {years}')
 
     def _download_month_raw(self,
                             ticker,
@@ -963,9 +954,6 @@ class HistoricalManagerDB:
                 logger.bind(target='histmanager').warning(
                     f'Year tick dataframe for {tick_key} is empty, skipping database write')
 
-        # update manager database
-        self._update_db()
-
     def clear_database(self, filter: Optional[str] = None) -> None:
 
         self._db_connector.clear_database(filter=filter)
@@ -1002,8 +990,6 @@ class HistoricalManagerDB:
 
         if not hasattr(self, '_tf_list'):
             self._tf_list = []
-        else:
-            logger.bind(target='histmanager').trace('_tf_list already exists')
 
         if isinstance(timeframe, str):
 
@@ -1017,14 +1003,13 @@ class HistoricalManagerDB:
             logger.bind(target='histmanager').error('timeframe invalid: str or list required')
             raise TypeError
 
-        tf_list = [check_timeframe_str(tf) for tf in timeframe]
+        tf_list = [check_timeframe_str(tf, engine=self.engine) for tf in timeframe]
 
         if not set(tf_list).issubset(self._tf_list):
 
             # concat timeframe accordingly
             # only just new elements not already present
             self._tf_list.extend(set(tf_list).difference(self._tf_list))
-            self._update_db()
 
     def get_data(
         self,
@@ -1102,7 +1087,7 @@ class HistoricalManagerDB:
         # force ticker parameter to lower case
         ticker = ticker.lower()
 
-        if not check_timeframe_str(timeframe):
+        if not check_timeframe_str(timeframe, engine=self.engine):
 
             logger.bind(target='histmanager').error(f'timeframe request {timeframe} invalid')
             raise ValueError
@@ -1144,16 +1129,11 @@ class HistoricalManagerDB:
                     year_tick_missing
                 )
 
-            # if timeframe req is in tf_list
-            # data requested should at this point be available
-            # call add data for specific timeframe requested
-            if timeframe not in self._tf_list:
+            # add dataframe to the instance
+            self.add_timeframe(timeframe)
 
-                # call add single tf data
-                self.add_timeframe(timeframe)
-
-            else:
-                logger.bind(target='histmanager').trace(f'Timeframe {timeframe} already in _tf_list')
+            # update database
+            self._update_db(ticker)
 
             # get all keys referring to specific ticker
             ticker_keys = self._get_ticker_keys(ticker)
@@ -1173,6 +1153,8 @@ class HistoricalManagerDB:
                     f'Year data completion for {years_interval_req} successful')
 
         # at this point all data requested have been aggregated to the database
+        # clear temporary data folder
+        self._clear_temporary_data_folder()
 
         # execute a read query on database
         return self._db_connector.read_data(
@@ -1222,12 +1204,6 @@ class HistoricalManagerDB:
             The chart will be displayed in a matplotlib window. The data is automatically
             fetched using get_data() and converted to the appropriate format for plotting.
         """
-
-        logger.bind(target='histmanager').info(f'''Chart request:
-                    ticker {ticker}
-                    timeframe {timeframe}
-                    from {start_date}
-                    to {end_date}''')
 
         chart_data = self.get_data(ticker=ticker,
                                    timeframe=timeframe,
