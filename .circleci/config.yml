@@ -30,7 +30,9 @@ install_deps:
 run_tests:
   &run_tests
   name: run tests
-  command: poetry run pytest --flake8 -vv
+  command: |
+    mkdir -p test-results
+    poetry run pytest --flake8 -vv --junitxml=test-results/junit.xml 2>&1 | tee test-results/console_output.log
   
 jobs:
   py312:
@@ -47,6 +49,16 @@ jobs:
       - run: *install_deps
       - save_cache: *store_cache
       - run: *run_tests
+      - run:
+          name: collect application logs
+          when: always
+          command: |
+            mkdir -p test-results/log
+            find ~/.database -name "*.log" -type f -exec cp {} test-results/log/ \; 2>/dev/null || true
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
   
 workflows:
   version: 1

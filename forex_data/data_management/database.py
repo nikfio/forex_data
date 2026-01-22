@@ -479,11 +479,6 @@ class DuckDBConnector(DatabaseConnector):
         None.
 
         """
-
-        # skip checks cuse they
-        # are not meant for polars syntax of timeframes/frequencies
-        # tf = check_timeframe_str(timeframe)
-
         return '_'.join([market.lower(),
                          ticker.lower(),
                          timeframe.lower()])
@@ -935,11 +930,6 @@ class LocalDBConnector(DatabaseConnector):
         None.
 
         """
-
-        # skip checks cuse they
-        # are not meant for polars syntax of timeframes/frequencies
-        # tf = check_timeframe_str(timeframe)
-
         return '_'.join([market.lower(),
                          ticker.lower(),
                          timeframe.lower()])
@@ -1107,9 +1097,6 @@ class LocalDBConnector(DatabaseConnector):
             else:
 
                 ticker_years_list = [int(row[0]) for row in read.collect().iter_rows()]
-
-        else:
-            logger.bind(target='localdb').warning(f'Expected 1 file for {ticker} - {timeframe}, found {len(files)}')
 
         return ticker_years_list
 
@@ -1300,7 +1287,7 @@ class LocalDBConnector(DatabaseConnector):
 
             except Exception as e:
 
-                logger.error(f'executing query {query} failed: {e}')
+                logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
 
             else:
 
