@@ -33,6 +33,20 @@ run_tests:
   command: |
     mkdir -p test-results
     poetry run pytest --flake8 -vv --junitxml=test-results/junit.xml 2>&1 | tee test-results/console_output.log
+
+run_profiling:
+  &run_profiling
+  name: run profiling with pyinstrument
+  command: |
+    mkdir -p test-results/profiling
+    echo "Profiling test suite execution..."
+    poetry run pyinstrument --renderer html \
+      --outfile test-results/profiling/full_test_suite.html \
+      -m pytest --flake8 -vv
+    poetry run pyinstrument --renderer json \
+      --outfile test-results/profiling/full_test_suite.json \
+      -m pytest --flake8 -vv
+    echo "Profiling completed. Reports saved to test-results/profiling/"
   
 jobs:
   py312:
@@ -49,6 +63,7 @@ jobs:
       - run: *install_deps
       - save_cache: *store_cache
       - run: *run_tests
+      - run: *run_profiling
       - run:
           name: collect application logs
           when: always
