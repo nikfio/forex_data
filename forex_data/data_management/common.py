@@ -5,80 +5,6 @@ Created on Sat Apr 30 09:23:19 2022
 @author: fiora
 """
 
-__all__ = [
-    'YEARS',
-    'MONTHS',
-    'DATE_FORMAT_SQL',
-    'DATE_FORMAT_HISTDATA_CSV',
-    'HISTDATA_URL_TICKDATA_TEMPLATE',
-    'HISTDATA_BASE_DOWNLOAD_METHOD',
-    'HISTDATA_BASE_DOWNLOAD_URL',
-    'DEFAULT_PATHS',
-    'DATA_TYPE',
-    'BASE_DATA_COLUMN_NAME',
-    'DATA_FILE_COLUMN_INDEX',
-    'SUPPORTED_DATA_FILES',
-    'SUPPORTED_DATA_ENGINES',
-    'ASSET_TYPE',
-    'TEMP_FOLDER',
-    'TEMP_CSV_FILE',
-    'DTYPE_DICT',
-    'PYARROW_DTYPE_DICT',
-    'POLARS_DTYPE_DICT',
-    'DATA_COLUMN_NAMES',
-    'FILENAME_TEMPLATE',
-    'DATA_KEY',
-    'TICK_TIMEFRAME',
-    'FILENAME_STR',
-    'REALTIME_DATA_PROVIDER',
-    'ALPHA_VANTAGE_API_KEY',
-    'CANONICAL_INDEX',
-    'DATE_NO_HOUR_FORMAT',
-    'POLYGON_IO_API_KEY',
-    'AV_LIST_URL',
-    'PAIR_ALPHAVANTAGE_FORMAT',
-    'PAIR_POLYGON_FORMAT',
-    'SQL_COMPARISON_OPERATORS',
-    'SUPPORTED_SQL_COMPARISON_OPERATORS',
-    'SUPPORTED_BASE_DATA_COLUMN_NAME',
-    'SQL_CONDITION_AGGREGATION_MODES',
-    'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
-
-    'validator_file_path',
-    'validator_dir_path',
-    'get_attrs_names',
-    'check_time_offset_str',
-    'check_timeframe_str',
-    'any_date_to_datetime64',
-    'empty_dataframe',
-    'is_empty_dataframe',
-    'shape_dataframe',
-    'get_dataframe_column',
-    'get_dataframe_row',
-    'get_dataframe_element',
-    'get_dotty_leafs',
-    'astype',
-    'read_csv',
-    'polars_datetime',
-    'sort_dataframe',
-    'concat_data',
-    'list_remove_duplicates',
-    'get_dotty_key_field',
-    'reframe_data',
-    'write_csv',
-    'write_parquet',
-    'read_parquet',
-    'to_pandas_dataframe',
-    'get_pair_symbols',
-    'to_source_symbol',
-    'get_date_interval',
-    'polygon_agg_to_dict',
-    'get_histdata_tickers',
-    'TickerNotFoundError',
-    'TickerDataNotFoundError',
-    'TickerDataBadTypeException',
-    'TickerDataInvalidException'
-]
 
 from loguru import logger
 
@@ -100,7 +26,19 @@ import requests
 from bs4 import BeautifulSoup
 
 from datetime import (
-    timedelta
+    timedelta,
+    datetime
+)
+
+from pathlib import Path
+
+from attrs import (
+    field,
+    validators
+)
+
+from holidays import (
+    country_holidays
 )
 
 # PANDAS
@@ -167,15 +105,80 @@ from dateutil.rrule import (
     FR
 )
 
-from datetime import datetime
+__all__ = [
+    'YEARS',
+    'MONTHS',
+    'DATE_FORMAT_SQL',
+    'DATE_FORMAT_HISTDATA_CSV',
+    'HISTDATA_URL_TICKDATA_TEMPLATE',
+    'HISTDATA_BASE_DOWNLOAD_METHOD',
+    'HISTDATA_BASE_DOWNLOAD_URL',
+    'DEFAULT_PATHS',
+    'DATA_TYPE',
+    'BASE_DATA_COLUMN_NAME',
+    'DATA_FILE_COLUMN_INDEX',
+    'SUPPORTED_DATA_FILES',
+    'SUPPORTED_DATA_ENGINES',
+    'ASSET_TYPE',
+    'TEMP_FOLDER',
+    'TEMP_CSV_FILE',
+    'DTYPE_DICT',
+    'PYARROW_DTYPE_DICT',
+    'POLARS_DTYPE_DICT',
+    'DATA_COLUMN_NAMES',
+    'FILENAME_TEMPLATE',
+    'DATA_KEY',
+    'TICK_TIMEFRAME',
+    'FILENAME_STR',
+    'REALTIME_DATA_PROVIDER',
+    'ALPHA_VANTAGE_API_KEY',
+    'CANONICAL_INDEX',
+    'DATE_NO_HOUR_FORMAT',
+    'POLYGON_IO_API_KEY',
+    'AV_LIST_URL',
+    'PAIR_ALPHAVANTAGE_FORMAT',
+    'PAIR_POLYGON_FORMAT',
+    'SQL_COMPARISON_OPERATORS',
+    'SUPPORTED_SQL_COMPARISON_OPERATORS',
+    'SUPPORTED_BASE_DATA_COLUMN_NAME',
+    'SQL_CONDITION_AGGREGATION_MODES',
+    'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
 
-from pathlib import Path
-
-from attrs import (
-    field,
-    validators
-)
-
+    'validator_file_path',
+    'validator_dir_path',
+    'get_attrs_names',
+    'check_timeframe_str',
+    'any_date_to_datetime64',
+    'empty_dataframe',
+    'is_empty_dataframe',
+    'shape_dataframe',
+    'get_dataframe_column',
+    'get_dataframe_row',
+    'get_dataframe_element',
+    'get_dotty_leafs',
+    'astype',
+    'read_csv',
+    'polars_datetime',
+    'sort_dataframe',
+    'concat_data',
+    'list_remove_duplicates',
+    'get_dotty_key_field',
+    'reframe_data',
+    'write_csv',
+    'write_parquet',
+    'read_parquet',
+    'to_pandas_dataframe',
+    'get_pair_symbols',
+    'to_source_symbol',
+    'get_date_interval',
+    'polygon_agg_to_dict',
+    'get_histdata_tickers',
+    'TickerNotFoundError',
+    'TickerDataNotFoundError',
+    'TickerDataBadTypeException',
+    'TickerDataInvalidException',
+    'business_days_data',
+]
 
 # =============================================================================
 # CUSTOM EXCEPTIONS
@@ -184,6 +187,8 @@ from attrs import (
 # TickerNotFoundError:
 # This exception is raised when the ticker requested is misspelled
 # or does not exist in the database.
+
+
 class TickerNotFoundError(Exception):
     pass
 
@@ -634,12 +639,6 @@ def to_source_symbol(ticker, source):
 
 # TIMESTAMP RELATED FUNCTIONS
 
-def check_time_offset_str(timeoffset_str):
-
-    # TODO: add support for polars time/date offset
-    return isinstance(to_offset(timeoffset_str), DateOffset)
-
-
 def timewindow_str_to_timedelta(time_window_str):
 
     if fullmatch(TIME_WINDOW_PATTERN_STR, time_window_str):
@@ -674,13 +673,6 @@ def any_date_to_datetime64(any_date,
                      f'failed conversion to {date_format} '
                      'date format')
         raise
-
-# =============================================================================
-#   TODO: is it necessary utc timezone when source is naive?
-#   if not any_date.tzinfo:
-#
-#         any_date = any_date.tz_localize('utc')
-# =============================================================================
 
     return any_date
 
@@ -1779,6 +1771,7 @@ def get_histdata_tickers() -> List[str]:
     except Exception as e:
         logger.error(f"Failed to retrieve tickers from HistData: {e}")
         return []
+
 # REAL TIME PROVIDERS UTILITIES
 
 
@@ -1800,3 +1793,27 @@ def polygon_agg_to_dict(agg):
         BASE_DATA_COLUMN_NAME.VWAP: agg.vwap,
         BASE_DATA_COLUMN_NAME.OTC: agg.otc
     }
+
+
+# MARKETS FUNCTIONS
+
+US_HOLIDAYS = country_holidays('US', years=YEARS)
+# Convert US_HOLIDAYS to a list of date objects for efficient filtering
+US_holiday_dates = [holiday_date for holiday_date in US_HOLIDAYS.keys()]
+
+
+def business_days_data(dataframe: polars_lazyframe | polars_dataframe) -> polars_dataframe | polars_lazyframe:
+
+    '''
+    Remove non-business days data from the input dataframe.
+    Filter out weekends data: saturday and sunday.
+    Use holidays to get list of country holidays.
+    Consider dataframe always have a column named 'timestamp' of type datetime.
+    '''
+
+    # Filter out weekends (Saturday=6, Sunday=7) and holidays
+    # Use Polars' dt.weekday() where Monday=1, Tuesday=2, ..., Saturday=6, Sunday=7
+    return dataframe.filter(
+        (col('timestamp').dt.weekday() < 6) &  # Keep Monday(1) through Friday(5)
+        (~col('timestamp').dt.date().is_in(US_holiday_dates))  # Exclude holidays
+    )

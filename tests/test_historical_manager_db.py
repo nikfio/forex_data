@@ -19,7 +19,8 @@ from datetime import (
 
 from polars import (
     DataFrame as polars_dataframe,
-    LazyFrame as polars_lazyframe
+    LazyFrame as polars_lazyframe,
+    col
 )
 
 from forex_data import (
@@ -31,9 +32,10 @@ from forex_data import (
     SQL_COMPARISON_OPERATORS,
     SQL_CONDITION_AGGREGATION_MODES,
     YEARS,
-    POLARS_DTYPE_DICT
+    POLARS_DTYPE_DICT,
+    business_days_data,
+    US_holiday_dates
 )
-
 
 __all__ = ['TestHistoricalManagerDB']
 
@@ -213,9 +215,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
             data = data.collect()
 
         expected_columns = ['timestamp', 'open', 'high', 'low', 'close']
-        for col in expected_columns:
-            self.assertIn(col, data.columns,
-                          msg=f"Column '{col}' missing from data")
+        for column in expected_columns:
+            self.assertIn(column, data.columns,
+                          msg=f"Column '{column}' missing from data")
 
     def test_10_data_sorted_by_timestamp(self):
         """Test that data is sorted by timestamp in ascending order."""
@@ -622,6 +624,118 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 close_threshold,
                 msg=f"Found CLOSE value {min_close} < threshold {close_threshold}"
             )
+
+    def test_24_business_days_data_filtering(self):
+        """
+        Test business_days_data function filters out weekends and
+        holidays correctly.
+        """
+        ticker = 'EURUSD'
+        timeframe = '1D'
+
+        # Use a 2-month date range (includes weekends and likely some holidays)
+        start = datetime(2019, 11, 1)  # November 2019
+        end = datetime(2019, 12, 31)   # Through December 2019
+
+        # Get the raw data (includes weekends and holidays)
+        raw_data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end
+        )
+
+        self.assertIsNotNone(raw_data)
+
+        # Collect if lazy frame
+        if isinstance(raw_data, polars_lazyframe):
+            raw_data = raw_data.collect()
+
+        # Apply business_days_data filter
+        filtered_data = business_days_data(raw_data)
+
+        # Collect if lazy frame
+        if isinstance(filtered_data, polars_lazyframe):
+            filtered_data = filtered_data.collect()
+
+        # Test 1: Filtered data should have <= rows than raw data
+        # (weekends/holidays removed, forex data may already be business-days-only)
+        self.assertLessEqual(
+            len(filtered_data),
+            len(raw_data),
+            msg="Filtered data should have <= rows after removing weekends/holidays"
+        )
+
+        # Test 2: Verify no weekend dates remain in filtered data
+        if len(filtered_data) > 0:
+            # Get weekday for each timestamp (1=Monday, ..., 7=Sunday)
+            weekdays = filtered_data.select(
+                col('timestamp').dt.weekday().alias('weekday')
+            )['weekday'].to_list()
+
+            # All weekdays should be 1-5 (Monday-Friday)
+            for weekday in weekdays:
+                self.assertLess(
+                    weekday,
+                    6,
+                    msg=f"Found weekend day (weekday={weekday}) in filtered data"
+                )
+                self.assertGreater(
+                    weekday,
+                    0,
+                    msg=f"Invalid weekday value: {weekday}"
+                )
+
+        # Test 3: Verify no US holidays remain in filtered data
+        if len(filtered_data) > 0:
+            dates = filtered_data.select(
+                col('timestamp').dt.date().alias('date')
+            )['date'].to_list()
+
+            for date in dates:
+                self.assertNotIn(
+                    date,
+                    US_holiday_dates,
+                    msg=f"Found US holiday {date} in filtered data"
+                )
+
+        # Test 4: Verify all remaining dates are valid business days
+        # (not weekends and not holidays)
+        if len(filtered_data) > 0:
+            for row in filtered_data.iter_rows(named=True):
+                timestamp = row['timestamp']
+
+                # Check it's not a weekend
+                weekday = timestamp.weekday()  # Python's weekday: 0=Monday, 6=Sunday
+                self.assertLess(
+                    weekday,
+                    5,  # 0-4 are Monday-Friday
+                    msg=f"Found weekend timestamp {timestamp} (weekday={weekday})"
+                )
+
+                # Check it's not a holiday
+                date = timestamp.date()
+                self.assertNotIn(
+                    date,
+                    US_holiday_dates,
+                    msg=f"Found holiday {date} in filtered data"
+                )
+
+        # Test 5: Verify filtered data is not empty
+        # (there should be at least some business days in 2 months)
+        self.assertGreater(
+            len(filtered_data),
+            0,
+            msg="Filtered data should not be empty for a 2-month period"
+        )
+
+        # Test 6: Verify data structure integrity
+        # (same columns as original)
+        self.assertEqual(
+            filtered_data.columns,
+            raw_data.columns,
+            msg="Filtered data should have same columns as raw data"
+        )
 
 
 if __name__ == '__main__':

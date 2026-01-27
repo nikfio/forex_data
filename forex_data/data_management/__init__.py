@@ -37,7 +37,9 @@ __all__ = [
     'TickerDataBadTypeException',
     'TickerDataInvalidException',
     'get_histdata_tickers',
-    'POLARS_DTYPE_DICT'
+    'POLARS_DTYPE_DICT',
+    'business_days_data',
+    'US_holiday_dates'
 ]
 
 from . import common
@@ -68,7 +70,9 @@ from .common import (
     TickerDataBadTypeException,
     TickerDataInvalidException,
     get_histdata_tickers,
-    POLARS_DTYPE_DICT
+    POLARS_DTYPE_DICT,
+    business_days_data,
+    US_holiday_dates
 )
 
 from .database import (
