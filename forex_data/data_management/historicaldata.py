@@ -113,6 +113,7 @@ class HistoricalManagerDB:
                  DEFAULT_PATHS.HIST_DATA_FOLDER /
                  TEMP_FOLDER),
         validator=validator_dir_path(create_if_missing=True))
+    _histdata_tickers_list = field(factory=list, validator=validators.instance_of(list))
 
     # if a valid config file or string
     # is passed
@@ -338,6 +339,9 @@ class HistoricalManagerDB:
 
             logger.bind(target='histmanager').error(f'Data type {self.data_type} not supported')
             raise ValueError(f'Data type {self.data_type} not supported')
+
+        # cache histdata tickers list at initialization
+        self._histdata_tickers_list = get_histdata_tickers()
 
     def _clear_temporary_data_folder(self) -> None:
 
@@ -782,6 +786,9 @@ class HistoricalManagerDB:
             df = df.unique(subset=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
                            keep='first')
 
+            # remove business days
+            df = business_days_data(df)
+
         elif engine == 'polars_lazy':
 
             # download to temporary csv file
@@ -842,6 +849,9 @@ class HistoricalManagerDB:
             df = df.unique(subset=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
                            keep='first')
 
+            # remove business days
+            df = business_days_data(df)
+
         else:
 
             logger.bind(target='histmanager').error(f'Engine {engine} is not supported')
@@ -867,7 +877,6 @@ class HistoricalManagerDB:
                 ticker=ticker.lower(),
                 year=year,
                 month_num=month_num)
-            # TODO: test connection with url, if fails raise connection error
 
             file = self._download_month_raw(
                 ticker,
@@ -1077,7 +1086,7 @@ class HistoricalManagerDB:
         # check ticker exists in available tickers
         # from histdata database
         if (
-                ticker.upper() not in get_histdata_tickers()
+                ticker.upper() not in self._histdata_tickers_list
                 and
                 ticker.lower() not in self._get_ticker_list()
         ):

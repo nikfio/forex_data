@@ -46,7 +46,9 @@ from .data_management import (
     TickerDataBadTypeException,
     TickerDataInvalidException,
     get_histdata_tickers,
-    POLARS_DTYPE_DICT
+    POLARS_DTYPE_DICT,
+    business_days_data,
+    US_holiday_dates
 )
 
 __all__ = [
@@ -86,5 +88,7 @@ __all__ = [
     'TickerDataBadTypeException',
     'TickerDataInvalidException',
     'get_histdata_tickers',
-    'POLARS_DTYPE_DICT'
+    'POLARS_DTYPE_DICT',
+    'business_days_data',
+    'US_holiday_dates'
 ]

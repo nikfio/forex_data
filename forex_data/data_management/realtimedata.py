@@ -613,7 +613,7 @@ class RealtimeManager:
 
             if isinstance(recent_days_window, int):
                 # set window as DateOffset str with num and days
-                days_window = '{days_num}d'.format(days_num=recent_days_window)
+                days_window = '{days_num}D'.format(days_num=recent_days_window)
 
                 day_start, day_end = get_date_interval(interval_end_mode='now',
                                                        interval_timespan=days_window,

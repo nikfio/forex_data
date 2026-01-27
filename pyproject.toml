@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "forex_data_aggregator"
-version = "0.1.2"
+version = "0.1.3"
 description = "Data aggregation for forex market data"
 authors = ["Nicola Fiorato <fiorato.nicola@gmail.com>"]
 license = "MIT"
@@ -36,6 +36,8 @@ connectorx = "^0.4.3"
 duckdb = "^1.3.1"
 adbc-driver-sqlite = "^1.6.0"
 dotty-dict = "^1.3.1"
+pyinstrument = "^5.1.2"
+holidays = "^0.89"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.3.2"
