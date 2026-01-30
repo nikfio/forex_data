@@ -29,7 +29,6 @@ from forex_data import (
     shape_dataframe
 )
 
-from sys import stdout
 from os import getenv
 
 # Use a runtime defined config yaml file
@@ -58,10 +57,6 @@ def main():
     realtimedata_manager = RealtimeManager(
         config=test_config_yaml
     )
-
-    # add verbose to standard output
-    logger.add(stdout,
-               level='TRACE')
 
     # example parameters
     ex_ticker = 'EURCAD'

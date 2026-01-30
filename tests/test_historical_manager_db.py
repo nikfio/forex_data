@@ -12,6 +12,8 @@ the functionality of the historical data manager including:
 
 import unittest
 import random
+from loguru import logger
+
 from datetime import (
     datetime,
     timedelta
@@ -417,6 +419,8 @@ class TestHistoricalManagerDB(unittest.TestCase):
         # approx 4 months later
         end_date = start_date + timedelta(days=4 * 30)
 
+        logger.debug(f"Downloading data for {ticker} from {start_date}"
+                     f" to {end_date} with timeframe {timeframe}")
         data = self.hist_manager.get_data(
             ticker=ticker,
             timeframe=timeframe,
@@ -735,6 +739,59 @@ class TestHistoricalManagerDB(unittest.TestCase):
             filtered_data.columns,
             raw_data.columns,
             msg="Filtered data should have same columns as raw data"
+        )
+
+    def test_25_close_saves_tickers_years_info(self):
+        """
+        Test that close() method saves tickers years information correctly.
+
+        This test verifies:
+        1. The close() method can be called without errors
+        2. It persists the tickers_years_dict to the file system
+        3. A new instance can load the saved data
+        """
+        # Create a new manager instance for this test
+        test_manager = HistoricalManagerDB(config=test_config_yaml)
+
+        # Get some data to populate the tickers_years_dict
+        ticker = 'EURUSD'
+        timeframe = '1D'
+        start = datetime(2019, 1, 1)
+        end = datetime(2019, 1, 31)
+
+        test_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end
+        )
+
+        # Verify tickers_years_dict has data
+        self.assertIsNotNone(test_manager._tickers_years_dict)
+        self.assertIn(ticker.lower(), test_manager._tickers_years_dict)
+
+        # Save the tickers_years_dict before closing
+        tickers_years_before = test_manager._tickers_years_dict.copy()
+
+        # Call close() - this should save the data
+        test_manager.close()
+
+        # Create a new instance - it should load the saved data
+        new_manager = HistoricalManagerDB(config=test_config_yaml)
+
+        # Verify the new instance loaded the same data
+        self.assertIsNotNone(new_manager._tickers_years_dict)
+        self.assertEqual(
+            new_manager._tickers_years_dict,
+            tickers_years_before,
+            msg="New instance should load the same tickers_years_dict that was saved"
+        )
+
+        # Specifically check the ticker we added
+        self.assertIn(
+            ticker.lower(),
+            new_manager._tickers_years_dict,
+            msg=f"Ticker {ticker} should be in loaded tickers_years_dict"
         )
 
 

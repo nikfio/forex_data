@@ -15,9 +15,9 @@ from forex_data import (
 )
 
 from loguru import logger
-from sys import stdout
 from time import time
 from random import choice
+from sys import stdout
 
 # Use a runtime defined config yaml file
 test_config_yaml = '''
@@ -34,9 +34,8 @@ def main():
         config=test_config_yaml
     )
 
-    # add verbose to standard output
-    logger.add(stdout,
-               level='TRACE')
+    # redirect logger output to stdout
+    logger.add(stdout, level="TRACE")
 
     # example parameters
     # get a random choice for ex_ticker picking from list
@@ -119,6 +118,9 @@ def main():
     end_time = time()
     logger.trace(f'end time: {end_time}')
     logger.trace(f'elapsed time: {end_time - start_time}')
+
+    # close data manager
+    histmanager.close()
 
 
 if __name__ == '__main__':

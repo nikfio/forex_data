@@ -330,7 +330,19 @@ class RealtimeManager:
     def __attrs_post_init__(self) -> None:
 
         # set up log sink for historical manager
-        logger.add(self._realtimedata_path / 'log' / 'forexrtdata.log',
+        # Remove existing handlers for this sink to prevent duplicate log entries
+        log_path = self._realtimedata_path / 'log' / 'forexrtdata.log'
+
+        handlers_to_remove = []
+        for handler_id, handler in logger._core.handlers.items():
+            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
+                if str(handler._sink._path) == str(log_path):
+                    handlers_to_remove.append(handler_id)
+
+        for handler_id in handlers_to_remove:
+            logger.remove(handler_id)
+
+        logger.add(log_path,
                    level="TRACE",
                    rotation="5 MB",
                    filter=lambda record: ('rtmanager' == record['extra'].get('target') and

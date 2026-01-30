@@ -60,12 +60,6 @@ from requests import Session
 from io import BytesIO
 from shutil import rmtree
 
-# python base
-from dotty_dict import (
-    Dotty,
-    dotty
-)
-
 from iteration_utilities import (
     duplicates,
     unique_everseen
@@ -114,6 +108,7 @@ class HistoricalManagerDB:
                  TEMP_FOLDER),
         validator=validator_dir_path(create_if_missing=True))
     _histdata_tickers_list = field(factory=list, validator=validators.instance_of(list))
+    _tickers_years_dict = field(factory=dict, validator=validators.instance_of(dict))
 
     # if a valid config file or string
     # is passed
@@ -284,7 +279,24 @@ class HistoricalManagerDB:
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
         # set up log sink for historical manager
-        logger.add(self._histdata_path / 'log' / 'forexhistdata.log',
+        # Remove existing handlers for this sink to prevent duplicate log entries
+        log_path = self._histdata_path / 'log' / 'forexhistdata.log'
+
+        # Remove handlers that match this log file path
+        # logger.remove() without args would remove ALL handlers including stderr
+        # So we iterate and remove only matching handlers
+        handlers_to_remove = []
+        for handler_id, handler in logger._core.handlers.items():
+            # Check if this handler writes to our log file
+            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
+                if str(handler._sink._path) == str(log_path):
+                    handlers_to_remove.append(handler_id)
+
+        for handler_id in handlers_to_remove:
+            logger.remove(handler_id)
+
+        # Now add the handler
+        logger.add(log_path,
                    level="TRACE",
                    rotation="5 MB",
                    filter=lambda record: ('histmanager' == record['extra'].get('target') and
@@ -343,6 +355,10 @@ class HistoricalManagerDB:
         # cache histdata tickers list at initialization
         self._histdata_tickers_list = get_histdata_tickers()
 
+        # initialize tickers years dict info of data available
+        # with the current connector
+        self._tickers_years_dict = self._db_connector.create_tickers_years_dict()
+
     def _clear_temporary_data_folder(self) -> None:
 
         # delete temporary data path
@@ -397,14 +413,18 @@ class HistoricalManagerDB:
 
         for ticker in ticker_list:
 
-            years_tick = self._get_ticker_years_list(ticker)
+            years_tick = self._tickers_years_dict[ticker][TICK_TIMEFRAME]
 
             for tf in self._tf_list:
 
-                ticker_years_list = self._get_ticker_years_list(ticker, timeframe=tf)
+                # Initialize ticker/timeframe in dict if not present
+                if tf not in self._tickers_years_dict[ticker]:
+                    self._tickers_years_dict[ticker][tf] = []
+
+                ticker_years_list = self._tickers_years_dict[ticker][tf]
 
                 if set(years_tick).difference(ticker_years_list):
-                    years = set(years_tick).difference(ticker_years_list)
+                    years = list(set(years_tick).difference(ticker_years_list))
 
                     end_year = max(years)
                     start_year = min(years)
@@ -426,7 +446,7 @@ class HistoricalManagerDB:
                     # reframe to timeframe
                     dataframe_tf = reframe_data(dataframe, tf)
 
-                    # get key for dotty dict: TICK
+                    # get data id key
                     tf_key = self._db_connector._db_key(
                         'forex',
                         ticker,
@@ -438,11 +458,20 @@ class HistoricalManagerDB:
                     self._db_connector.write_data(tf_key,
                                                   dataframe_tf)
 
-                    ticker_years_list = self._get_ticker_years_list(ticker,
-                                                                    timeframe=tf)
+                    # update years list in local info file
+                    self._db_connector.add_tickers_years_info_to_file(ticker,
+                                                                      tf,
+                                                                      years)
+
+                    # update internal ticker years list info
+                    self._tickers_years_dict[ticker][tf].extend(years)
+                    # sort and remove duplicates
+                    self._tickers_years_dict[ticker][tf].sort()
+                    self._tickers_years_dict[ticker][tf] = \
+                        list_remove_duplicates(self._tickers_years_dict[ticker][tf])
 
                     # REDO THE CHECK FOR CONSISTENCY
-                    if set(years_tick).difference(ticker_years_list):
+                    if set(years_tick).difference(self._tickers_years_dict[ticker][tf]):
 
                         logger.bind(target='histmanager').critical(
                             f'ticker {ticker}: {tf} timeframe completing'
@@ -936,13 +965,12 @@ class HistoricalManagerDB:
                 f'Years must be limited to: {YEARS}')
             raise ValueError
 
-        else:
-            logger.bind(target='histmanager').trace(f'Requested years {years} are valid')
-
         # convert to list of int
         if not all(isinstance(year, int) for year in years):
             years = [int(year) for year in years]
 
+        # download data for each year
+        years_data_df = empty_dataframe(self.engine)
         for year in years:
 
             year_tick_df = self._download_year(
@@ -950,18 +978,40 @@ class HistoricalManagerDB:
                 year
             )
 
-            # get key for dotty dict: TICK
-            tick_key = self._db_connector._db_key('forex',
-                                                  ticker,
-                                                  TICK_TIMEFRAME)
+            # if first iteration, assign instead of concat
+            if is_empty_dataframe(years_data_df):
 
-            # call to upload df to database if not empty
-            if not is_empty_dataframe(year_tick_df):
-                self._db_connector.write_data(tick_key,
-                                              year_tick_df)
+                years_data_df = year_tick_df
+
             else:
-                logger.bind(target='histmanager').warning(
-                    f'Year tick dataframe for {tick_key} is empty, skipping database write')
+
+                years_data_df = concat_data([years_data_df, year_tick_df])
+
+        # get data id key
+        tick_key = self._db_connector._db_key('forex',
+                                              ticker,
+                                              TICK_TIMEFRAME)
+
+        # call to upload df to database if not empty
+        if not is_empty_dataframe(years_data_df):
+            self._db_connector.write_data(tick_key,
+                                          years_data_df)
+
+            # update years list in local info file
+            self._db_connector.add_tickers_years_info_to_file(ticker,
+                                                              TICK_TIMEFRAME,
+                                                              years)
+
+            # update internal ticker years list info
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME].extend(years)
+            # sort and remove duplicates
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME].sort()
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = \
+                list_remove_duplicates(self._tickers_years_dict[ticker][TICK_TIMEFRAME])
+
+        else:
+            logger.bind(target='histmanager').warning(
+                f'Years data dataframe for {tick_key} is empty, skipping database write')
 
     def clear_database(self, filter: Optional[str] = None) -> None:
 
@@ -1095,6 +1145,7 @@ class HistoricalManagerDB:
 
         # force ticker parameter to lower case
         ticker = ticker.lower()
+        timeframe = check_timeframe_str(timeframe, engine=self.engine).lower()
 
         if not check_timeframe_str(timeframe, engine=self.engine):
 
@@ -1116,19 +1167,23 @@ class HistoricalManagerDB:
         # get years including interval requested
         years_interval_req = list(range(start.year, end.year + 1, 1))
 
-        # get all keys referring to specific ticker
-        ticker_years_list = self._get_ticker_years_list(ticker, timeframe=timeframe)
+        # Initialize ticker/timeframe in dict if not present
+        if ticker not in self._tickers_years_dict:
+            self._tickers_years_dict[ticker] = {}
+        if timeframe not in self._tickers_years_dict[ticker]:
+            self._tickers_years_dict[ticker][timeframe] = []
+        if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
 
         # aggregate data to current instance if necessary
-        if not set(years_interval_req).issubset(ticker_years_list):
+        if not set(years_interval_req).issubset(self._tickers_years_dict[ticker][timeframe]):
 
             year_tf_missing = list(
-                set(years_interval_req).difference(ticker_years_list))
+                set(years_interval_req).difference(self._tickers_years_dict[ticker][timeframe]))
 
-            year_tick_keys = self._get_ticker_years_list(
-                ticker, timeframe=TICK_TIMEFRAME)
-
-            year_tick_missing = list(set(years_interval_req).difference(year_tick_keys))
+            year_tick_missing = list(set(years_interval_req).difference(
+                self._tickers_years_dict[ticker][TICK_TIMEFRAME]
+            ))
 
             # if tick is missing --> download missing years
             if year_tick_missing:
@@ -1144,24 +1199,13 @@ class HistoricalManagerDB:
             # update database
             self._update_db(ticker)
 
-            # get all keys referring to specific ticker
-            ticker_keys = self._get_ticker_keys(ticker)
-
-            # get all keys referring to specific ticker
-            ticker_years_list = self._get_ticker_years_list(ticker, timeframe=timeframe)
-
-            if not set(years_interval_req).issubset(ticker_years_list):
+            if not set(years_interval_req).issubset(self._tickers_years_dict[ticker][timeframe]):
 
                 logger.bind(target='histmanager').critical(
                     f'processing year data completion for '
                     f'{years_interval_req} not ok')
                 raise ValueError
 
-            else:
-                logger.bind(target='histmanager').trace(
-                    f'Year data completion for {years_interval_req} successful')
-
-        # at this point all data requested have been aggregated to the database
         # clear temporary data folder
         self._clear_temporary_data_folder()
 
@@ -1245,3 +1289,7 @@ class HistoricalManagerDB:
         mpf_plot(chart_data, type='candle', **chart_kwargs)
 
         mpf_show()
+
+    def close(self):
+
+        self._db_connector.save_tickers_years_info(self._tickers_years_dict)
