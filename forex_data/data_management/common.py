@@ -19,7 +19,8 @@ from typing import (
     cast,
     Any,
     List,
-    Literal
+    Literal,
+    Dict
 )
 
 import requests
@@ -178,6 +179,7 @@ __all__ = [
     'TickerDataBadTypeException',
     'TickerDataInvalidException',
     'business_days_data',
+    'update_ticker_years_dict',
 ]
 
 # =============================================================================
@@ -1817,3 +1819,55 @@ def business_days_data(dataframe: polars_lazyframe | polars_dataframe) -> polars
         (col('timestamp').dt.weekday() < 6) &  # Keep Monday(1) through Friday(5)
         (~col('timestamp').dt.date().is_in(US_holiday_dates))  # Exclude holidays
     )
+
+
+def update_ticker_years_dict(
+    ticker_years_dict: Dict[str, Dict[str, List[int]]],
+    ticker: str,
+    timeframe: str,
+    years_to_add: List[int]
+) -> bool:
+    """
+    Update a ticker years dictionary with new years for a specific ticker and timeframe.
+
+    This function modifies the dictionary in place and returns whether any changes were made.
+
+    Parameters
+    ----------
+    ticker_years_dict : Dict[str, Dict[str, List[int]]]
+        Dictionary containing ticker years data, structured as:
+        {ticker: {timeframe: [year1, year2, ...]}}
+    ticker : str
+        The ticker symbol to update
+    timeframe : str
+        The timeframe for the ticker data
+    years_to_add : List[int]
+        List of years to add to the years list
+
+    Returns
+    -------
+    bool
+        True if any changes were made, False otherwise
+    """
+    # Initialize ticker if not present
+    if ticker not in ticker_years_dict:
+        ticker_years_dict[ticker] = {}
+
+    # Initialize timeframe if not present
+    if timeframe not in ticker_years_dict[ticker]:
+        ticker_years_dict[ticker][timeframe] = []
+
+    # Track if any changes were made
+    changes_made = False
+
+    # Add years if not already present
+    for y in years_to_add:
+        if y not in ticker_years_dict[ticker][timeframe]:
+            ticker_years_dict[ticker][timeframe].append(y)
+            changes_made = True
+
+    # Keep years sorted if changes were made
+    if changes_made:
+        ticker_years_dict[ticker][timeframe].sort()
+
+    return ticker_years_dict, changes_made

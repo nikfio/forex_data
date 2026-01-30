@@ -177,7 +177,12 @@ class TestRealtimeManager(unittest.TestCase):
 
                     for col in expected_cols:
                         msg = f"Column '{col}' missing from daily close data"
-                        self.assertIn(col, result.columns, msg=msg)
+                        if isinstance(result, polars_lazyframe):
+                            columns = result.collect_schema().names()
+                        else:
+                            columns = result.columns
+                        self.assertIn(col, columns, msg=msg)
+
         except Exception as e:
             self.skipTest(f"API call failed: {str(e)}")
 

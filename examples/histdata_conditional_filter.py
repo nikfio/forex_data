@@ -19,7 +19,6 @@ from forex_data import (
 )
 
 from loguru import logger
-from sys import stdout
 from time import time
 
 
@@ -37,10 +36,6 @@ def main():
     histmanager = HistoricalManagerDB(
         config=test_config_yaml
     )
-
-    # Add logging to stdout
-    logger.add(stdout,
-               level="TRACE")
 
     # Example 1: Get data with a single condition (open price < threshold)
     ex_ticker = 'EURUSD'
@@ -166,6 +161,9 @@ def main():
         )
 
     logger.info(f"Elapsed time: {time() - start_time:.4f}s\n")
+
+    # close data manager
+    histmanager.close()
 
 
 if __name__ == '__main__':
