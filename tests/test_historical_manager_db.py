@@ -195,8 +195,8 @@ class TestHistoricalManagerDB(unittest.TestCase):
             ).days,
             7,
             msg=f"Between two random consecutive candles the timestamp difference "
-                f"is not 7 days: {random_candles[1]['timestamp'][0]} - "
-                f"{random_candles[0]['timestamp'][0]}"
+            f"is not 7 days: {random_candles[1]['timestamp'][0]} - "
+            f"{random_candles[0]['timestamp'][0]}"
         )
 
     def test_09_data_columns_present(self):
@@ -528,7 +528,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 self.assertTrue(
                     high_condition or low_condition,
                     msg=f"Row does not satisfy OR condition: "
-                        f"HIGH={row['high']}, LOW={row['low']}"
+                    f"HIGH={row['high']}, LOW={row['low']}"
                 )
 
     def test_22_get_data_with_multiple_conditions_and(self):

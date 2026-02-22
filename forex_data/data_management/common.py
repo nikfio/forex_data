@@ -180,6 +180,9 @@ __all__ = [
     'TickerDataInvalidException',
     'business_days_data',
     'update_ticker_years_dict',
+    'get_class_attr_keys',
+    'get_class_attr_values',
+    'get_class_attr_dict',
 ]
 
 # =============================================================================
@@ -282,6 +285,53 @@ GET_YEAR_FROM_TICK_KEY_PATTERN_STR = '^[A-Za-z].Y[0-9].TICK'
 YEAR_FIELD_PATTERN_STR = '^Y([0-9]{4,})$'
 POLARS_DURATION_PATTERN_STR = '^[0-9]+(ns|us|ms|s|m|h|d|w|mo|q|y|i)$'
 PYARROW_DURATION_PATTERN_STR = '^[0-9]+(ns|us|ms|s|m|h|d|w|mo|q|y|i)$'
+
+# GENERAL UTILITIES
+
+
+def get_class_attr_keys(var):
+
+    defined_keys = []
+
+    try:
+
+        keys = vars(var)
+
+        defined_keys = [key for key in keys
+                        if not search(r'__(\w+)__',
+                                      key)]
+
+    except Exception:
+
+        return None
+
+    return defined_keys
+
+
+def get_class_attr_values(var):
+
+    defined_vals = []
+
+    dict_var = dict(vars(var))
+    keys = get_class_attr_keys(var)
+
+    try:
+
+        defined_vals = [dict_var[key] for key in keys]
+
+    except Exception:
+
+        return None
+
+    return defined_vals
+
+
+def get_class_attr_dict(var):
+
+    def_keys = get_class_attr_keys(var)
+
+    return {key: getattr(var, key)
+            for key in def_keys}
 
 # auxiliary CONSTANT DEFINITIONS
 
@@ -534,11 +584,9 @@ def check_timeframe_str(tf: str | Timedelta | DateOffset, engine: Literal['panda
             raise
 
     elif (
-            engine == 'polars'
-            or
-            engine == 'polars_lazy'
-            or
-            engine == 'pyarrow'
+            engine == 'polars' or
+        engine == 'polars_lazy' or
+        engine == 'pyarrow'
     ):
 
         '''
@@ -1805,7 +1853,6 @@ US_holiday_dates = [holiday_date for holiday_date in US_HOLIDAYS.keys()]
 
 
 def business_days_data(dataframe: polars_lazyframe | polars_dataframe) -> polars_dataframe | polars_lazyframe:
-
     '''
     Remove non-business days data from the input dataframe.
     Filter out weekends data: saturday and sunday.

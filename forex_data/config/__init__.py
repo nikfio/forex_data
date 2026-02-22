@@ -9,12 +9,14 @@ __all__ = [
     'config_file',
     'read_config_file',
     'read_config_string',
-    'read_config_folder'
+    'read_config_folder',
+    '_apply_config'
 ]
 
 from . import config_file
 from .config_file import (
     read_config_file,
     read_config_string,
-    read_config_folder
+    read_config_folder,
+    _apply_config
 )
