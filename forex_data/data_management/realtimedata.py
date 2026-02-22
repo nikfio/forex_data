@@ -124,7 +124,8 @@ from .common import (
 from ..config import (
     read_config_file,
     read_config_string,
-    read_config_folder
+    read_config_folder,
+    _apply_config
 )
 
 # constants
@@ -185,139 +186,7 @@ class RealtimeManager:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if 'config' in kwargs.keys():
-
-            if kwargs['config']:
-
-                config_path = Path(kwargs['config'])
-
-                if (
-                    config_path.exists() and
-                    config_path.is_dir()
-                ):
-
-                    config_filepath = read_config_folder(
-                        config_path, file_pattern='data_config.yaml')
-
-                else:
-
-                    config_filepath = Path()
-
-                config_args = {}
-                if config_filepath.exists() \
-                        and  \
-                        config_filepath.is_file() \
-                        and  \
-                        config_filepath.suffix == '.yaml':
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_file(str(config_filepath)).items()}
-
-                elif isinstance(kwargs['config'], str):
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_string(kwargs['config']).items()}
-
-                else:
-
-                    logger.critical('invalid config type '
-                                    f'{kwargs["config"]}: '
-                                    'required str or Path, got '
-                                    f'{type(kwargs["config"])}')
-                    raise TypeError
-
-                # check consistency of config_args
-                if (
-                        not isinstance(config_args, dict) or
-                    not bool(config_args)
-                ):
-
-                    logger.critical(f'config {kwargs["config"]} '
-                                    'has no valid yaml formatted data')
-                    raise TypeError
-
-                # set args from config file
-                attrs_keys_configfile = \
-                    set(_class_attributes_name).intersection(config_args.keys())
-
-                for attr_key in attrs_keys_configfile:
-
-                    self.__setattr__(attr_key,
-                                     config_args[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # set args from instantiation
-                # override if attr already has a value from config
-                attrs_keys_input = \
-                    set(_class_attributes_name).intersection(kwargs.keys())
-
-                for attr_key in attrs_keys_input:
-
-                    self.__setattr__(attr_key,
-                                     kwargs[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # attrs not present in config file or instance inputs
-                # --> self.attr leads to KeyError
-                # are manually assigned to default value derived
-                # from __attrs_attrs__
-
-                for attr_key in array(_class_attributes_name)[
-                        _not_assigned_attrs_index_mask
-                ]:
-
-                    try:
-
-                        attr = [attr
-                                for attr in self.__attrs_attrs__
-                                if attr.name == attr_key][0]
-
-                    except KeyError:
-
-                        logger.error('KeyError: initializing object has no '
-                                     f'attribute {attr.name}')
-                        raise
-
-                    except IndexError:
-
-                        logger.error('IndexError: initializing object has no '
-                                     f'attribute {attr.name}')
-                        raise
-
-                    else:
-
-                        # assign default value
-                        # try default and factory sabsequently
-                        # if neither are present
-                        # assign None
-                        if hasattr(attr, 'default'):
-
-                            if hasattr(attr.default, 'factory'):
-
-                                self.__setattr__(attr.name,
-                                                 attr.default.factory())
-
-                            else:
-
-                                self.__setattr__(attr.name,
-                                                 attr.default)
-
-                        else:
-
-                            self.__setattr__(attr.name,
-                                             None)
-
-        else:
+        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init

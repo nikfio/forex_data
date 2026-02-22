@@ -70,7 +70,8 @@ from .common import *
 from ..config import (
     read_config_file,
     read_config_string,
-    read_config_folder
+    read_config_folder,
+    _apply_config
 )
 
 from .database import (
@@ -127,146 +128,7 @@ class HistoricalManagerDB:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if 'config' in kwargs.keys():
-
-            if kwargs['config']:
-
-                config_path = Path(kwargs['config'])
-
-                if (
-                    config_path.exists()
-                    and
-                    config_path.is_dir()
-                ):
-
-                    config_filepath = read_config_folder(
-                        config_path, file_pattern='data_config.yaml')
-
-                else:
-
-                    config_filepath = Path()
-
-                config_args = {}
-                if config_filepath.exists() \
-                        and  \
-                        config_filepath.is_file() \
-                        and  \
-                        config_filepath.suffix == '.yaml':
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_file(str(config_filepath)).items()}
-
-                elif isinstance(kwargs['config'], str):
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_string(kwargs['config']).items()}
-
-                else:
-
-                    logger.critical('invalid config type '
-                                    f'{kwargs["config"]}: '
-                                    'required str or Path, got '
-                                    f'{type(kwargs["config"])}')
-                    raise TypeError
-
-                # check consistency of config_args
-                if (
-                    not isinstance(config_args, dict)
-                    or
-                    not bool(config_args)
-                ):
-
-                    logger.critical(f'config {kwargs["config"]} '
-                                    'has no valid yaml formatted data')
-                    raise TypeError
-
-                # set args from config file
-                attrs_keys_configfile = \
-                    set(_class_attributes_name).intersection(config_args.keys())
-
-                for attr_key in attrs_keys_configfile:
-
-                    self.__setattr__(attr_key,
-                                     config_args[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # set args from instantiation
-                # override if attr already has a value from config
-                attrs_keys_input = \
-                    set(_class_attributes_name).intersection(kwargs.keys())
-
-                for attr_key in attrs_keys_input:
-
-                    self.__setattr__(attr_key,
-                                     kwargs[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # attrs not present in config file or instance inputs
-                # --> self.attr leads to KeyError
-                # are manually assigned to default value derived
-                # from __attrs_attrs__
-
-                for attr_key in array(_class_attributes_name)[
-                        _not_assigned_attrs_index_mask
-                ]:
-
-                    try:
-
-                        attr = [attr
-                                for attr in self.__attrs_attrs__
-                                if attr.name == attr_key][0]
-
-                    except KeyError:
-
-                        logger.warning('KeyError: initializing object has no '
-                                       f'attribute {attr.name}')
-                        raise
-
-                    except IndexError:
-
-                        logger.warning('IndexError: initializing object has no '
-                                       f'attribute {attr.name}')
-                        raise
-
-                    else:
-
-                        # assign default value
-                        # try default and factory sabsequently
-                        # if neither are present
-                        # assign None
-                        if hasattr(attr, 'default'):
-
-                            if hasattr(attr.default, 'factory'):
-
-                                self.__setattr__(attr.name,
-                                                 attr.default.factory())
-
-                            else:
-
-                                self.__setattr__(attr.name,
-                                                 attr.default)
-
-                        else:
-
-                            self.__setattr__(attr.name,
-                                             None)
-
-            else:
-
-                logger.trace(
-                    f'config {kwargs["config"]} is empty, using default configuration')
-
-        else:
+        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init
@@ -274,7 +136,7 @@ class HistoricalManagerDB:
 
         validate(self)
 
-        self.__attrs_post_init__()
+        self.__attrs_post_init__(**kwargs)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
@@ -321,7 +183,8 @@ class HistoricalManagerDB:
 
         else:
 
-            logger.bind(target='histmanager').error(f'Engine {self.engine} not supported')
+            logger.bind(target='histmanager').error(
+                f'Engine {self.engine} not supported')
             raise ValueError(f'Engine {self.engine} not supported')
 
         self._temporary_data_path = self._histdata_path \
@@ -349,7 +212,8 @@ class HistoricalManagerDB:
 
         else:
 
-            logger.bind(target='histmanager').error(f'Data type {self.data_type} not supported')
+            logger.bind(target='histmanager').error(
+                f'Data type {self.data_type} not supported')
             raise ValueError(f'Data type {self.data_type} not supported')
 
         # cache histdata tickers list at initialization
@@ -549,7 +413,8 @@ class HistoricalManagerDB:
         }
 
         # logger trace ticker year and month specifed are being downloaded
-        logger.bind(target='histmanager').trace(f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
+        logger.bind(target='histmanager').trace(
+            f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
         r = session.request(
             HISTDATA_BASE_DOWNLOAD_METHOD,
             HISTDATA_BASE_DOWNLOAD_URL,
@@ -570,7 +435,8 @@ class HistoricalManagerDB:
         except BadZipFile as e:
 
             # here will be a warning log
-            logger.bind(target='histmanager').error(f'{ticker} - {year} - {MONTHS[month_num - 1]}: {e}')
+            logger.bind(target='histmanager').error(
+                f'{ticker} - {year} - {MONTHS[month_num - 1]}: {e}')
             raise TickerDataBadTypeException(
                 f"Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}")
 
@@ -953,7 +819,8 @@ class HistoricalManagerDB:
             isinstance(years, list)
         ):
 
-            logger.bind(target='histmanager').error('years {years} invalid, must be list type')
+            logger.bind(target='histmanager').error(
+                'years {years} invalid, must be list type')
             raise TypeError
 
         if not (
@@ -1059,7 +926,8 @@ class HistoricalManagerDB:
             all([isinstance(tf, str) for tf in timeframe])
         ):
 
-            logger.bind(target='histmanager').error('timeframe invalid: str or list required')
+            logger.bind(target='histmanager').error(
+                'timeframe invalid: str or list required')
             raise TypeError
 
         tf_list = [check_timeframe_str(tf, engine=self.engine) for tf in timeframe]
@@ -1136,11 +1004,11 @@ class HistoricalManagerDB:
         # check ticker exists in available tickers
         # from histdata database
         if (
-                ticker.upper() not in self._histdata_tickers_list
-                and
-                ticker.lower() not in self._get_ticker_list()
+                ticker.upper() not in self._histdata_tickers_list and
+            ticker.lower() not in self._get_ticker_list()
         ):
-            logger.bind(target='histmanager').error(f'ticker {ticker.upper()} not found in database')
+            logger.bind(target='histmanager').error(
+                f'ticker {ticker.upper()} not found in database')
             raise TickerNotFoundError(f'ticker {ticker} not found in database')
 
         # force ticker parameter to lower case
@@ -1149,7 +1017,8 @@ class HistoricalManagerDB:
 
         if not check_timeframe_str(timeframe, engine=self.engine):
 
-            logger.bind(target='histmanager').error(f'timeframe request {timeframe} invalid')
+            logger.bind(target='histmanager').error(
+                f'timeframe request {timeframe} invalid')
             raise ValueError
 
         else:
@@ -1273,7 +1142,8 @@ class HistoricalManagerDB:
             chart_data.index = to_datetime(chart_data.index)
 
         else:
-            logger.bind(target='histmanager').trace(f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
+            logger.bind(target='histmanager').trace(
+                f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
 
         # candlestick chart type
         # use mplfinance

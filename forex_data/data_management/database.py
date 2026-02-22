@@ -37,16 +37,17 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from pathlib import Path as PathType
 from datetime import datetime
 import json
-
-# Import polars types directly
 from polars import (
     DataFrame as polars_dataframe,
     LazyFrame as polars_lazyframe,
     read_database
 )
+from .common import *
+from adbc_driver_sqlite import dbapi as sqlite_dbapi
+
+# Import polars types directly
 
 # Import from adbc_driver_sqlite
-from adbc_driver_sqlite import dbapi as sqlite_dbapi
 
 # Import from sqlalchemy for text queries
 try:
@@ -57,32 +58,15 @@ except ImportError:
         return s
 
 # Import from common module - explicit imports for items not in __all__
-from .common import (
-    TICK_TIMEFRAME,
-    BASE_DATA_COLUMN_NAME,
-    DATA_KEY,
-    DATA_TYPE,
-    SUPPORTED_DATA_FILES,
-    SUPPORTED_DATA_ENGINES,
-    SUPPORTED_BASE_DATA_COLUMN_NAME,
-    SUPPORTED_SQL_COMPARISON_OPERATORS,
-    get_attrs_names,
-    validator_dir_path,
-    is_empty_dataframe,
-    list_remove_duplicates,
-    POLARS_DTYPE_DICT,
-    update_ticker_years_dict
-)
 
 # Import remaining items via star import
-from .common import *
-
-# Import from config module
 from ..config import (
     read_config_file,
     read_config_string,
-    read_config_folder
+    read_config_folder,
+    _apply_config
 )
+# Import from config module
 
 
 '''
@@ -104,8 +88,7 @@ class DatabaseConnector:
 
         # create data folder if not exists
         if (
-            not Path(self.data_folder).exists()
-            or
+            not Path(self.data_folder).exists() or
             not Path(self.data_folder).is_dir()
         ):
 
@@ -173,141 +156,7 @@ class DuckDBConnector(DatabaseConnector):
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if 'config' in kwargs.keys():
-
-            if kwargs['config']:
-
-                config_path = Path(kwargs['config'])
-
-                if (
-                    config_path.exists() and
-                    config_path.is_dir()
-                ):
-
-                    config_filepath = read_config_folder(config_path,
-                                                         file_pattern='_config.yaml')
-
-                else:
-
-                    config_filepath = Path()
-
-                config_args = {}
-                if config_filepath.exists() \
-                        and  \
-                        config_filepath.is_file() \
-                        and  \
-                        config_filepath.suffix == '.yaml':
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_file(str(config_filepath)).items()}
-
-                elif isinstance(kwargs['config'], str):
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_string(kwargs['config']).items()}
-
-                else:
-
-                    logger.critical('invalid config type '
-                                    f'{kwargs["config"]}: '
-                                    'required str or Path, got '
-                                    f'{type(kwargs["config"])}')
-                    raise TypeError
-
-                # check consistency of config_args
-                if (
-                        not isinstance(config_args, dict) or
-                    not bool(config_args)
-                ):
-
-                    logger.critical(f'config {kwargs["config"]} '
-                                    'has no valid yaml formatted data')
-                    raise TypeError
-
-                # set args from config file
-                attrs_keys_configfile = \
-                    set(_class_attributes_name).intersection(config_args.keys())
-
-                for attr_key in attrs_keys_configfile:
-
-                    self.__setattr__(attr_key,
-                                     config_args[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # set args from instantiation
-                # override if attr already has a value from config
-                attrs_keys_input = \
-                    set(_class_attributes_name).intersection(kwargs.keys())
-
-                for attr_key in attrs_keys_input:
-
-                    self.__setattr__(attr_key,
-                                     kwargs[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # attrs not present in config file or instance inputs
-                # --> self.attr leads to KeyError
-                # are manually assigned to default value derived
-                # from __attrs_attrs__
-
-                for attr_key in array(_class_attributes_name)[
-                        _not_assigned_attrs_index_mask
-                ]:
-
-                    try:
-
-                        attr = [attr
-                                for attr in self.__attrs_attrs__
-                                if attr.name == attr_key][0]
-
-                    except KeyError:
-
-                        logger.warning('KeyError: initializing object has no '
-                                       f'attribute {attr.name}')
-                        raise
-
-                    except IndexError:
-
-                        logger.warning('IndexError: initializing object has no '
-                                       f'attribute {attr.name}')
-                        raise
-
-                    else:
-
-                        # assign default value
-                        # try default and factory sabsequently
-                        # if neither are present
-                        # assign None
-                        if hasattr(attr, 'default'):
-
-                            if hasattr(attr.default, 'factory'):
-                                self.__setattr__(attr.name,
-                                                 attr.default.factory())
-
-                            else:
-
-                                self.__setattr__(attr.name,
-                                                 attr.default)
-
-                        else:
-
-                            self.__setattr__(attr.name,
-                                             None)
-
-            else:
-                logger.trace(f'config {kwargs["config"]} is empty, using default configuration')
-
-        else:
+        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init
@@ -350,7 +199,8 @@ class DuckDBConnector(DatabaseConnector):
                                                     exist_ok=True)
         else:
 
-            logger.bind(target='duckdb').trace(f'DuckDB file {self.duckdb_filepath} already exists')
+            logger.bind(target='duckdb').trace(
+                f'DuckDB file {self.duckdb_filepath} already exists')
 
         # set autovacuum
         conn = self.connect()
@@ -391,7 +241,8 @@ class DuckDBConnector(DatabaseConnector):
 
         except Exception as e:
 
-            logger.bind(target='duckdb').error(f'Error during connection to {self.duckdb_filepath}')
+            logger.bind(target='duckdb').error(
+                f'Error during connection to {self.duckdb_filepath}')
 
         else:
 
@@ -441,7 +292,8 @@ class DuckDBConnector(DatabaseConnector):
             duckdb_columns_dict = dict(o_dict)
 
         else:
-            logger.bind(target='duckdb').trace(f'Timestamp is already the first column in {duckdb_columns_dict.keys()}')
+            logger.bind(target='duckdb').trace(
+                f'Timestamp is already the first column in {duckdb_columns_dict.keys()}')
 
         return duckdb_columns_dict
 
@@ -458,7 +310,8 @@ class DuckDBConnector(DatabaseConnector):
 
         except Exception as e:
 
-            logger.bind(target='duckdb').error(f'Error list tables for {self.duckdb_filepath}: {e}')
+            logger.bind(target='duckdb').error(
+                f'Error list tables for {self.duckdb_filepath}: {e}')
 
         else:
 
@@ -691,19 +544,22 @@ class DuckDBConnector(DatabaseConnector):
 
             except Exception as e:
 
-                logger.bind(target='duckdb').error(f'executing query {query} failed: {e}')
+                logger.bind(target='duckdb').error(
+                    f'executing query {query} failed: {e}')
 
             else:
 
                 if timeframe == TICK_TIMEFRAME:
 
                     # final cast to standard dtypes
-                    dataframe = dataframe.cast(cast(Any, POLARS_DTYPE_DICT.TIME_TICK_DTYPE))
+                    dataframe = dataframe.cast(
+                        cast(Any, POLARS_DTYPE_DICT.TIME_TICK_DTYPE))
 
                 else:
 
                     # final cast to standard dtypes
-                    dataframe = dataframe.cast(cast(Any, POLARS_DTYPE_DICT.TIME_TF_DTYPE))
+                    dataframe = dataframe.cast(
+                        cast(Any, POLARS_DTYPE_DICT.TIME_TF_DTYPE))
 
         # close
         conn.commit()
@@ -759,145 +615,7 @@ class LocalDBConnector(DatabaseConnector):
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if 'config' in kwargs.keys():
-
-            if kwargs['config']:
-
-                config_path = Path(kwargs['config'])
-
-                if (
-                    config_path.exists() and
-                    config_path.is_dir()
-                ):
-
-                    config_filepath = read_config_folder(config_path,
-                                                         file_pattern='_config.yaml')
-
-                else:
-
-                    config_filepath = Path()
-
-                config_args = {}
-                if config_filepath.exists() \
-                        and  \
-                        config_filepath.is_file() \
-                        and  \
-                        config_filepath.suffix == '.yaml':
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_file(str(config_filepath)).items()}
-
-                elif isinstance(kwargs['config'], str):
-
-                    # read parameters from config file
-                    # and force keys to lower case
-                    config_args = {key.lower(): val for key, val in
-                                   read_config_string(kwargs['config']).items()}
-
-                else:
-
-                    logger.bind(target='localdb').critical(
-                        'invalid config type '
-                        f'{kwargs["config"]}: '
-                        'required str or Path, got '
-                        f'{type(kwargs["config"])}')
-                    raise TypeError
-
-                # check consistency of config_args
-                if (
-                        not isinstance(config_args, dict) or
-                    not bool(config_args)
-                ):
-
-                    logger.bind(target='localdb').critical(
-                        f'config {kwargs["config"]} '
-                        'has no valid yaml formatted data')
-                    raise TypeError
-
-                # set args from config file
-                attrs_keys_configfile = \
-                    set(_class_attributes_name).intersection(config_args.keys())
-
-                for attr_key in attrs_keys_configfile:
-
-                    self.__setattr__(attr_key,
-                                     config_args[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # set args from instantiation
-                # override if attr already has a value from config
-                attrs_keys_input = \
-                    set(_class_attributes_name).intersection(kwargs.keys())
-
-                for attr_key in attrs_keys_input:
-
-                    self.__setattr__(attr_key,
-                                     kwargs[attr_key])
-
-                    _not_assigned_attrs_index_mask[
-                        _class_attributes_name.index(attr_key)
-                    ] = False
-
-                # attrs not present in config file or instance inputs
-                # --> self.attr leads to KeyError
-                # are manually assigned to default value derived
-                # from __attrs_attrs__
-
-                for attr_key in array(_class_attributes_name)[
-                        _not_assigned_attrs_index_mask
-                ]:
-
-                    try:
-
-                        attr = [attr
-                                for attr in self.__attrs_attrs__
-                                if attr.name == attr_key][0]
-
-                    except KeyError:
-
-                        logger.error('KeyError: initializing object has no '
-                                     f'attribute {attr.name}')
-                        raise
-
-                    except IndexError:
-
-                        logger.error('IndexError: initializing object has no '
-                                     f'attribute {attr.name}')
-                        raise
-
-                    else:
-
-                        # assign default value
-                        # try default and factory sabsequently
-                        # if neither are present
-                        # assign None
-                        if hasattr(attr, 'default'):
-
-                            if hasattr(attr.default, 'factory'):
-
-                                self.__setattr__(attr.name,
-                                                 attr.default.factory())
-
-                            else:
-
-                                self.__setattr__(attr.name,
-                                                 attr.default)
-
-                        else:
-
-                            self.__setattr__(attr.name,
-                                             None)
-
-            else:
-
-                logger.trace(f'config {kwargs["config"]} is empty, using default configuration')
-
-        else:
+        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init
@@ -980,7 +698,8 @@ class LocalDBConnector(DatabaseConnector):
                 isinstance(filename, str)
         ):
 
-            logger.bind(target='localdb').error('filename {filename} invalid type: required str')
+            logger.bind(target='localdb').error(
+                'filename {filename} invalid type: required str')
             raise TypeError(f'filename {filename} invalid type: required str')
 
         file_items = self._get_items_from_db_key(filename)
@@ -1032,7 +751,6 @@ class LocalDBConnector(DatabaseConnector):
         return list_remove_duplicates(tickers_list)
 
     def clear_database(self, filter: Optional[str] = None) -> None:
-
         """
         Clear database files
         If filter is provided and is a ticker present in database (files present)
@@ -1053,10 +771,12 @@ class LocalDBConnector(DatabaseConnector):
                         if search(filter, file.stem, IGNORECASE):
                             file.unlink(missing_ok=True)
                 else:
-                    logger.bind(target='localdb').info(f'No data files found in {self._local_path} with filter {filter}')
+                    logger.bind(target='localdb').info(
+                        f'No data files found in {self._local_path} with filter {filter}')
 
             else:
-                logger.bind(target='localdb').error(f'Filter {filter} invalid type: required str')
+                logger.bind(target='localdb').error(
+                    f'Filter {filter} invalid type: required str')
 
         else:
 
@@ -1126,7 +846,8 @@ class LocalDBConnector(DatabaseConnector):
 
             except Exception as e:
 
-                logger.bind(target='localdb').error(f'Error querying table {table}: {e}')
+                logger.bind(target='localdb').error(
+                    f'Error querying table {table}: {e}')
                 raise
 
             else:
@@ -1136,7 +857,6 @@ class LocalDBConnector(DatabaseConnector):
         return ticker_years_list
 
     def create_tickers_years_dict(self) -> Dict[str, Dict[str, List[int]]]:
-
         """
         Create a dictionary containing ticker years data, structured as:
         {ticker: {timeframe: [year1, year2, ...]}}
@@ -1194,7 +914,8 @@ class LocalDBConnector(DatabaseConnector):
             logger.bind(target='localdb').error(
                 f'ticker_years_dict must be a dictionary, got {type(ticker_years_dict)}'
             )
-            raise TypeError(f'ticker_years_dict must be a dictionary, got {type(ticker_years_dict)}')
+            raise TypeError(
+                f'ticker_years_dict must be a dictionary, got {type(ticker_years_dict)}')
 
         try:
             with open(self._tickers_years_info_filepath, 'w') as f:
@@ -1203,7 +924,8 @@ class LocalDBConnector(DatabaseConnector):
             logger.bind(target='localdb').error(
                 f'Error writing ticker years data to {self._tickers_years_info_filepath}: {e}'
             )
-            raise IOError(f'Error writing ticker years data to {self._tickers_years_info_filepath}: {e}')
+            raise IOError(
+                f'Error writing ticker years data to {self._tickers_years_info_filepath}: {e}')
 
     def add_tickers_years_info_to_file(self, ticker: str, timeframe: str, year: Union[int, List[int]]) -> None:
         """
@@ -1239,7 +961,8 @@ class LocalDBConnector(DatabaseConnector):
             logger.bind(target='localdb').error(
                 f'year must be an integer or list of integers, got {type(year)}'
             )
-            raise TypeError(f'year must be an integer or list of integers, got {type(year)}')
+            raise TypeError(
+                f'year must be an integer or list of integers, got {type(year)}')
 
         # Load existing data or create new dict if file doesn't exist
         if self._tickers_years_info_filepath.exists():
@@ -1283,7 +1006,8 @@ class LocalDBConnector(DatabaseConnector):
             logger.bind(target='localdb').error(
                 f'File {self._tickers_years_info_filepath} not found'
             )
-            raise FileNotFoundError(f'File {self._tickers_years_info_filepath} not found')
+            raise FileNotFoundError(
+                f'File {self._tickers_years_info_filepath} not found')
 
         try:
             with open(self._tickers_years_info_filepath, 'r') as f:
@@ -1293,12 +1017,14 @@ class LocalDBConnector(DatabaseConnector):
             logger.bind(target='localdb').error(
                 f'Error decoding JSON from {self._tickers_years_info_filepath}: {e}'
             )
-            raise IOError(f'Error decoding JSON from {self._tickers_years_info_filepath}: {e}')
+            raise IOError(
+                f'Error decoding JSON from {self._tickers_years_info_filepath}: {e}')
         except Exception as e:
             logger.bind(target='localdb').error(
                 f'Error reading ticker years data from {self._tickers_years_info_filepath}: {e}'
             )
-            raise IOError(f'Error reading ticker years data from {self._tickers_years_info_filepath}: {e}')
+            raise IOError(
+                f'Error reading ticker years data from {self._tickers_years_info_filepath}: {e}')
 
     def write_data(
         self,
@@ -1380,28 +1106,35 @@ class LocalDBConnector(DatabaseConnector):
                 comparison_operator = [comparison_operator]
 
             if any([col not in list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__) for col in comparison_column_name]):
-                logger.bind(target='localdb').error(f'comparison_column_name must be a supported column name: {list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
-                raise ValueError('comparison_column_name must be a supported column name')
+                logger.bind(target='localdb').error(
+                    f'comparison_column_name must be a supported column name: {list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
+                raise ValueError(
+                    'comparison_column_name must be a supported column name')
 
             if any([cond not in list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__) for cond in comparison_operator]):
-                logger.bind(target='localdb').error(f'comparison_operator must be a supported SQL comparison operator: {list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)}')
-                raise ValueError('comparison_operator must be a supported SQL comparison operator')
+                logger.bind(target='localdb').error(
+                    f'comparison_operator must be a supported SQL comparison operator: {list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)}')
+                raise ValueError(
+                    'comparison_operator must be a supported SQL comparison operator')
 
             if (
                 (
-                    comparison_aggregation_mode is not None
-                    and
+                    comparison_aggregation_mode is not None and
                     comparisons_len > 1
-                )
-                and
-                comparison_aggregation_mode not in list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)
+                ) and
+                comparison_aggregation_mode not in list(
+                    SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)
             ):
-                logger.bind(target='localdb').error(f'comparison_aggregation_mode must be a supported SQL condition aggregation mode: {list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)}')
-                raise ValueError('comparison_aggregation_mode must be a supported SQL condition aggregation mode')
+                logger.bind(target='localdb').error(
+                    f'comparison_aggregation_mode must be a supported SQL condition aggregation mode: {list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)}')
+                raise ValueError(
+                    'comparison_aggregation_mode must be a supported SQL condition aggregation mode')
 
             if len(comparison_column_name) != len(check_level) or len(comparison_column_name) != len(comparison_operator):
-                logger.bind(target='localdb').error('comparison_column_name, check_level and comparison_operator must have the same length')
-                raise ValueError('comparison_column_name, check_level and comparison_operator must have the same length')
+                logger.bind(target='localdb').error(
+                    'comparison_column_name, check_level and comparison_operator must have the same length')
+                raise ValueError(
+                    'comparison_column_name, check_level and comparison_operator must have the same length')
 
             comparisons_len = len(comparison_column_name)
 
@@ -1426,12 +1159,13 @@ class LocalDBConnector(DatabaseConnector):
 
         else:
 
-            logger.bind(target='localdb').error(f'Engine {self.engine} or data type {self.data_type} not supported')
-            raise ValueError(f'Engine {self.engine} or data type {self.data_type} not supported')
+            logger.bind(target='localdb').error(
+                f'Engine {self.engine} or data type {self.data_type} not supported')
+            raise ValueError(
+                f'Engine {self.engine} or data type {self.data_type} not supported')
 
         if (
-            filepath.exists()
-            and
+            filepath.exists() and
             filepath.is_file()
         ):
 
@@ -1488,7 +1222,8 @@ class LocalDBConnector(DatabaseConnector):
 
             except Exception as e:
 
-                logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
+                logger.bind(target='localdb').error(
+                    f'executing query {query} failed: {e}')
 
             else:
 
