@@ -109,6 +109,7 @@ Available options:
 * pandas
 * pyarrow
 * polars
+* polars_lazy
 
 #### DATA_FILETYPE
 

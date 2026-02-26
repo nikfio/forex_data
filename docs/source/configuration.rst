@@ -27,8 +27,8 @@ Create a YAML configuration file ending with ``data_config.yaml`` file with the 
    
    # API keys for real-time data providers
    PROVIDERS_KEY:
-     ALPHAVANTAGE: your_alphavantage_key
-     POLYGON: your_polygon_key
+     ALPHA_VANTAGE_API_KEY: your_alphavantage_key
+     POLYGON_IO_API_KEY: your_polygon_key
 
 Configuration Options
 =====================
@@ -42,6 +42,7 @@ Specifies which data processing engine to use.
 
 **Options**: 
   * ``polars`` (Recommended) - Fastest, most efficient
+  * ``polars_lazy`` - Polars LazyFrame interface
   * ``pyarrow`` - Very fast, columnar format
   * ``pandas`` - Slower but most compatible
 
@@ -119,16 +120,16 @@ Contains API keys for real-time data providers.
 **Type**: Dictionary
 
 **Supported Providers**:
-  * ``ALPHAVANTAGE`` - Alpha Vantage API key
-  * ``POLYGON`` - Polygon.io API key
+  * ``ALPHA_VANTAGE_API_KEY`` - Alpha Vantage API key
+  * ``POLYGON_IO_API_KEY`` - Polygon.io API key
 
 **Example**:
 
 .. code-block:: yaml
 
    PROVIDERS_KEY:
-     ALPHAVANTAGE: YOUR_API_KEY_HERE
-     POLYGON: YOUR_API_KEY_HERE
+     ALPHA_VANTAGE_API_KEY: YOUR_API_KEY_HERE
+     POLYGON_IO_API_KEY: YOUR_API_KEY_HERE
 
 Getting API Keys
 ^^^^^^^^^^^^^^^^
@@ -227,8 +228,8 @@ For sensitive data like API keys, consider using environment variables:
        config = yaml.safe_load(f)
    
    # Override with environment variables
-   if 'ALPHAVANTAGE_KEY' in os.environ:
-       config['PROVIDERS_KEY']['ALPHAVANTAGE'] = os.environ['ALPHAVANTAGE_KEY']
+   if 'ALPHA_VANTAGE_API_KEY' in os.environ:
+       config['PROVIDERS_KEY']['ALPHA_VANTAGE_API_KEY'] = os.environ['ALPHA_VANTAGE_API_KEY']
 
 Configuration Best Practices
 =============================
@@ -255,8 +256,8 @@ Here's a recommended production configuration:
    
    # API keys (use environment variables in real production!)
    PROVIDERS_KEY:
-     ALPHAVANTAGE: ${ALPHAVANTAGE_KEY}
-     POLYGON: ${POLYGON_KEY}
+     ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY}
+     POLYGON_IO_API_KEY: ${POLYGON_IO_API_KEY}
 
 Troubleshooting
 ===============

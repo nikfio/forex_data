@@ -29,12 +29,12 @@ Create a file ending with ``data_config.yaml``:
 
 .. code-block:: yaml
 
-   ENGINE: polars          # Options: polars, pyarrow, pandas
+   ENGINE: polars          # Options: polars, polars_lazy, pyarrow, pandas
    DATA_FILETYPE: parquet       # Options: parquet, csv
    
    PROVIDERS_KEY:
-     ALPHAVANTAGE: your_api_key_here
-     POLYGON: your_api_key_here
+     ALPHA_VANTAGE_API_KEY: your_api_key_here
+     POLYGON_IO_API_KEY: your_api_key_here
 
 .. tip::
    Use **parquet** for better performance and **polars** for the fastest data processing!
@@ -234,7 +234,7 @@ Polars (Recommended)
 
 .. code-block:: yaml
 
-   DATA_ENGINE: polars
+   ENGINE: polars
 
 * ✅ Fastest performance
 * ✅ Modern API
