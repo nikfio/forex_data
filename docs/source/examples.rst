@@ -18,17 +18,17 @@ Get historical data for a specific currency pair and date range:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    from forex_data.config import APPCONFIG_FILE_YAML
    
    # Create manager for NZD/USD
-   manager = historical_manager_db(
-       ticker='NZDUSD',
-       config_file=APPCONFIG_FILE_YAML
+   manager = HistoricalManagerDB(
+       config=APPCONFIG_FILE_YAML
    )
    
    # Get hourly data for 2 months
    data = manager.get_data(
+       ticker='NZDUSD',
        timeframe='1h',
        start='2009-10-04',
        end='2009-12-03'
@@ -59,15 +59,15 @@ Aggregate data into different timeframes:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    
-   manager = historical_manager_db(
-       ticker='EURUSD',
-       config_file='appconfig.yaml'
+   manager = HistoricalManagerDB(
+       config='appconfig.yaml'
    )
    
    # Get 1-minute data
    minute_data = manager.get_data(
+       ticker='EURUSD',
        timeframe='1m',
        start='2020-01-01 00:00:00',
        end='2020-01-01 23:59:59'
@@ -78,6 +78,7 @@ Aggregate data into different timeframes:
    
    # Get 15-minute data
    fifteen_min_data = manager.get_data(
+       ticker='EURUSD',
        timeframe='15m',
        start='2020-01-01',
        end='2020-01-07'
@@ -88,6 +89,7 @@ Aggregate data into different timeframes:
    
    # Get daily data
    daily_data = manager.get_data(
+       ticker='EURUSD',
        timeframe='1D',
        start='2020-01-01',
        end='2020-12-31'
@@ -104,15 +106,15 @@ Create candlestick charts from historical data:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    
-   manager = historical_manager_db(
-       ticker='NZDUSD',
-       config_file='appconfig.yaml'
+   manager = HistoricalManagerDB(
+       config='appconfig.yaml'
    )
    
    # Plot 5 months of daily data
    manager.plot(
+       ticker='NZDUSD',
        timeframe='1D',
        start_date='2013-02-02',
        end_date='2013-06-23'
@@ -127,15 +129,15 @@ Analyze data across multiple years:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    
-   manager = historical_manager_db(
-       ticker='GBPUSD',
-       config_file='appconfig.yaml'
+   manager = HistoricalManagerDB(
+       config='appconfig.yaml'
    )
    
    # Get 5 years of weekly data
    weekly_data = manager.get_data(
+       ticker='GBPUSD',
        timeframe='1W',
        start='2015-01-01',
        end='2019-12-31'
@@ -213,15 +215,14 @@ Retrieve the most recent closing price:
 
 .. code-block:: python
 
-   from forex_data.data_management import realtime_manager
+   from forex_data import RealtimeManager
    
-   rt_manager = realtime_manager(
-       ticker='NZDUSD',
-       config_file='appconfig.yaml'
+   rt_manager = RealtimeManager(
+       config='appconfig.yaml'
    )
    
    # Get the latest daily close
-   latest_close = rt_manager.get_daily_close(last_close=True)
+   latest_close = rt_manager.get_daily_close(ticker='NZDUSD', last_close=True)
    
    print("Latest close:")
    print(latest_close)
@@ -246,15 +247,14 @@ Get the last N days of market data:
 
 .. code-block:: python
 
-   from forex_data.data_management import realtime_manager
+   from forex_data import RealtimeManager
    
-   rt_manager = realtime_manager(
-       ticker='EURUSD',
-       config_file='appconfig.yaml'
+   rt_manager = RealtimeManager(
+       config='appconfig.yaml'
    )
    
    # Get last 10 days
-   recent_data = rt_manager.get_daily_close(recent_days_window=10)
+   recent_data = rt_manager.get_daily_close(ticker='EURUSD', recent_days_window=10)
    
    print("Last 10 days of trading:")
    print(recent_data)
@@ -266,15 +266,15 @@ Query real-time data for a specific date range:
 
 .. code-block:: python
 
-   from forex_data.data_management import realtime_manager
+   from forex_data import RealtimeManager
    
-   rt_manager = realtime_manager(
-       ticker='GBPUSD',
-       config_file='appconfig.yaml'
+   rt_manager = RealtimeManager(
+       config='appconfig.yaml'
    )
    
    # Get daily closes for March 2024
    march_data = rt_manager.get_daily_close(
+       ticker='GBPUSD',
        day_start='2024-03-01',
        day_end='2024-03-31'
    )
@@ -289,15 +289,15 @@ Get intraday data with specific timeframes:
 
 .. code-block:: python
 
-   from forex_data.data_management import realtime_manager
+   from forex_data import RealtimeManager
    
-   rt_manager = realtime_manager(
-       ticker='USDJPY',
-       config_file='appconfig.yaml'
+   rt_manager = RealtimeManager(
+       config='appconfig.yaml'
    )
    
    # Get hourly data for a week
    hourly_data = rt_manager.get_data(
+       ticker='USDJPY',
        timeframe='1h',
        start='2024-04-10',
        end='2024-04-15'
@@ -316,23 +316,25 @@ Combine historical data with recent real-time updates:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db, realtime_manager
+   from forex_data import HistoricalManagerDB, RealtimeManager
    import polars as pl  # or pandas as pd
    
    ticker = 'NZDUSD'
    config = 'appconfig.yaml'
    
    # Get historical data up to last month
-   hist_manager = historical_manager_db(ticker=ticker, config_file=config)
+   hist_manager = HistoricalManagerDB(config=config)
    historical = hist_manager.get_data(
+       ticker=ticker,
        timeframe='1D',
        start='2020-01-01',
        end='2023-12-31'
    )
    
    # Get recent data
-   rt_manager = realtime_manager(ticker=ticker, config_file=config)
+   rt_manager = RealtimeManager(config=config)
    recent = rt_manager.get_daily_close(
+       ticker=ticker,
        day_start='2024-01-01',
        day_end='2024-12-31'
    )
@@ -353,18 +355,18 @@ Analyze multiple currency pairs:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    
    pairs = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD']
    data_dict = {}
    
    for pair in pairs:
-       manager = historical_manager_db(
-           ticker=pair,
-           config_file='appconfig.yaml'
+       manager = HistoricalManagerDB(
+           config='appconfig.yaml'
        )
        
        data = manager.get_data(
+           ticker=pair,
            timeframe='1D',
            start='2023-01-01',
            end='2023-12-31'
@@ -388,16 +390,16 @@ Build a custom processing pipeline:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    import polars as pl
    
-   manager = historical_manager_db(
-       ticker='EURUSD',
-       config_file='appconfig.yaml'
+   manager = HistoricalManagerDB(
+       config='appconfig.yaml'
    )
    
    # Get raw data
    data = manager.get_data(
+       ticker='EURUSD',
        timeframe='1h',
        start='2023-01-01',
        end='2023-12-31'
@@ -425,18 +427,18 @@ Robust data retrieval with error handling:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    from loguru import logger
    
    def get_forex_data_safely(ticker, timeframe, start, end):
        """Safely retrieve forex data with error handling."""
        try:
-           manager = historical_manager_db(
-               ticker=ticker,
-               config_file='appconfig.yaml'
+           manager = HistoricalManagerDB(
+               config='appconfig.yaml'
            )
            
            data = manager.get_data(
+               ticker=ticker,
                timeframe=timeframe,
                start=start,
                end=end
@@ -475,12 +477,11 @@ Optimize for large datasets:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    
    # Use Polars for best performance
-   manager = historical_manager_db(
-       ticker='EURUSD',
-       config_file='appconfig.yaml',
+   manager = HistoricalManagerDB(
+       config='appconfig.yaml',
        engine='polars',  # Explicitly use Polars
        filetype='parquet'  # Use Parquet for speed
    )
@@ -490,6 +491,7 @@ Optimize for large datasets:
    start_time = time.time()
    
    data = manager.get_data(
+       ticker='EURUSD',
        timeframe='1m',
        start='2020-01-01',
        end='2023-12-31'
@@ -506,14 +508,14 @@ Export data for use in other tools:
 
 .. code-block:: python
 
-   from forex_data.data_management import historical_manager_db
+   from forex_data import HistoricalManagerDB
    
-   manager = historical_manager_db(
-       ticker='GBPUSD',
-       config_file='appconfig.yaml'
+   manager = HistoricalManagerDB(
+       config='appconfig.yaml'
    )
    
    data = manager.get_data(
+       ticker='GBPUSD',
        timeframe='1D',
        start='2023-01-01',
        end='2023-12-31'
@@ -566,7 +568,7 @@ Tips and Best Practices
    .. code-block:: python
    
       # In your appconfig.yaml
-      DATA_ENGINE: polars
+      ENGINE: polars
 
 2. **Cache Timeframes**
    
@@ -597,8 +599,8 @@ Tips and Best Practices
       
       # Add delays between API calls
       for pair in ['EURUSD', 'GBPUSD', 'USDJPY']:
-          rt_manager = realtime_manager(ticker=pair, config_file='appconfig.yaml')
-          data = rt_manager.get_daily_close(recent_days_window=10)
+          rt_manager = RealtimeManager(config='appconfig.yaml')
+          data = rt_manager.get_daily_close(ticker=pair, recent_days_window=10)
           sleep(1)  # Respect rate limits
 
 5. **Validate Data Quality**
