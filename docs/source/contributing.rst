@@ -297,23 +297,17 @@ Based on the project roadmap, priority areas include:
 
 1. **Database Integration**
    
-   * PostgreSQL support
    * DuckDB integration
-   * Arrow Flight SQL server
-
+   * Cache data location in cloud services persistent storage (S3, Google Cloud Storage, etc.)
+   
 2. **Enhanced Real-time Manager**
    
+   * Allow Real-Time manager to cache data as in Historical Manager (and sharing cache folder/location)
+   * Interface for Twelve Data provider
    * Automatic failover between providers
    * Smart API call distribution
-   * Rate limit management
-
-3. **Improved Charting**
-   
-   * More chart types
-   * Technical indicators
-   * Interactive features
-
-4. **Performance**
+  
+3. **Performance**
    
    * Benchmark additions
    * Optimization opportunities

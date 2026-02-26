@@ -7,12 +7,13 @@ All notable changes to the forex_data project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-Version 0.1.1 (Current)
+Version 0.1.5 (Current)
 =======================
 
-*Release Date: 30/12/2025*
+*Release Date: 27/02/2026*
 
-Initial release of the forex_data package.
+Tested with Python 3.12 and 3.13.
+Largely tested with default data parameters: engine 'polars-lazy' and file format 'parquet'.
 
 Added
 -----
@@ -27,6 +28,7 @@ Core Features
   * Multiple timeframe support (1m, 5m, 15m, 30m, 1h, 4h, 1D, 1W, 1M)
   * Automatic timeframe aggregation
   * Smart data caching for improved performance
+  * Get data function with conditional options
 
 * **Real-time Data Management**: 
 
@@ -93,7 +95,7 @@ Documentation
 Known Issues
 ------------
 
-* Real-time data caching not yet fully implemented
+* Data engines, all configurations among engine and file format are not tested yet
 * Limited to daily and intraday timeframes for real-time sources
 * API rate limits affects data retrieval frequency based on the plan associated with the API key
 
@@ -106,30 +108,27 @@ Planned for v0.2.0
 Database Integration
 ^^^^^^^^^^^^^^^^^^^^
 
-* DuckDB integration
 * Cache data in AWS S3 storage and other major cloud providers persistent storage service
 
 Enhanced Features
 ^^^^^^^^^^^^^^^^^
 
-* Improved real-time data caching
-  * store data in same database used for historical data
-* API call distribution across providers
-* Functionalities to ease data elaboration and visualization
+* Twelve data provider integration
+* Real-time data providers caching as in Historical manager
 
 Performance
 ^^^^^^^^^^^
 
-* Data engine performance comparisons (Polars vs PyArrow vs Pandas vs DuckDB)
-* Memory usage optimizations (Enhance files organization and segmentation)
+* Data engine and format files, all options testing 
+* Performance comparisons (Polars vs PyArrow vs Pandas)
 
 Planned for v0.3.0
 ------------------
 
-* Additional data query other than base ticker price data (e.g. volume, fundamentals information and others))
-* Additional data providers
-* Add Indicators support
-* Add Indicators support in charts
+* DuckDB integration as engine for data caching
+* Robust connection between Historical and Real-time data managers if applicable
+* Data types outside raw price data available for query (e.g. volume, fundamentals information and others))
+* Caching optimizations (Enhance files organization and segmentation)
 
 Planned for v0.4.0
 ------------------
@@ -139,10 +138,7 @@ Planned for v0.4.0
 How to Upgrade
 ==============
 
-From Development to v0.1.1
---------------------------
-
-When v0.1.1 is released, update with Poetry:
+Update with Poetry:
 
 .. code-block:: bash
 
@@ -153,38 +149,6 @@ Or with pip:
 .. code-block:: bash
 
    pip install --upgrade forex_data
-
-Migration Notes
-===============
-
-v0.1.1 Breaking Changes
------------------------
-
-*When released*
-
-* Initial release - no breaking changes
-
-Deprecation Warnings
---------------------
-
-*None in current version*
-
-Version History Details
-=======================
-
-Development (Pre-release)
--------------------------
-
-The package has been in active development with the following milestones:
-
-* Initial project structure
-* Historical data manager implementation
-* Real-time data manager implementation
-* Multi-engine support (Polars, Pandas, PyArrow)
-* Configuration system
-* Test suite development
-* Documentation creation
-* CircleCI integration
 
 Contributing to Changelog
 ==========================
