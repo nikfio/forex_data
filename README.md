@@ -16,8 +16,7 @@ The forex_data package offers ways to aggregate data from the Forex market into 
 * low
 * close
 
-The first purpose is to aggregate data in OHLC format and allow to have data in any timeframe specified in the most simple and efficient way.
-The second purpose is to manage one or multiple sources, an interface layer will have primary functions with predefined name, inputs and ouput results: in order to ease the access and usage of multiple data sources.
+The purpose is to aggregate data in OHLC format from multiple sources, optimize data caching and provide an interface to easily access and use the data: the main outcome from the interface is a dataframe.
 
 At the moment, sources are divided in **historical sources** and **real-time sources**.
 
@@ -25,10 +24,9 @@ At the moment, sources are divided in **historical sources** and **real-time sou
 
 ### HISTORICAL SOURCE
 
-A historical source is a source of data which makes data available but does not have a defined update policy for design reasons
-On the contrary, it can provide a ton of history data, tipically from the first years of 2000s and the free tier is fine for the purposes of the package.
+A historical source provides data tipically from the first years of 2000s and the free tier is fine for the purposes of the package. The update rate is slow but data can be retrived with a low resolution like 1-minute timeframe.
 
-A perfect data source of this type is [histdata.com](http://www.histdata.com/), which work is really genuine and a lot appreciated.
+The historical source used in the package is [histdata.com](http://www.histdata.com/), which work is really genuine and a lot appreciated.
 
 Summarizing, a historical source can provide tons of data even from many years ago and with no limits at the downside of a slow update rate. For example, *histdata* updates data on a montly basis.
 
@@ -43,23 +41,7 @@ A minimal free or trial offering is proposed, but they rely on premium subscript
 * and many other parameters ...
 
 As of now, just [alpha-vantage](https://www.alphavantage.co/documentation/) and [polygon-io](https://polygon.io/docs/forex/getting-started) are managed. The intention is to make the most out of them and their free tier access to data.
-
-Even if free subscription is limitated for these providers, the reasons to include them in the package are to have closer real-time update than any historical source and also the module is designed to ease the work of studying a new provider API calls: a real time data manager uses at the same time all the remote sources available and provides access to their API through easier interface.
-
-### Considerations
-
-*What is the trade-off between historical and real-time source? And why a simultaneous usage of both is powerful?*
-
-This question is the primary key of usefulness of the package.
-An historical source like the one managed by the package, tipically updates data every month so you would have a delay of a month in retrieving the latest data, but on the upside you can have data from like 20 or more years ago to last month with a under a minute resolution.
-
-A real-time source usually lets you get data limiting the number of candles of the output.
-Also, tipically the source free subscription does not let to get data older than a month o few time more: especially if it requested with low resolution like 1-minute timeframe.
-The real time source fills the gap of the month delay explained for the historical source.
-And it is widely agreed that latest data have more influence on next trading positions to be set.
-
-Concluding, the combination of historical and real-time source gives a 1-minute or lower resolution for data starting over 20 years ago approximately until yesterday or today data.
-
+[Twelve data](https://twelvedata.com/) interface is under development.
 
 ## INSTALLATION
 
@@ -156,7 +138,6 @@ A generic usage folder for the package named `.database` is created at the curre
 Here log is dumped in a file called `forexdata.log`, the complete location of the log file will be:
 
 `~/.database/forexdata.log`
-
 
 ## EXAMPLES
 
@@ -491,16 +472,6 @@ The pipeline executes the following steps for Python 3.12:
 4. **Install Dependencies**: Install project dependencies using `poetry install`
 5. **Save Cache**: Cache the installed dependencies for faster future builds
 6. **Run Tests**: Execute tests with flake8 linting using `poetry run pytest --flake8`
-
-#### Caching Strategy
-
-The pipeline uses CircleCI's caching mechanism to speed up builds:
-
-- **Cache Key**: `v1-dependencies-{{ checksum "poetry.lock" }}`
-- **Fallback**: `v1-dependencies-` (if no exact match)
-- **Cached Paths**: `./repo` directory
-
-This ensures that dependencies are only reinstalled when `poetry.lock` changes, significantly reducing build times.
 
 #### Environment Variables
 
