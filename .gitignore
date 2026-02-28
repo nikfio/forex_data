@@ -1,4 +1,4 @@
-.spyproject
+.agent
 *.pyc
 issues/
 .vscode/

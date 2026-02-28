@@ -121,6 +121,11 @@ Available options:
 *parquet* filetype is strongly suggested for read/write speed and disk space occupation.
 Meanwhile, if you have any analysis application outside the Python environment, it would more likely accept csv files over parquet: so *csv* filetype could be a better choice for its broader acceptance.
 
+#### DATA_PATH
+
+Specifies the absolute directory path where the downloaded data files will be stored.
+If not provided, a default location is used (`~/.database/`).
+
 #### PROVIDERS_KEY
 
 To use real-time sources you need to provide an API key.
@@ -167,6 +172,8 @@ Let's walk through the [example for historical data source](examples/histdata_db
     DATA_FILETYPE: 'parquet'
     
     ENGINE: 'polars_lazy'
+    
+    DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'
     '''
     ```
     You can define configuration inline or use a file. The configuration can override specific settings.
@@ -305,6 +312,8 @@ export POLYGON_IO_API_KEY="your_polygon_io_key"
     DATA_FILETYPE: 'parquet'
     
     ENGINE: 'polars_lazy'
+    
+    DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'
     
     PROVIDERS_KEY:
         ALPHA_VANTAGE_API_KEY : {alpha_vantage_key},

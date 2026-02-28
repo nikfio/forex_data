@@ -25,6 +25,9 @@ Create a YAML configuration file ending with ``data_config.yaml`` file with the 
    # File format for cached data
    DATA_FILETYPE: parquet
    
+   # Path to data directory
+   DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'
+   
    # API keys for real-time data providers
    PROVIDERS_KEY:
      ALPHA_VANTAGE_API_KEY: your_alphavantage_key
@@ -111,6 +114,21 @@ Defines the file format for caching downloaded data.
      - ✅ Yes
 
 **Recommendation**: Use ``parquet`` unless you specifically need CSV compatibility.
+
+DATA_PATH
+---------
+
+Specifies the absolute directory path where the downloaded data files will be stored.
+
+**Type**: String
+
+**Default**: ``~/.database/``
+
+**Example**:
+
+.. code-block:: yaml
+
+   DATA_PATH: '/my/custom/data/path'
 
 PROVIDERS_KEY
 -------------
