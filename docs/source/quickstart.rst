@@ -31,6 +31,7 @@ Create a file ending with ``data_config.yaml``:
 
    ENGINE: polars          # Options: polars, polars_lazy, pyarrow, pandas
    DATA_FILETYPE: parquet       # Options: parquet, csv
+   DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY' # Optional custom path
    
    PROVIDERS_KEY:
      ALPHA_VANTAGE_API_KEY: your_api_key_here

@@ -154,6 +154,8 @@ class RealtimeManager:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
+    data_path: str = field(default=str(DEFAULT_PATHS.BASE_PATH),
+                           validator=validators.instance_of(str))
 
     # internal parameters
     _db_dict = field(factory=dotty,
@@ -163,7 +165,7 @@ class RealtimeManager:
         default=Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.REALTIME_DATA_FOLDER,
         validator=validator_dir_path(create_if_missing=True)
     )
-    _temporary_data_path = field(
+    _realtime_data_path = field(
         default=(Path(DEFAULT_PATHS.BASE_PATH) /
                  DEFAULT_PATHS.REALTIME_DATA_FOLDER /
                  TEMP_FOLDER),
@@ -198,8 +200,15 @@ class RealtimeManager:
 
     def __attrs_post_init__(self) -> None:
 
+        # sanity check on data_path
+        # make sure it exists and is a folder
+        # otherwise create the folder
+        if not Path(self.data_path).is_dir():
+            Path(self.data_path).mkdir(parents=True, exist_ok=True)
+
         # set up log sink for historical manager
         # Remove existing handlers for this sink to prevent duplicate log entries
+        self._realtimedata_path = Path(self.data_path) / DEFAULT_PATHS.REALTIME_DATA_FOLDER
         log_path = self._realtimedata_path / 'log' / 'forexrtdata.log'
 
         handlers_to_remove = []
@@ -241,7 +250,7 @@ class RealtimeManager:
 
             self._dataframe_type = polars_lazyframe
 
-        self._temporary_data_path = self._realtimedata_path \
+        self._realtime_data_path = self._realtimedata_path \
             / TEMP_FOLDER
 
         self._clear_temporary_data_folder()
@@ -250,18 +259,18 @@ class RealtimeManager:
 
         # delete temporary data path
         if (
-            self._temporary_data_path.exists() and
-            self._temporary_data_path.is_dir()
+            self._realtime_data_path.exists() and
+            self._realtime_data_path.is_dir()
         ):
 
             try:
 
-                rmtree(str(self._temporary_data_path))
+                rmtree(str(self._realtime_data_path))
 
             except Exception as e:
 
                 logger.warning('Deleting temporary data folder '
-                               f'{str(self._temporary_data_path)} not successfull: {e}')
+                               f'{str(self._realtime_data_path)} not successfull: {e}')
 
     def _getClient(self, provider: str) -> Any:
 

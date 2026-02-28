@@ -95,6 +95,8 @@ class HistoricalManagerDB:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
+    data_path: str = field(default=str(DEFAULT_PATHS.BASE_PATH),
+                           validator=validators.instance_of(str))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -140,8 +142,15 @@ class HistoricalManagerDB:
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
+        # sanity check on data_path
+        # make sure it exists and is a folder
+        # otherwise create the folder
+        if not Path(self.data_path).is_dir():
+            Path(self.data_path).mkdir(parents=True, exist_ok=True)
+
         # set up log sink for historical manager
         # Remove existing handlers for this sink to prevent duplicate log entries
+        self._histdata_path = Path(self.data_path) / DEFAULT_PATHS.HIST_DATA_FOLDER
         log_path = self._histdata_path / 'log' / 'forexhistdata.log'
 
         # Remove handlers that match this log file path
