@@ -21,9 +21,8 @@ from sys import stdout
 
 # Use a runtime defined config yaml file
 test_config_yaml = '''
-DATA_FILETYPE: 'parquet'
-
 ENGINE: 'polars_lazy'
+DATA_TYPE: 'parquet'
 '''
 
 
@@ -86,7 +85,6 @@ def main():
     # get data from another ticker
 
     # example parameters
-    ex_ticker = 'EURUSD'
     ex_timeframe = '3D'
     ex_start_date = '2018-10-03 10:00:00'
     ex_end_date = '2020-12-03 10:00:00'

@@ -77,8 +77,9 @@ BASE CONNECTOR
 @define(kw_only=True, slots=True)
 class DatabaseConnector:
 
-    data_folder: str = field(default='',
-                             validator=validators.instance_of(str))
+    data_path: Union[str, Path] = field(default='',
+                                        validator=validators.or_(validators.instance_of(str),
+                                                                 validators.instance_of(Path)))
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -87,13 +88,15 @@ class DatabaseConnector:
     def __attrs_post_init__(self) -> None:
 
         # create data folder if not exists
+        self.data_path = Path(self.data_path).expanduser().resolve()
         if (
-            not Path(self.data_folder).exists() or
-            not Path(self.data_folder).is_dir()
+            not self.data_path.exists()
+            or
+            not self.data_path.is_dir()
         ):
 
-            Path(self.data_folder).mkdir(parents=True,
-                                         exist_ok=True)
+            self.data_path.mkdir(parents=True,
+                                 exist_ok=True)
 
     def connect(self) -> Any:
         """Connect to database - must be implemented by subclasses."""
@@ -172,7 +175,7 @@ class DuckDBConnector(DatabaseConnector):
 
         # set up log sink for DuckDB
         # Remove existing handlers for this sink to prevent duplicate log entries
-        log_path = Path(self.data_folder) / 'log' / 'duckdb.log'
+        log_path = self.data_path / 'log' / 'duckdb.log'
 
         handlers_to_remove = []
         for handler_id, handler in logger._core.handlers.items():
@@ -598,16 +601,11 @@ LOCAL DATA FILES MANAGER
 @define(kw_only=True, slots=True)
 class LocalDBConnector(DatabaseConnector):
 
-    data_folder: str = field(default='',
-                             validator=validators.instance_of(str))
     data_type: str = field(default='parquet',
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
 
-    _local_path = field(
-        default=Path('.'),
-        validator=validator_dir_path(create_if_missing=False))
     _tickers_years_info_filepath = field(default=Path('.'))
 
     def __init__(self, **kwargs: Any) -> None:
@@ -631,7 +629,7 @@ class LocalDBConnector(DatabaseConnector):
 
         # set up log sink for LocalDB
         # Remove existing handlers for this sink to prevent duplicate log entries
-        log_path = Path(self.data_folder) / 'log' / 'localdb.log'
+        log_path = Path(self.data_path) / 'log' / 'localdb.log'
 
         handlers_to_remove = []
         for handler_id, handler in logger._core.handlers.items():
@@ -648,8 +646,8 @@ class LocalDBConnector(DatabaseConnector):
                    filter=lambda record: ('localdb' == record['extra'].get('target') and
                                           bool(record["extra"].get('target'))))
 
-        self._local_path = Path(self.data_folder)
-        self._tickers_years_info_filepath = self._local_path / 'tickers_years_info.json'
+        self.data_path = Path(self.data_path)
+        self._tickers_years_info_filepath = self.data_path / 'tickers_years_info.json'
 
     def _db_key(self,
                 market: str,
@@ -721,7 +719,7 @@ class LocalDBConnector(DatabaseConnector):
         local_files_name = []
 
         # list for all data filetypes supported
-        local_files = [file for file in list(self._local_path.rglob(f'*'))
+        local_files = [file for file in list(self.data_path.rglob(f'*'))
                        if search(self.data_type + '$', file.suffix)]
 
         local_files_name = [file.name for file in local_files]
@@ -765,14 +763,14 @@ class LocalDBConnector(DatabaseConnector):
             # and use re.search to catch matches
             if isinstance(filter, str):
 
-                data_files = self._local_path.rglob(f'*.{self.data_type}')
+                data_files = self.data_path.rglob(f'*.{self.data_type}')
                 if data_files:
                     for file in data_files:
                         if search(filter, file.stem, IGNORECASE):
                             file.unlink(missing_ok=True)
                 else:
                     logger.bind(target='localdb').info(
-                        f'No data files found in {self._local_path} with filter {filter}')
+                        f'No data files found in {self.data_path} with filter {filter}')
 
             else:
                 logger.bind(target='localdb').error(
@@ -782,7 +780,7 @@ class LocalDBConnector(DatabaseConnector):
 
             # clear all files in local path at
             # folder level using shutil
-            shutil.rmtree(self._local_path)
+            shutil.rmtree(self.data_path)
 
     def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
 
@@ -1039,7 +1037,7 @@ class LocalDBConnector(DatabaseConnector):
                                       items[DATA_KEY.TICKER_INDEX],
                                       items[DATA_KEY.TF_INDEX])
 
-        filepath = (self._local_path /
+        filepath = (self.data_path /
                     items[DATA_KEY.MARKET] /
                     items[DATA_KEY.TICKER_INDEX] /
                     filename)
@@ -1144,7 +1142,7 @@ class LocalDBConnector(DatabaseConnector):
                                       ticker,
                                       timeframe)
 
-        filepath = (self._local_path /
+        filepath = (self.data_path /
                     market /
                     ticker /
                     filename)
