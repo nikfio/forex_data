@@ -898,6 +898,11 @@ class HistoricalManagerDB:
 
         self._db_connector.clear_database(filter=filter)
 
+        if filter:
+            self._tickers_years_dict = self._db_connector.load_tickers_years_info()
+        else:
+            self._tickers_years_dict.clear()
+
     def add_timeframe(self, timeframe: str) -> None:
         """
         Add and cache a new timeframe to the database.
