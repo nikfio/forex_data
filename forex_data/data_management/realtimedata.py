@@ -154,8 +154,9 @@ class RealtimeManager:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
-    data_path: str = field(default=str(DEFAULT_PATHS.BASE_PATH),
-                           validator=validators.instance_of(str))
+    data_path: Union[str, Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
+                                        validator=validators.or_(validators.instance_of(str),
+                                                                 validators.instance_of(Path)))
 
     # internal parameters
     _db_dict = field(factory=dotty,
@@ -200,15 +201,20 @@ class RealtimeManager:
 
     def __attrs_post_init__(self) -> None:
 
-        # sanity check on data_path
-        # make sure it exists and is a folder
-        # otherwise create the folder
-        if not Path(self.data_path).is_dir():
-            Path(self.data_path).mkdir(parents=True, exist_ok=True)
+        # create data folder if not exists
+        self.data_path = Path(self.data_path).expanduser().resolve()
+        if (
+            not self.data_path.exists()
+            or
+            not self.data_path.is_dir()
+        ):
+
+            self.data_path.mkdir(parents=True,
+                                 exist_ok=True)
 
         # set up log sink for historical manager
         # Remove existing handlers for this sink to prevent duplicate log entries
-        self._realtimedata_path = Path(self.data_path) / DEFAULT_PATHS.REALTIME_DATA_FOLDER
+        self._realtimedata_path = self.data_path / DEFAULT_PATHS.REALTIME_DATA_FOLDER
         log_path = self._realtimedata_path / 'log' / 'forexrtdata.log'
 
         handlers_to_remove = []

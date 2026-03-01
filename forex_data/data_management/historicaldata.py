@@ -95,8 +95,9 @@ class HistoricalManagerDB:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
-    data_path: str = field(default=str(DEFAULT_PATHS.BASE_PATH),
-                           validator=validators.instance_of(str))
+    data_path: Union[str, Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
+                                        validator=validators.or_(validators.instance_of(str),
+                                                                 validators.instance_of(Path)))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -142,15 +143,20 @@ class HistoricalManagerDB:
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
-        # sanity check on data_path
-        # make sure it exists and is a folder
-        # otherwise create the folder
-        if not Path(self.data_path).is_dir():
-            Path(self.data_path).mkdir(parents=True, exist_ok=True)
+        # create data folder if not exists
+        self.data_path = Path(self.data_path).expanduser().resolve()
+        if (
+            not self.data_path.exists()
+            or
+            not self.data_path.is_dir()
+        ):
+
+            self.data_path.mkdir(parents=True,
+                                 exist_ok=True)
 
         # set up log sink for historical manager
         # Remove existing handlers for this sink to prevent duplicate log entries
-        self._histdata_path = Path(self.data_path) / DEFAULT_PATHS.HIST_DATA_FOLDER
+        self._histdata_path = self.data_path / DEFAULT_PATHS.HIST_DATA_FOLDER
         log_path = self._histdata_path / 'log' / 'forexhistdata.log'
 
         # Remove handlers that match this log file path
@@ -212,12 +218,11 @@ class HistoricalManagerDB:
             self.data_type == DATA_TYPE.PARQUET_FILETYPE
         ):
 
-            self._db_connector = \
-                LocalDBConnector(
-                    data_folder=str(self._histdata_path / 'LocalDB'),
-                    data_type=self.data_type,
-                    engine=self.engine
-                )
+            self._db_connector = LocalDBConnector(
+                data_path=str(self._histdata_path / 'LocalDB'),
+                data_type=self.data_type,
+                engine=self.engine
+            )
 
         else:
 
@@ -242,7 +247,7 @@ class HistoricalManagerDB:
 
             try:
 
-                rmtree(str(self._temporary_data_path))
+                rmtree(self._temporary_data_path)
 
             except Exception as e:
 

@@ -7,10 +7,10 @@ All notable changes to the forex_data project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-Version 0.1.5 (Current)
+Version 0.1.6 (Current)
 =======================
 
-*Release Date: 27/02/2026*
+*Release Date: 01/03/2026*
 
 Tested with Python 3.12 and 3.13.
 Largely tested with default data parameters: engine 'polars-lazy' and file format 'parquet'.
