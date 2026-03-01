@@ -748,40 +748,6 @@ class LocalDBConnector(DatabaseConnector):
 
         return list_remove_duplicates(tickers_list)
 
-    def clear_database(self, filter: Optional[str] = None) -> None:
-        """
-        Clear database files
-        If filter is provided and is a ticker present in database (files present)
-        delete only files related to that ticker
-        """
-
-        if filter:
-
-            # in local path search for files having filter in path stem
-            # and delete them
-            # list all files in local path ending with data_type
-            # and use re.search to catch matches
-            if isinstance(filter, str):
-
-                data_files = self.data_path.rglob(f'*.{self.data_type}')
-                if data_files:
-                    for file in data_files:
-                        if search(filter, file.stem, IGNORECASE):
-                            file.unlink(missing_ok=True)
-                else:
-                    logger.bind(target='localdb').info(
-                        f'No data files found in {self.data_path} with filter {filter}')
-
-            else:
-                logger.bind(target='localdb').error(
-                    f'Filter {filter} invalid type: required str')
-
-        else:
-
-            # clear all files in local path at
-            # folder level using shutil
-            shutil.rmtree(self.data_path)
-
     def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
 
         local_files, local_files_name = self._list_local_data()
@@ -982,6 +948,74 @@ class LocalDBConnector(DatabaseConnector):
         # Only save if changes were made
         if changes_made:
             self.save_tickers_years_info(ticker_years_dict)
+
+    def clear_tickers_years_info(self, filter: Optional[str] = None) -> None:
+        """
+        Clear the tickers years info file.
+        If filter is specified, it has to be a ticker value and so 
+        only the tickers years info related to the filter are cleared.
+        If filter is not specified, the entire file is cleared.
+        Parameters
+        ----------
+        filter : Optional[str], optional
+            Filter to apply to the tickers years info file, by default None
+            Filter has to be a ticker value
+        """
+        if filter:
+            ticker_years_dict = self.load_tickers_years_info()
+            ticker_years_dict = {k: v for k, v in ticker_years_dict.items() if filter.lower() != k.lower()}
+            self.save_tickers_years_info(ticker_years_dict)
+        else:
+            self._tickers_years_info_filepath.unlink(missing_ok=True)
+
+    def clear_database(self, filter: Optional[str] = None) -> None:
+        """
+        Clear database files
+        If filter is provided and is a ticker present in database (files present)
+        delete only files related to that ticker
+        """
+
+        # create a list of data files
+        # with extension matching either one of the supported data types
+        data_files = [file for file in self.data_path.rglob('*')
+                        if file.is_file() 
+                            and 
+                            any(search(suffix,
+                                       file.suffix,
+                                       IGNORECASE)
+                                for suffix in SUPPORTED_DATA_FILES)]
+
+        if filter:
+
+            # in local path search for files having filter in path stem
+            # and delete them
+            # list all files in local path ending with data_type
+            # and use re.search to catch matches
+            if isinstance(filter, str):
+
+                if data_files:
+                    for file in data_files:
+                        if search(filter, file.stem, IGNORECASE):
+                            file.unlink(missing_ok=True)
+
+                    # clear just ticker years info in all tickers years info json file
+                    self.clear_tickers_years_info(filter=filter)
+                else:
+                    logger.bind(target='localdb').info(
+                        f'No data files found in {self.data_path} with filter {filter}')
+
+            else:
+                logger.bind(target='localdb').error(
+                    f'Filter {filter} invalid type: required str')
+
+        else:
+
+            # clear all data files in data path
+            for file in data_files:
+                file.unlink(missing_ok=True)
+
+            # clear the json file containing tickers years info
+            self.clear_tickers_years_info()
 
     def load_tickers_years_info(self) -> Dict[str, Dict[str, List[int]]]:
         """
