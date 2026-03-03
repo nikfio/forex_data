@@ -954,7 +954,7 @@ class LocalDBConnector(DatabaseConnector):
     def clear_tickers_years_info(self, filter: Optional[str] = None) -> None:
         """
         Clear the tickers years info file.
-        If filter is specified, it has to be a ticker value and so 
+        If filter is specified, it has to be a ticker value and so
         only the tickers years info related to the filter are cleared.
         If filter is not specified, the entire file is cleared.
         Parameters
@@ -979,13 +979,13 @@ class LocalDBConnector(DatabaseConnector):
 
         # create a list of data files
         # with extension matching either one of the supported data types
-        data_files = [file for file in self.data_path.rglob('*')
-                        if file.is_file() 
-                            and 
-                            any(search(suffix,
-                                       file.suffix,
-                                       IGNORECASE)
-                                for suffix in SUPPORTED_DATA_FILES)]
+        data_files = [
+            file for file in self.data_path.rglob('*')
+            if file.is_file() and any(
+                search(suffix, file.suffix, IGNORECASE)
+                for suffix in SUPPORTED_DATA_FILES
+            )
+        ]
 
         if filter:
 

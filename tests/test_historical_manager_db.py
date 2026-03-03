@@ -794,6 +794,62 @@ class TestHistoricalManagerDB(unittest.TestCase):
             msg=f"Ticker {ticker} should be in loaded tickers_years_dict"
         )
 
+    def test_26_tickers_years_info_regeneration(self):
+        """
+        Test that deleting the tickers years info file and
+        reinitializing HistoricalManagerDB regenerates the
+        tickers years info dict and the file correctly.
+        """
+        # Create an instance and populate it with some data
+        test_manager = HistoricalManagerDB(config=test_config_yaml)
+        ticker = 'EURJPY'
+        timeframe = '1D'
+        start = datetime(2018, 10, 4)
+        end = datetime(2018, 10, 5)
+
+        test_manager.get_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end
+        )
+
+        self.assertIsNotNone(test_manager._tickers_years_dict)
+        self.assertIn(ticker.lower(), test_manager._tickers_years_dict)
+
+        # Ensure the file exists before deleting
+        info_file = test_manager._db_connector._tickers_years_info_filepath
+        self.assertTrue(info_file.exists())
+
+        # Save current state for expected comparison
+        expected_dict = test_manager._tickers_years_dict.copy()
+
+        # Delete the file
+        info_file.unlink()
+        self.assertFalse(info_file.exists())
+
+        test_manager.close()
+
+        # Reinitialize manager
+        new_manager = HistoricalManagerDB(config=test_config_yaml)
+
+        # Dictionary should be regenerated via scanning LocalDB
+        self.assertIsNotNone(new_manager._tickers_years_dict)
+
+        # Check that the dict regenerated matches what was in DB
+        self.assertIn(ticker.lower(), new_manager._tickers_years_dict)
+        self.assertEqual(
+            new_manager._tickers_years_dict.get(ticker.lower()),
+            expected_dict.get(ticker.lower()),
+            msg="Regenerated dict should match the data stored in DB"
+        )
+
+        # File should be recreated
+        new_info_file = new_manager._db_connector._tickers_years_info_filepath
+        self.assertTrue(new_info_file.exists())
+
+        new_manager.close()
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -97,9 +97,9 @@ class TestRealtimeManager(unittest.TestCase):
             # Result can be a Series (pandas) or empty
             if not is_empty_dataframe(result):
                 # For pandas engine, last_close returns a Series
-                self.assertIsInstance(result, (pandas_series, 
-                                               pandas_dataframe, 
-                                               polars_dataframe, 
+                self.assertIsInstance(result, (pandas_series,
+                                               pandas_dataframe,
+                                               polars_dataframe,
                                                polars_lazyframe))
         except Exception as e:
             # API rate limit or connectivity issues are expected
