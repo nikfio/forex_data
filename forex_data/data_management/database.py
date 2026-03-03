@@ -850,6 +850,8 @@ class LocalDBConnector(DatabaseConnector):
                 if years_list:  # Only add if there are years
                     tickers_years_dict[ticker][timeframe] = years_list
 
+        # save tickers years info to file
+        self.save_tickers_years_info(tickers_years_dict)
         return tickers_years_dict
 
     def save_tickers_years_info(
