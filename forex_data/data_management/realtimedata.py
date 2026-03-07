@@ -275,8 +275,9 @@ class RealtimeManager:
 
             except Exception as e:
 
-                logger.warning('Deleting temporary data folder '
-                               f'{str(self._realtime_data_path)} not successfull: {e}')
+                # failure is not sign of malfunction
+                # not to log
+                pass
 
     def _getClient(self, provider: str) -> Any:
 

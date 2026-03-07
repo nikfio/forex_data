@@ -251,9 +251,9 @@ class HistoricalManagerDB:
 
             except Exception as e:
 
-                logger.bind(target='histmanager').warning(
-                    'Deleting temporary data folder '
-                    f'{str(self._temporary_data_path)} not successfull: {e}')
+                # failure is not sign of malfunction
+                # not to log
+                pass
 
     def _get_ticker_list(self) -> List[str]:
 
