@@ -10,6 +10,7 @@ from loguru import logger
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+from uuid import uuid4
 from shutil import rmtree
 from io import StringIO
 
@@ -167,10 +168,9 @@ class RealtimeManager:
         validator=validator_dir_path(create_if_missing=True)
     )
     _realtime_data_path = field(
-        default=(Path(DEFAULT_PATHS.BASE_PATH) /
-                 DEFAULT_PATHS.REALTIME_DATA_FOLDER /
-                 TEMP_FOLDER),
-        validator=validator_dir_path(create_if_missing=True))
+        default=None,
+        validator=validators.optional(
+            validators.instance_of(Path)))
 
     # if a valid config file or string
     # is passed
@@ -256,8 +256,13 @@ class RealtimeManager:
 
             self._dataframe_type = polars_lazyframe
 
-        self._realtime_data_path = self._realtimedata_path \
-            / TEMP_FOLDER
+        # Each instance gets its own unique temp subfolder under Temp/
+        # so that parallel RealtimeManager instances never share or
+        # conflict on the same temporary directory.
+        self._realtime_data_path = (
+            self._realtimedata_path / TEMP_FOLDER / str(uuid4())
+        )
+        self._realtime_data_path.mkdir(parents=True, exist_ok=True)
 
         self._clear_temporary_data_folder()
 

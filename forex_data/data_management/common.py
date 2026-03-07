@@ -1710,12 +1710,22 @@ def validator_dir_path(create_if_missing=False):
 
         if create_if_missing:
 
-            Path(value).mkdir(parents=True, exist_ok=True)
+            try:
+                Path(value).mkdir(parents=True, exist_ok=True)
+            except FileExistsError:
+                # A parallel process created the directory between the
+                # exist_ok check and the actual os.mkdir syscall (TOCTOU
+                # race on macOS). Safe to ignore if it is now a directory.
+                if not Path(value).is_dir():
+                    logger.error(
+                        f'Path {value} exists but is not a directory')
+                    raise
 
         else:
 
             if not (
-                Path(value).exists() or
+                Path(value).exists() 
+                or
                 Path(value).is_dir()
             ):
 
