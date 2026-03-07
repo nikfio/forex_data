@@ -2,6 +2,7 @@
 from loguru import logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+from uuid import uuid4
 
 from attrs import (
     define,
@@ -105,12 +106,11 @@ class HistoricalManagerDB:
     _dataframe_type = field(default=pandas_dataframe)
     _histdata_path = field(
         default=Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.HIST_DATA_FOLDER,
-        validator=validator_dir_path(create_if_missing=True))
+        validator=validators.instance_of(Path))
     _temporary_data_path = field(
-        default=(Path(DEFAULT_PATHS.BASE_PATH) /
-                 DEFAULT_PATHS.HIST_DATA_FOLDER /
-                 TEMP_FOLDER),
-        validator=validator_dir_path(create_if_missing=True))
+        default=Path(DEFAULT_PATHS.BASE_PATH) / TEMP_FOLDER,
+        validator=validators.optional(
+            validators.instance_of(Path)))
     _histdata_tickers_list = field(factory=list, validator=validators.instance_of(list))
     _tickers_years_dict = field(factory=dict, validator=validators.instance_of(dict))
 
@@ -202,8 +202,13 @@ class HistoricalManagerDB:
                 f'Engine {self.engine} not supported')
             raise ValueError(f'Engine {self.engine} not supported')
 
-        self._temporary_data_path = self._histdata_path \
-            / TEMP_FOLDER
+        # Each instance gets its own unique temp subfolder under Temp/
+        # so that parallel HistoricalManagerDB instances never share or
+        # conflict on the same temporary directory.
+        self._temporary_data_path = (
+            self._histdata_path / TEMP_FOLDER / str(uuid4())
+        )
+        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
 
         self._clear_temporary_data_folder()
 
