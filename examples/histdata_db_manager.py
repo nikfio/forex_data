@@ -16,6 +16,7 @@ from forex_data import (
 
 from loguru import logger
 from time import time
+from datetime import datetime
 from random import choice
 from sys import stdout
 
@@ -23,6 +24,7 @@ from sys import stdout
 test_config_yaml = '''
 ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
+DATA_PATH: '~/.test_database'
 '''
 
 
@@ -45,7 +47,7 @@ def main():
     ex_end_date = '2018-12-03 10:00:00'
 
     start_time = time()
-    logger.trace(f'Start measure time: {start_time}')
+    logger.trace(f'Start measure time: {datetime.fromtimestamp(start_time)}')
 
     # get data
     yeardata = histmanager.get_data(
@@ -114,8 +116,8 @@ def main():
                      end {ex_start_date}""")
 
     end_time = time()
-    logger.trace(f'end time: {end_time}')
-    logger.trace(f'elapsed time: {end_time - start_time}')
+    logger.trace(f'end time: {datetime.fromtimestamp(end_time)}')
+    logger.trace(f'elapsed time: {end_time - start_time} seconds')
 
     # close data manager
     histmanager.close()

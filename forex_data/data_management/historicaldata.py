@@ -210,8 +210,6 @@ class HistoricalManagerDB:
         )
         self._temporary_data_path.mkdir(parents=True, exist_ok=True)
 
-        self._clear_temporary_data_folder()
-
         # instance database connector if selected
         if self.data_type == DATA_TYPE.DUCKDB:
 
@@ -1099,9 +1097,6 @@ class HistoricalManagerDB:
                     f'{years_interval_req} not ok')
                 raise ValueError
 
-        # clear temporary data folder
-        self._clear_temporary_data_folder()
-
         # execute a read query on database
         return self._db_connector.read_data(
             market='forex',
@@ -1186,4 +1181,8 @@ class HistoricalManagerDB:
 
     def close(self):
 
+        # update tickers years info file with current data status
         self._db_connector.save_tickers_years_info(self._tickers_years_dict)
+
+        # clear temporary files
+        self._clear_temporary_data_folder()

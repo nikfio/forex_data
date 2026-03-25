@@ -156,14 +156,12 @@ __all__ = [
     'get_dataframe_column',
     'get_dataframe_row',
     'get_dataframe_element',
-    'get_dotty_leafs',
     'astype',
     'read_csv',
     'polars_datetime',
     'sort_dataframe',
     'concat_data',
     'list_remove_duplicates',
-    'get_dotty_key_field',
     'reframe_data',
     'write_csv',
     'write_parquet',
@@ -335,7 +333,7 @@ def get_class_attr_dict(var):
 
 # auxiliary CONSTANT DEFINITIONS
 
-# dotty key template: <ticker>.Y<year>.<timeframe>.<data-type>
+# key template: <ticker>.Y<year>.<timeframe>.<data-type>
 
 
 class DATA_KEY:
@@ -1542,140 +1540,10 @@ def reframe_data(dataframe, tf):
                          f'or {DATA_COLUMN_NAMES.TF_DATA}')
             raise ValueError
 
-# UTILS FOR DOTTY DICTIONARY
-
-
-def get_dotty_key_field(key, index):
-
-    if not isinstance(key, str):
-
-        logger.error(f'dotty key {key} invalid type, str required')
-        raise TypeError
-
-    try:
-
-        field = key.split('.')[index]
-
-    except IndexError:
-
-        logger.exception(f'index {index} invalid for key {key}')
-        raise
-
-    return field
-
-
-def get_dotty_keys(dotty_dict,
-                   root=False,
-                   level=None,
-                   parent_key=None):
-
-    dotty_copy = dotty_dict.copy()
-
-    if root:
-
-        return dotty_copy.keys()
-
-    elif level:
-
-        if not (
-                isinstance(level, int) and
-                level >= 0):
-
-            logger.error('level must be zero or positive integer')
-            raise ValueError
-
-        # default start at root key
-        level_counter = 0
-
-        pass
-
-    elif parent_key:
-
-        if not isinstance(parent_key, str):
-
-            logger.error('parent key must be str')
-
-        parent_dict = dotty_copy.pop(parent_key)
-
-        if parent_dict:
-
-            try:
-                keys = parent_dict.keys()
-            except KeyError as err:
-
-                logger.exception(f'{err} : keys not found under {parent_key}')
-                return []
-
-            else:
-
-                return [str(k) for k in keys]
-
-        else:
-
-            logger.error('{parent_key} key not exist')
-            raise KeyError
-
-
-def get_dotty_leafs(dotty_dict):
-
-    leaf_keys = list()
-
-    def get_leaf(dotty_dict, parent_key):
-
-        try:
-
-            if dotty_dict.keys():
-
-                for key in dotty_dict.keys():
-
-                    key_w_parent = '{parent}.{key}'.format(parent=parent_key,
-                                                           key=key)
-
-                    get_leaf(dotty_dict.get(key), key_w_parent)
-
-        except AttributeError:
-
-            leaf_keys.append(parent_key)
-
-        except ValueError:
-
-            leaf_keys.append(parent_key)
-
-    # root field is temporary to have common start in any case in all leafs
-    get_leaf(dotty_dict, 'root')
-
-    # leave out root field from all paths to leafs
-    original_leaf_keys = leaf_keys
-    leaf_keys = []
-    for leaf in original_leaf_keys:
-        match_result = search(r'(?<=root.)\\S+', leaf)
-        if match_result:
-            leaf_keys.append(match_result.group(0))
-
-    return leaf_keys
-
-
-def get_dotty_key_parent(key):
-
-    if isinstance(key, str):
-
-        logger.error('dotty key must be str type')
-        raise TypeError
-
-    # prune last field and rejoin with '.' separator
-    # to recreate a dotty key
-    parent_key = '.'.join(key.split('.')[:-2])
-
-    return parent_key
-
-
-# TODO: function that returns all leafs at a given
-#       given level
-
-
 # ATTRS
 
 # ADDED VALIDATORS
+
 
 def validator_file_path(file_ext=None):
 
@@ -1724,7 +1592,7 @@ def validator_dir_path(create_if_missing=False):
         else:
 
             if not (
-                Path(value).exists() 
+                Path(value).exists()
                 or
                 Path(value).is_dir()
             ):
