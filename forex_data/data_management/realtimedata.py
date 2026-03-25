@@ -46,8 +46,6 @@ from polars import (
 from numpy import array
 
 # python base
-from dotty_dict import dotty
-from dotty_dict import Dotty
 
 # external
 
@@ -101,14 +99,12 @@ from .common import (
     get_dataframe_column,
     get_dataframe_row,
     get_dataframe_element,
-    get_dotty_leafs,
     astype,
     read_csv,
     polars_datetime,
     sort_dataframe,
     concat_data,
     list_remove_duplicates,
-    get_dotty_key_field,
     reframe_data,
     write_csv,
     write_parquet,
@@ -160,8 +156,6 @@ class RealtimeManager:
                                                                  validators.instance_of(Path)))
 
     # internal parameters
-    _db_dict = field(factory=dotty,
-                     validator=validators.instance_of(Dotty))
     _dataframe_type = field(default=pandas_dataframe)
     _realtimedata_path = field(
         default=Path(DEFAULT_PATHS.BASE_PATH) / DEFAULT_PATHS.REALTIME_DATA_FOLDER,

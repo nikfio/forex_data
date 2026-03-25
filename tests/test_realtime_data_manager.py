@@ -11,6 +11,8 @@ the functionality of the realtime data manager including:
 """
 
 import unittest
+import shutil
+from pathlib import Path
 from os import getenv
 
 from pandas import (
@@ -44,7 +46,15 @@ if not alpha_vantage_key:
 if not polygon_io_key:
     raise ValueError("POLYGON_IO_API_KEY environment variable is required")
 
+_base_path = Path.home() / ".test_database"
+_data_path = _base_path
+_counter = 1
+while _data_path.exists():
+    _data_path = Path.home() / f".test_database_{_counter}"
+    _counter += 1
+
 test_config_yaml = f'''
+DATA_PATH: '{_data_path}'
 DATA_FILETYPE: 'parquet'
 
 ENGINE: 'polars_lazy'
@@ -69,6 +79,18 @@ class TestRealtimeManager(unittest.TestCase):
 
         # Example ticker for tests
         cls.test_ticker = 'EURUSD'
+
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up test fixtures after all tests have run."""
+        if hasattr(cls, 'realtime_manager') and cls.realtime_manager is not None:
+            try:
+                cls.realtime_manager.close()
+            except Exception:
+                pass
+
+        if _data_path.exists():
+            shutil.rmtree(_data_path)
 
     def test_01_initialization_with_config(self):
         """Test that RealtimeManager initializes correctly with config."""

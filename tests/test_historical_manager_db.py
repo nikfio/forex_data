@@ -12,6 +12,7 @@ the functionality of the historical data manager including:
 
 import unittest
 import random
+import shutil
 from loguru import logger
 
 from datetime import (
@@ -41,10 +42,19 @@ from forex_data import (
 
 __all__ = ['TestHistoricalManagerDB']
 
-# Use a runtime defined config yaml file
-test_config_yaml = '''
-DATA_FILETYPE: 'parquet'
+from pathlib import Path
 
+_base_path = Path.home() / ".test_database"
+_data_path = _base_path
+_counter = 1
+while _data_path.exists():
+    _data_path = Path.home() / f".test_database_{_counter}"
+    _counter += 1
+
+# Use a runtime defined config yaml file
+test_config_yaml = f'''
+DATA_PATH: '{_data_path}'
+DATA_FILETYPE: 'parquet'
 ENGINE: 'polars_lazy'
 '''
 
@@ -60,6 +70,18 @@ class TestHistoricalManagerDB(unittest.TestCase):
         cls.hist_manager = HistoricalManagerDB(
             config=test_config_yaml
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up test fixtures after all tests have run."""
+        if hasattr(cls, 'hist_manager') and cls.hist_manager is not None:
+            try:
+                cls.hist_manager.close()
+            except Exception:
+                pass
+
+        if _data_path.exists():
+            shutil.rmtree(_data_path)
 
     def test_01_initialization_with_config(self):
         """Test that HistoricalManagerDB initializes correctly with config."""
