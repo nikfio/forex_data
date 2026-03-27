@@ -667,7 +667,11 @@ class LocalDBConnector(DatabaseConnector):
                     handlers_to_remove.append(handler_id)
 
         for handler_id in handlers_to_remove:
-            logger.remove(handler_id)
+            try:
+                logger.remove(handler_id)
+            except ValueError:
+                # Handler already removed by another thread
+                pass
 
         logger.add(log_path,
                    level="TRACE",
