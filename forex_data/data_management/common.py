@@ -547,7 +547,11 @@ def infer_date_from_format_dt(s, date_format='ISO8601', unit=None, utc=False):
 # https://pandas.pydata.org/docs/user_guide/timeseries.html#dateoffset-objects
 # add compatibility to polars frequency string
 
-def check_timeframe_str(tf: str | Timedelta | DateOffset, engine: Literal['pandas', 'polars', 'polars_lazy', 'pyarrow'] = 'pandas'):
+def check_timeframe_str(tf: str | Timedelta | DateOffset,
+                        engine: Literal['pandas',
+                                        'polars',
+                                        'polars_lazy',
+                                        'pyarrow'] = 'pandas'):
 
     if tf == 'TICK':
 
@@ -1592,8 +1596,7 @@ def validator_dir_path(create_if_missing=False):
         else:
 
             if not (
-                Path(value).exists()
-                or
+                Path(value).exists() or
                 Path(value).is_dir()
             ):
 
@@ -1730,7 +1733,8 @@ US_HOLIDAYS = country_holidays('US', years=YEARS)
 US_holiday_dates = [holiday_date for holiday_date in US_HOLIDAYS.keys()]
 
 
-def business_days_data(dataframe: polars_lazyframe | polars_dataframe) -> polars_dataframe | polars_lazyframe:
+def business_days_data(dataframe: polars_lazyframe |
+                       polars_dataframe) -> polars_dataframe | polars_lazyframe:
     '''
     Remove non-business days data from the input dataframe.
     Filter out weekends data: saturday and sunday.

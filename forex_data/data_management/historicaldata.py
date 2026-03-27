@@ -3,6 +3,7 @@ from loguru import logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 from uuid import uuid4
+from filelock import FileLock
 
 from attrs import (
     define,
@@ -96,9 +97,10 @@ class HistoricalManagerDB:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
-    data_path: Union[str, Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
-                                        validator=validators.or_(validators.instance_of(str),
-                                                                 validators.instance_of(Path)))
+    data_path: Union[str,
+                     Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
+                                   validator=validators.or_(validators.instance_of(str),
+                                                            validators.instance_of(Path)))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -131,7 +133,11 @@ class HistoricalManagerDB:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
+        if not _apply_config(
+                self,
+                kwargs,
+                _class_attributes_name,
+                _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init
@@ -146,8 +152,7 @@ class HistoricalManagerDB:
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()
         if (
-            not self.data_path.exists()
-            or
+            not self.data_path.exists() or
             not self.data_path.is_dir()
         ):
 
@@ -361,7 +366,8 @@ class HistoricalManagerDB:
                         raise KeyError
 
                     else:
-                        logger.bind(target='histmanager').trace(
+                        logger.bind(
+                            target='histmanager').trace(
                             f'ticker {ticker}: {tf} timeframe completing operation successful for {years}')
 
     def _download_month_raw(self,
@@ -894,7 +900,8 @@ class HistoricalManagerDB:
                 list_remove_duplicates(self._tickers_years_dict[ticker][TICK_TIMEFRAME])
 
         else:
-            logger.bind(target='histmanager').warning(
+            logger.bind(
+                target='histmanager').warning(
                 f'Years data dataframe for {tick_key} is empty, skipping database write')
 
     def clear_database(self, filter: Optional[str] = None) -> None:
@@ -1067,10 +1074,12 @@ class HistoricalManagerDB:
             self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
 
         # aggregate data to current instance if necessary
-        if not set(years_interval_req).issubset(self._tickers_years_dict[ticker][timeframe]):
+        if not set(years_interval_req).issubset(
+                self._tickers_years_dict[ticker][timeframe]):
 
             year_tf_missing = list(
-                set(years_interval_req).difference(self._tickers_years_dict[ticker][timeframe]))
+                set(years_interval_req).difference(
+                    self._tickers_years_dict[ticker][timeframe]))
 
             year_tick_missing = list(set(years_interval_req).difference(
                 self._tickers_years_dict[ticker][TICK_TIMEFRAME]
@@ -1079,10 +1088,35 @@ class HistoricalManagerDB:
             # if tick is missing --> download missing years
             if year_tick_missing:
 
-                self._download(
-                    ticker,
-                    year_tick_missing
-                )
+                lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
+
+                with FileLock(lock_file):
+                    # Re-read the JSON file to fetch the latest state from disk
+                    self._tickers_years_dict = self._db_connector.create_tickers_years_dict()
+
+                    # Initialize ticker/timeframe in dict if not present after rebuild
+                    if ticker not in self._tickers_years_dict:
+                        self._tickers_years_dict[ticker] = {}
+                    if timeframe not in self._tickers_years_dict[ticker]:
+                        self._tickers_years_dict[ticker][timeframe] = []
+                    if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
+                        self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+
+                    # Re-calculate missing years
+                    year_tick_missing = list(set(years_interval_req).difference(
+                        self._tickers_years_dict[ticker][TICK_TIMEFRAME]
+                    ))
+
+                    # ONLY download if it's STILL missing after re-reading
+                    if year_tick_missing:
+                        self._download(
+                            ticker,
+                            year_tick_missing
+                        )
+                    else:
+                        logger.bind(
+                            target='histmanager').info(
+                            f"Skipped downloading {ticker} {years_interval_req} as it was managed by another process.")
 
             # add dataframe to the instance
             self.add_timeframe(timeframe)
@@ -1090,7 +1124,8 @@ class HistoricalManagerDB:
             # update database
             self._update_db(ticker)
 
-            if not set(years_interval_req).issubset(self._tickers_years_dict[ticker][timeframe]):
+            if not set(years_interval_req).issubset(
+                    self._tickers_years_dict[ticker][timeframe]):
 
                 logger.bind(target='histmanager').critical(
                     f'processing year data completion for '

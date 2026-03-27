@@ -18,32 +18,32 @@ Created on Sun Feb 23 00:02:36 2025
 '''
 
 
-from loguru import logger
-from pathlib import Path
+from adbc_driver_sqlite import dbapi as sqlite_dbapi
+from .common import *
+from polars import (
+    DataFrame as polars_dataframe,
+    LazyFrame as polars_lazyframe,
+    read_database
+)
+import json
+from datetime import datetime
+from pathlib import Path as PathType
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from numpy import array
+from collections import OrderedDict
+from re import (
+    fullmatch,
+    search,
+    IGNORECASE
+)
 from attrs import (
     define,
     field,
     validate,
     validators
 )
-from re import (
-    fullmatch,
-    search,
-    IGNORECASE
-)
-from collections import OrderedDict
-from numpy import array
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
-from pathlib import Path as PathType
-from datetime import datetime
-import json
-from polars import (
-    DataFrame as polars_dataframe,
-    LazyFrame as polars_lazyframe,
-    read_database
-)
-from .common import *
-from adbc_driver_sqlite import dbapi as sqlite_dbapi
+from loguru import logger
+from pathlib import Path
 
 # Import polars types directly
 
@@ -60,13 +60,8 @@ except ImportError:
 # Import from common module - explicit imports for items not in __all__
 
 # Import remaining items via star import
-from ..config import (
-    read_config_file,
-    read_config_string,
-    read_config_folder,
-    _apply_config
-)
 # Import from config module
+from ..config import _apply_config
 
 
 '''
@@ -77,9 +72,8 @@ BASE CONNECTOR
 @define(kw_only=True, slots=True)
 class DatabaseConnector:
 
-    data_path: Union[str, Path] = field(default='',
-                                        validator=validators.or_(validators.instance_of(str),
-                                                                 validators.instance_of(Path)))
+    data_path: Union[str, Path] = field(default='', validator=validators.or_(
+        validators.instance_of(str), validators.instance_of(Path)))
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -90,8 +84,7 @@ class DatabaseConnector:
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()
         if (
-            not self.data_path.exists()
-            or
+            not self.data_path.exists() or
             not self.data_path.is_dir()
         ):
 
@@ -106,11 +99,21 @@ class DatabaseConnector:
         """Check database connection - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement check_connection")
 
-    def write_data(self, target_table: str, dataframe: Union[polars_dataframe, polars_lazyframe], clean: bool = False) -> None:
+    def write_data(self,
+                   target_table: str,
+                   dataframe: Union[polars_dataframe,
+                                    polars_lazyframe],
+                   clean: bool = False) -> None:
         """Write data to database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement write_data")
 
-    def read_data(self, market: str, ticker: str, timeframe: str, start: datetime, end: datetime) -> polars_lazyframe:
+    def read_data(
+            self,
+            market: str,
+            ticker: str,
+            timeframe: str,
+            start: datetime,
+            end: datetime) -> polars_lazyframe:
         """Read data from database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_data")
 
@@ -126,11 +129,17 @@ class DatabaseConnector:
         """Get list of tickers - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement get_tickers_list")
 
-    def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
+    def get_ticker_keys(
+            self,
+            ticker: str,
+            timeframe: Optional[str] = None) -> List[str]:
         """Get ticker keys - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement get_ticker_keys")
 
-    def get_ticker_years_list(self, ticker: str, timeframe: str = TICK_TIMEFRAME) -> List[int]:
+    def get_ticker_years_list(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> List[int]:
         """Get years list for ticker - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement get_ticker_years_list")
 
@@ -159,7 +168,11 @@ class DuckDBConnector(DatabaseConnector):
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
+        if not _apply_config(
+                self,
+                kwargs,
+                _class_attributes_name,
+                _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init
@@ -295,8 +308,10 @@ class DuckDBConnector(DatabaseConnector):
             duckdb_columns_dict = dict(o_dict)
 
         else:
-            logger.bind(target='duckdb').trace(
-                f'Timestamp is already the first column in {duckdb_columns_dict.keys()}')
+            logger.bind(
+                target='duckdb').trace(
+                f'Timestamp is already the first column in {
+                    duckdb_columns_dict.keys()}')
 
         return duckdb_columns_dict
 
@@ -371,7 +386,10 @@ class DuckDBConnector(DatabaseConnector):
 
         return list_remove_duplicates(tickers_list)
 
-    def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
+    def get_ticker_keys(
+            self,
+            ticker: str,
+            timeframe: Optional[str] = None) -> List[str]:
 
         ticker_keys_list = []
 
@@ -393,7 +411,10 @@ class DuckDBConnector(DatabaseConnector):
 
         return ticker_keys_list
 
-    def get_ticker_years_list(self, ticker: str, timeframe: str = TICK_TIMEFRAME) -> List[int]:
+    def get_ticker_years_list(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> List[int]:
 
         ticker_years_list = []
         table = ''
@@ -439,7 +460,11 @@ class DuckDBConnector(DatabaseConnector):
 
         return ticker_years_list
 
-    def write_data(self, target_table: str, dataframe: Union[polars_dataframe, polars_lazyframe], clean: bool = False) -> None:
+    def write_data(self,
+                   target_table: str,
+                   dataframe: Union[polars_dataframe,
+                                    polars_lazyframe],
+                   clean: bool = False) -> None:
 
         duckdb_cols_dict = {}
         if isinstance(dataframe, polars_lazyframe):
@@ -613,7 +638,11 @@ class LocalDBConnector(DatabaseConnector):
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
+        if not _apply_config(
+                self,
+                kwargs,
+                _class_attributes_name,
+                _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init
@@ -748,7 +777,10 @@ class LocalDBConnector(DatabaseConnector):
 
         return list_remove_duplicates(tickers_list)
 
-    def get_ticker_keys(self, ticker: str, timeframe: Optional[str] = None) -> List[str]:
+    def get_ticker_keys(
+            self,
+            ticker: str,
+            timeframe: Optional[str] = None) -> List[str]:
 
         local_files, local_files_name = self._list_local_data()
 
@@ -771,7 +803,10 @@ class LocalDBConnector(DatabaseConnector):
                           key)
             ]
 
-    def get_ticker_years_list(self, ticker: str, timeframe: str = TICK_TIMEFRAME) -> List[int]:
+    def get_ticker_years_list(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> List[int]:
 
         ticker_years_list = []
         table = ''
@@ -881,19 +916,23 @@ class LocalDBConnector(DatabaseConnector):
                 f'ticker_years_dict must be a dictionary, got {type(ticker_years_dict)}'
             )
             raise TypeError(
-                f'ticker_years_dict must be a dictionary, got {type(ticker_years_dict)}')
+                f'ticker_years_dict must be a dictionary, got {
+                    type(ticker_years_dict)}')
 
         try:
             with open(self._tickers_years_info_filepath, 'w') as f:
                 json.dump(ticker_years_dict, f, indent=2)
         except Exception as e:
-            logger.bind(target='localdb').error(
-                f'Error writing ticker years data to {self._tickers_years_info_filepath}: {e}'
-            )
+            logger.bind(
+                target='localdb').error(
+                f'Error writing ticker years data to {
+                    self._tickers_years_info_filepath}: {e}')
             raise IOError(
-                f'Error writing ticker years data to {self._tickers_years_info_filepath}: {e}')
+                f'Error writing ticker years data to {
+                    self._tickers_years_info_filepath}: {e}')
 
-    def add_tickers_years_info_to_file(self, ticker: str, timeframe: str, year: Union[int, List[int]]) -> None:
+    def add_tickers_years_info_to_file(
+            self, ticker: str, timeframe: str, year: Union[int, List[int]]) -> None:
         """
         In local info filepath, update just the years list of the given ticker and timeframe
         by adding the year(s) specified if not already present
@@ -935,9 +974,10 @@ class LocalDBConnector(DatabaseConnector):
             ticker_years_dict = self.load_tickers_years_info()
         else:
             ticker_years_dict = {}
-            logger.bind(target='localdb').info(
-                f'File {self._tickers_years_info_filepath} does not exist. Creating new dict.'
-            )
+            logger.bind(
+                target='localdb').info(
+                f'File {
+                    self._tickers_years_info_filepath} does not exist. Creating new dict.')
 
         # Update the dictionary with the new years
         _, changes_made = update_ticker_years_dict(
@@ -965,7 +1005,9 @@ class LocalDBConnector(DatabaseConnector):
         """
         if filter:
             ticker_years_dict = self.load_tickers_years_info()
-            ticker_years_dict = {k: v for k, v in ticker_years_dict.items() if filter.lower() != k.lower()}
+            ticker_years_dict = {
+                k: v for k,
+                v in ticker_years_dict.items() if filter.lower() != k.lower()}
             self.save_tickers_years_info(ticker_years_dict)
         else:
             self._tickers_years_info_filepath.unlink(missing_ok=True)
@@ -1054,11 +1096,13 @@ class LocalDBConnector(DatabaseConnector):
             raise IOError(
                 f'Error decoding JSON from {self._tickers_years_info_filepath}: {e}')
         except Exception as e:
-            logger.bind(target='localdb').error(
-                f'Error reading ticker years data from {self._tickers_years_info_filepath}: {e}'
-            )
+            logger.bind(
+                target='localdb').error(
+                f'Error reading ticker years data from {
+                    self._tickers_years_info_filepath}: {e}')
             raise IOError(
-                f'Error reading ticker years data from {self._tickers_years_info_filepath}: {e}')
+                f'Error reading ticker years data from {
+                    self._tickers_years_info_filepath}: {e}')
 
     def write_data(
         self,
@@ -1139,15 +1183,23 @@ class LocalDBConnector(DatabaseConnector):
             if isinstance(comparison_operator, str):
                 comparison_operator = [comparison_operator]
 
-            if any([col not in list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__) for col in comparison_column_name]):
-                logger.bind(target='localdb').error(
-                    f'comparison_column_name must be a supported column name: {list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
+            if any([col not in list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)
+                   for col in comparison_column_name]):
+                logger.bind(
+                    target='localdb').error(
+                    f'comparison_column_name must be a supported column name: {
+                        list(
+                            SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
                 raise ValueError(
                     'comparison_column_name must be a supported column name')
 
-            if any([cond not in list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__) for cond in comparison_operator]):
-                logger.bind(target='localdb').error(
-                    f'comparison_operator must be a supported SQL comparison operator: {list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)}')
+            if any([cond not in list(SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)
+                   for cond in comparison_operator]):
+                logger.bind(
+                    target='localdb').error(
+                    f'comparison_operator must be a supported SQL comparison operator: {
+                        list(
+                            SUPPORTED_SQL_COMPARISON_OPERATORS.__args__)}')
                 raise ValueError(
                     'comparison_operator must be a supported SQL comparison operator')
 
@@ -1159,12 +1211,16 @@ class LocalDBConnector(DatabaseConnector):
                 comparison_aggregation_mode not in list(
                     SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)
             ):
-                logger.bind(target='localdb').error(
-                    f'comparison_aggregation_mode must be a supported SQL condition aggregation mode: {list(SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)}')
+                logger.bind(
+                    target='localdb').error(
+                    f'comparison_aggregation_mode must be a supported SQL condition aggregation mode: {
+                        list(
+                            SUPPORTED_SQL_CONDITION_AGGREGATION_MODES.__args__)}')
                 raise ValueError(
                     'comparison_aggregation_mode must be a supported SQL condition aggregation mode')
 
-            if len(comparison_column_name) != len(check_level) or len(comparison_column_name) != len(comparison_operator):
+            if len(comparison_column_name) != len(check_level) or len(
+                    comparison_column_name) != len(comparison_operator):
                 logger.bind(target='localdb').error(
                     'comparison_column_name, check_level and comparison_operator must have the same length')
                 raise ValueError(
@@ -1234,11 +1290,13 @@ class LocalDBConnector(DatabaseConnector):
                                  '''
                     else:
                         # multiple conditions
-                        # wrap all conditions in parentheses with aggregation mode between them
+                        # wrap all conditions in parentheses with aggregation mode
+                        # between them
                         query += f'''AND
                                  ({comparison_column_name[0]} {comparison_operator[0]} {check_level[0]}
                                  '''
-                        for col, level, cond, index in zip(comparison_column_name[1:], check_level[1:], comparison_operator[1:], range(1, comparisons_len)):
+                        for col, level, cond, index in zip(
+                                comparison_column_name[1:], check_level[1:], comparison_operator[1:], range(1, comparisons_len)):
 
                             if index == comparisons_len - 1:
                                 # closing conditions needs closing bracket
