@@ -21,10 +21,11 @@ ENGINE: 'polars_lazy'
 '''
 
 
-def worker_task_process(worker_id):
+def worker_task_process(worker_id, config_yaml):
     """Worker task that instantiates its own manager."""
+    manager = None
     try:
-        manager = HistoricalManagerDB(config=test_config_yaml)
+        manager = HistoricalManagerDB(config=config_yaml)
         data = manager.get_data(
             ticker='EURUSD',
             timeframe='1D',
@@ -34,18 +35,23 @@ def worker_task_process(worker_id):
         if hasattr(data, 'collect'):
             data = data.collect()
 
-        length = len(data)
-        manager.close()
-        return length
+        return len(data)
     except Exception as e:
         logger.exception(f"Worker {worker_id} failed with exception: {e}")
         return e
+    finally:
+        if manager:
+            try:
+                manager.close()
+            except Exception:
+                pass
 
 
-def worker_task_thread(worker_id):
+def worker_task_thread(worker_id, config_yaml):
     """Worker task that uses its own manager instance in threads."""
+    manager = None
     try:
-        manager = HistoricalManagerDB(config=test_config_yaml)
+        manager = HistoricalManagerDB(config=config_yaml)
         data = manager.get_data(
             ticker='GBPUSD',
             timeframe='1D',
@@ -55,12 +61,16 @@ def worker_task_thread(worker_id):
         if hasattr(data, 'collect'):
             data = data.collect()
 
-        length = len(data)
-        manager.close()
-        return length
+        return len(data)
     except Exception as e:
         logger.exception(f"Worker {worker_id} failed with exception: {e}")
         return e
+    finally:
+        if manager:
+            try:
+                manager.close()
+            except Exception:
+                pass
 
 
 class TestHistoricalManagerConcurrency(unittest.TestCase):
@@ -68,13 +78,30 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Clean directory if it accidentally exists."""
+        """Clean directory if it accidentally exists and set up shared manager."""
+        # Broad cleanup of any legacy test directories matching the pattern
+        for p in Path.home().glob(".test_database_concurrent*"):
+            if p.is_dir():
+                try:
+                    shutil.rmtree(p)
+                except Exception:
+                    pass
+
+        # Also ensure our specific current path is clean
         if _data_path.exists():
             shutil.rmtree(_data_path)
+
+        cls.hist_manager = HistoricalManagerDB(config=test_config_yaml)
 
     @classmethod
     def tearDownClass(cls):
         """Clean up test fixtures after all tests have run."""
+        if hasattr(cls, 'hist_manager') and cls.hist_manager is not None:
+            try:
+                cls.hist_manager.close()
+            except Exception:
+                pass
+
         if _data_path.exists():
             shutil.rmtree(_data_path)
 
@@ -87,7 +114,7 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
             max_workers=num_workers
         ) as executor:
             futures = [
-                executor.submit(worker_task_process, i)
+                executor.submit(worker_task_process, i, test_config_yaml)
                 for i in range(num_workers)
             ]
             for future in concurrent.futures.as_completed(futures):
@@ -118,7 +145,7 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
             max_workers=num_workers
         ) as executor:
             futures = [
-                executor.submit(worker_task_thread, i)
+                executor.submit(worker_task_thread, i, test_config_yaml)
                 for i in range(num_workers)
             ]
             for future in concurrent.futures.as_completed(futures):
