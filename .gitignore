@@ -5,6 +5,7 @@ issues/
 notes/
 *data_config.yaml
 *DS_Store*
+profiling/
 
 # Documentation guide files
 docs/*.md
