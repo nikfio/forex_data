@@ -28,18 +28,18 @@ from forex_data import (
 from loguru import logger
 
 # ── Configuration ────────────────────────────────────────────────────────────
-N_STEPS        = 5           # number of steps to time in the repeated loop
-TOP_N_FUNCS    = 40          # how many functions to print in the cProfile report
-SORT_BY        = 'cumulative' # pstats sort key: 'cumulative', 'tottime', 'calls'
+N_STEPS = 5           # number of steps to time in the repeated loop
+TOP_N_FUNCS = 40          # how many functions to print in the cProfile report
+SORT_BY = 'cumulative'  # pstats sort key: 'cumulative', 'tottime', 'calls'
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR     = Path(__file__).parent.parent
-PROFILE_DIR  = BASE_DIR / 'profiling'
+BASE_DIR = Path(__file__).parent.parent
+PROFILE_DIR = BASE_DIR / 'profiling'
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-CPROFILE_BIN  = PROFILE_DIR / 'histdata_conditional_filter_cprofile.prof'
-CPROFILE_TXT  = PROFILE_DIR / 'histdata_conditional_filter_cprofile_stats.txt'
-TIMING_TXT    = PROFILE_DIR / 'histdata_conditional_filter_timing.txt'
+CPROFILE_BIN = PROFILE_DIR / 'histdata_conditional_filter_cprofile.prof'
+CPROFILE_TXT = PROFILE_DIR / 'histdata_conditional_filter_cprofile_stats.txt'
+TIMING_TXT = PROFILE_DIR / 'histdata_conditional_filter_timing.txt'
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ def phase_timer(label: str, results: dict):
     t0 = time.perf_counter()
     yield
     results[label] = time.perf_counter() - t0
+
 
 def _write_timing_report(phase_times: dict, timings: dict) -> None:
     lines = []
@@ -66,10 +67,10 @@ def _write_timing_report(phase_times: dict, timings: dict) -> None:
         lines.append(f"{section} Timing  ({len(t_list)} iterations)")
         lines.append("-" * 40)
         if t_list:
-            mean_ms   = (sum(t_list) / len(t_list)) * 1000
-            min_ms    = min(t_list) * 1000
-            max_ms    = max(t_list) * 1000
-            total_ms  = sum(t_list) * 1000
+            mean_ms = (sum(t_list) / len(t_list)) * 1000
+            min_ms = min(t_list) * 1000
+            max_ms = max(t_list) * 1000
+            total_ms = sum(t_list) * 1000
             lines.append(f"  Total                          {total_ms:10.3f} ms")
             lines.append(f"  Mean per call                  {mean_ms:10.3f} ms")
             lines.append(f"  Min                            {min_ms:10.3f} ms")
@@ -82,6 +83,7 @@ def _write_timing_report(phase_times: dict, timings: dict) -> None:
     print("\n" + report)
     TIMING_TXT.write_text(report)
     logger.bind(target='profiler').info(f"Timing report saved → {TIMING_TXT}")
+
 
 def _write_cprofile_report(profiler: cProfile.Profile) -> None:
     profiler.dump_stats(str(CPROFILE_BIN))
@@ -108,6 +110,7 @@ def _write_cprofile_report(profiler: cProfile.Profile) -> None:
     print(f"  Binary profile saved to:                        {CPROFILE_BIN}")
     print(f"  Tip: visualise with  →  python -m snakeviz {CPROFILE_BIN}\n")
 
+
 def _try_line_profiler(manager: HistoricalManagerDB, ex_ticker: str) -> None:
     try:
         from line_profiler import LineProfiler  # type: ignore
@@ -122,7 +125,7 @@ def _try_line_profiler(manager: HistoricalManagerDB, ex_ticker: str) -> None:
     lp.add_function(manager.get_data)
 
     wrapped_get_data = lp(manager.get_data)
-    
+
     for _ in range(2):
         wrapped_get_data(
             ticker=ex_ticker, timeframe='1D', start='2018-01-01', end='2018-12-31',
@@ -134,7 +137,9 @@ def _try_line_profiler(manager: HistoricalManagerDB, ex_ticker: str) -> None:
     with open(lp_output_path, 'w') as f:
         lp.print_stats(stream=f, output_unit=1e-3)
 
-    logger.bind(target='profiler').info(f"line_profiler report saved → {lp_output_path}")
+    logger.bind(
+        target='profiler').info(
+        f"line_profiler report saved → {lp_output_path}")
     print("── line_profiler (get_data) ────────────────────")
     lp.print_stats(stream=stdout, output_unit=1e-3)
 
@@ -145,16 +150,19 @@ DATA_FILETYPE: 'parquet'
 ENGINE: 'polars_lazy'
 '''
 
+
 def main():
     logger.remove()
-    logger.add(stdout, level="INFO",
-               format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | {message}")
+    logger.add(
+        stdout,
+        level="INFO",
+        format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | {message}")
     logger.add(PROFILE_DIR / 'profiling_run_histdata_cond_filter.log',
                level="TRACE",
                filter=lambda r: True)
 
     logger.bind(target='profiler').info("Starting profiling run…")
-    
+
     phase_times: dict[str, float] = {}
     profiler = cProfile.Profile()
     profiler.enable()
@@ -193,14 +201,16 @@ def main():
             timeframe=ex_timeframe,
             start=ex_start_date_2,
             end=ex_end_date_2,
-            comparison_column_name=[BASE_DATA_COLUMN_NAME.HIGH, BASE_DATA_COLUMN_NAME.LOW],
-            check_level=[high_threshold, low_threshold],
+            comparison_column_name=[
+                BASE_DATA_COLUMN_NAME.HIGH,
+                BASE_DATA_COLUMN_NAME.LOW],
+            check_level=[
+                high_threshold,
+                low_threshold],
             comparison_operator=[
                 SQL_COMPARISON_OPERATORS.GREATER_THAN,
-                SQL_COMPARISON_OPERATORS.LESS_THAN
-            ],
-            aggregation_mode=condition_mode
-        )
+                SQL_COMPARISON_OPERATORS.LESS_THAN],
+            aggregation_mode=condition_mode)
 
     # Example 3: Compare with non-filtered data
     ex_start_date_3 = '2020-06-01'
@@ -228,7 +238,7 @@ def main():
 
     profiler.disable()
     _write_cprofile_report(profiler)
-    
+
     logger.info(f"Running {N_STEPS} iterations for stable timing…")
     timings = {
         'Example 1': [],
@@ -236,64 +246,86 @@ def main():
         'Example 3 No Filter': [],
         'Example 3 Close Filter': []
     }
-    
+
     for _ in range(N_STEPS):
         t0 = time.perf_counter()
         histmanager.get_data(
-            ticker=ex_ticker, timeframe=ex_timeframe, start=ex_start_date_1, end=ex_end_date_1,
-            comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN, check_level=min_open_value,
-            comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN
-        )
+            ticker=ex_ticker,
+            timeframe=ex_timeframe,
+            start=ex_start_date_1,
+            end=ex_end_date_1,
+            comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+            check_level=min_open_value,
+            comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN)
         timings['Example 1'].append(time.perf_counter() - t0)
-        
+
         t0 = time.perf_counter()
         histmanager.get_data(
-            ticker=ex_ticker, timeframe=ex_timeframe, start=ex_start_date_2, end=ex_end_date_2,
-            comparison_column_name=[BASE_DATA_COLUMN_NAME.HIGH, BASE_DATA_COLUMN_NAME.LOW],
-            check_level=[high_threshold, low_threshold],
-            comparison_operator=[SQL_COMPARISON_OPERATORS.GREATER_THAN, SQL_COMPARISON_OPERATORS.LESS_THAN],
-            aggregation_mode=condition_mode
-        )
+            ticker=ex_ticker,
+            timeframe=ex_timeframe,
+            start=ex_start_date_2,
+            end=ex_end_date_2,
+            comparison_column_name=[
+                BASE_DATA_COLUMN_NAME.HIGH,
+                BASE_DATA_COLUMN_NAME.LOW],
+            check_level=[
+                high_threshold,
+                low_threshold],
+            comparison_operator=[
+                SQL_COMPARISON_OPERATORS.GREATER_THAN,
+                SQL_COMPARISON_OPERATORS.LESS_THAN],
+            aggregation_mode=condition_mode)
         timings['Example 2'].append(time.perf_counter() - t0)
 
         t0 = time.perf_counter()
         histmanager.get_data(
-            ticker=ex_ticker, timeframe=ex_timeframe, start=ex_start_date_3, end=ex_end_date_3
-        )
+            ticker=ex_ticker,
+            timeframe=ex_timeframe,
+            start=ex_start_date_3,
+            end=ex_end_date_3)
         timings['Example 3 No Filter'].append(time.perf_counter() - t0)
 
         t0 = time.perf_counter()
         histmanager.get_data(
-            ticker=ex_ticker, timeframe=ex_timeframe, start=ex_start_date_3, end=ex_end_date_3,
-            comparison_column_name=BASE_DATA_COLUMN_NAME.CLOSE, check_level=close_threshold,
-            comparison_operator=SQL_COMPARISON_OPERATORS.GREATER_THAN_OR_EQUAL
-        )
+            ticker=ex_ticker,
+            timeframe=ex_timeframe,
+            start=ex_start_date_3,
+            end=ex_end_date_3,
+            comparison_column_name=BASE_DATA_COLUMN_NAME.CLOSE,
+            check_level=close_threshold,
+            comparison_operator=SQL_COMPARISON_OPERATORS.GREATER_THAN_OR_EQUAL)
         timings['Example 3 Close Filter'].append(time.perf_counter() - t0)
 
     _write_timing_report(phase_times, timings)
     _try_line_profiler(histmanager, ex_ticker)
-    
+
     if not is_empty_dataframe(filtered_data_1):
-        logger.bind(target='profiler').success(
-            f"Example 1: {ex_ticker}-{ex_timeframe} Found {shape_dataframe(filtered_data_1)[0]} entries OPEN < {min_open_value}"
-        )
+        logger.bind(
+            target='profiler').success(
+            f"Example 1: {ex_ticker}-{ex_timeframe} Found {
+                shape_dataframe(filtered_data_1)[0]} entries OPEN < {min_open_value}")
 
     if not is_empty_dataframe(filtered_data_2):
-        logger.bind(target='profiler').success(
-            f"Example 2: {ex_ticker}-{ex_timeframe} Found {shape_dataframe(filtered_data_2)[0]} entries HIGH > {high_threshold} OR LOW < {low_threshold}"
-        )
+        logger.bind(
+            target='profiler').success(
+            f"Example 2: {ex_ticker}-{ex_timeframe} Found "
+            f"{shape_dataframe(filtered_data_2)[0]} entries "
+            f"HIGH > {high_threshold} OR LOW < {low_threshold}")
 
     if not is_empty_dataframe(all_data_3) and not is_empty_dataframe(filtered_data_3):
         t_candles = shape_dataframe(all_data_3)[0]
         f_candles = shape_dataframe(filtered_data_3)[0]
         logger.bind(target='profiler').success(
-            f"Example 3: {ex_ticker}-{ex_timeframe} Total: {t_candles}, Filtered >= {close_threshold}: {f_candles} ({(f_candles / t_candles * 100):.2f}%)"
+            f"Example 3: {ex_ticker}-{ex_timeframe} Total: {t_candles}, "
+            f"Filtered >= {close_threshold}: {f_candles} "
+            f"({(f_candles / t_candles * 100):.2f}%)"
         )
 
     logger.info("Profiling complete.")
     logger.info(f"All output files are in: {PROFILE_DIR}")
 
     histmanager.close()
+
 
 if __name__ == '__main__':
     main()

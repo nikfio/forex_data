@@ -58,18 +58,18 @@ PROVIDERS_KEY:
 '''
 
 # ── Configuration ────────────────────────────────────────────────────────────
-N_STEPS        = 5           # number of steps to time in the repeated loop
-TOP_N_FUNCS    = 40          # how many functions to print in the cProfile report
-SORT_BY        = 'cumulative' # pstats sort key: 'cumulative', 'tottime', 'calls'
+N_STEPS = 5           # number of steps to time in the repeated loop
+TOP_N_FUNCS = 40          # how many functions to print in the cProfile report
+SORT_BY = 'cumulative'  # pstats sort key: 'cumulative', 'tottime', 'calls'
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR     = Path(__file__).parent.parent
-PROFILE_DIR  = BASE_DIR / 'profiling'
+BASE_DIR = Path(__file__).parent.parent
+PROFILE_DIR = BASE_DIR / 'profiling'
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-CPROFILE_BIN  = PROFILE_DIR / 'realtime_data_manager_cprofile.prof'
-CPROFILE_TXT  = PROFILE_DIR / 'realtime_data_manager_cprofile_stats.txt'
-TIMING_TXT    = PROFILE_DIR / 'realtime_data_manager_timing.txt'
+CPROFILE_BIN = PROFILE_DIR / 'realtime_data_manager_cprofile.prof'
+CPROFILE_TXT = PROFILE_DIR / 'realtime_data_manager_cprofile_stats.txt'
+TIMING_TXT = PROFILE_DIR / 'realtime_data_manager_timing.txt'
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -79,6 +79,7 @@ def phase_timer(label: str, results: dict):
     t0 = time.perf_counter()
     yield
     results[label] = time.perf_counter() - t0
+
 
 def _write_timing_report(phase_times: dict, timings: dict) -> None:
     lines = []
@@ -96,10 +97,10 @@ def _write_timing_report(phase_times: dict, timings: dict) -> None:
         lines.append(f"{section} Timing  ({len(t_list)} iterations)")
         lines.append("-" * 40)
         if t_list:
-            mean_ms   = (sum(t_list) / len(t_list)) * 1000
-            min_ms    = min(t_list) * 1000
-            max_ms    = max(t_list) * 1000
-            total_ms  = sum(t_list) * 1000
+            mean_ms = (sum(t_list) / len(t_list)) * 1000
+            min_ms = min(t_list) * 1000
+            max_ms = max(t_list) * 1000
+            total_ms = sum(t_list) * 1000
             lines.append(f"  Total                          {total_ms:10.3f} ms")
             lines.append(f"  Mean per call                  {mean_ms:10.3f} ms")
             lines.append(f"  Min                            {min_ms:10.3f} ms")
@@ -112,6 +113,7 @@ def _write_timing_report(phase_times: dict, timings: dict) -> None:
     print("\n" + report)
     TIMING_TXT.write_text(report)
     logger.bind(target='profiler').info(f"Timing report saved → {TIMING_TXT}")
+
 
 def _write_cprofile_report(profiler: cProfile.Profile) -> None:
     profiler.dump_stats(str(CPROFILE_BIN))
@@ -138,6 +140,7 @@ def _write_cprofile_report(profiler: cProfile.Profile) -> None:
     print(f"  Binary profile saved to:                        {CPROFILE_BIN}")
     print(f"  Tip: visualise with  →  python -m snakeviz {CPROFILE_BIN}\n")
 
+
 def _try_line_profiler(manager: RealtimeManager, ex_ticker: str) -> None:
     try:
         from line_profiler import LineProfiler  # type: ignore
@@ -154,7 +157,7 @@ def _try_line_profiler(manager: RealtimeManager, ex_ticker: str) -> None:
 
     w_get_data = lp(manager.get_data)
     w_get_daily_close = lp(manager.get_daily_close)
-    
+
     for _ in range(2):
         w_get_daily_close(ticker=ex_ticker, last_close=True)
         w_get_data(
@@ -168,14 +171,19 @@ def _try_line_profiler(manager: RealtimeManager, ex_ticker: str) -> None:
     with open(lp_output_path, 'w') as f:
         lp.print_stats(stream=f, output_unit=1e-3)
 
-    logger.bind(target='profiler').info(f"line_profiler report saved → {lp_output_path}")
+    logger.bind(
+        target='profiler').info(
+        f"line_profiler report saved → {lp_output_path}")
     print("── line_profiler ────────────────────")
     lp.print_stats(stream=stdout, output_unit=1e-3)
 
+
 def main():
     logger.remove()
-    logger.add(stdout, level="INFO",
-               format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | {message}")
+    logger.add(
+        stdout,
+        level="INFO",
+        format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | {message}")
     logger.add(PROFILE_DIR / 'profiling_run_realtime_data.log',
                level="TRACE",
                filter=lambda r: True)
@@ -214,16 +222,20 @@ def main():
     ex_timeframe_tf = '1h'
     with phase_timer("get_data (timeframe)", phase_times):
         window_data_ohlc = realtimedata_manager.get_data(
-            ticker=ex_ticker, start=ex_start_date_tf, end=ex_end_date_tf, timeframe=ex_timeframe_tf
-        )
+            ticker=ex_ticker,
+            start=ex_start_date_tf,
+            end=ex_end_date_tf,
+            timeframe=ex_timeframe_tf)
 
     ex_start_date_intra = Timestamp.now() - Timedelta('10D')
     ex_end_date_intra = Timestamp.now() - Timedelta('8D')
     ex_timeframe_intra = '5m'
     with phase_timer("get_data (intraday)", phase_times):
         window_data_ohlc_intraday = realtimedata_manager.get_data(
-            ticker='EURUSD', start=ex_start_date_intra, end=ex_end_date_intra, timeframe=ex_timeframe_intra
-        )
+            ticker='EURUSD',
+            start=ex_start_date_intra,
+            end=ex_end_date_intra,
+            timeframe=ex_timeframe_intra)
 
     profiler.disable()
     _write_cprofile_report(profiler)
@@ -243,19 +255,31 @@ def main():
         timings['last_close'].append(time.perf_counter() - t0)
 
         t0 = time.perf_counter()
-        realtimedata_manager.get_daily_close(ticker=ex_ticker, recent_days_window=ex_n_days)
+        realtimedata_manager.get_daily_close(
+            ticker=ex_ticker, recent_days_window=ex_n_days)
         timings['recent_days'].append(time.perf_counter() - t0)
 
         t0 = time.perf_counter()
-        realtimedata_manager.get_daily_close(ticker=ex_ticker, day_start=ex_start_date_limits, day_end=ex_end_date_limits)
+        realtimedata_manager.get_daily_close(
+            ticker=ex_ticker,
+            day_start=ex_start_date_limits,
+            day_end=ex_end_date_limits)
         timings['start_end_daily'].append(time.perf_counter() - t0)
 
         t0 = time.perf_counter()
-        realtimedata_manager.get_data(ticker=ex_ticker, start=ex_start_date_tf, end=ex_end_date_tf, timeframe=ex_timeframe_tf)
+        realtimedata_manager.get_data(
+            ticker=ex_ticker,
+            start=ex_start_date_tf,
+            end=ex_end_date_tf,
+            timeframe=ex_timeframe_tf)
         timings['get_data_tf'].append(time.perf_counter() - t0)
 
         t0 = time.perf_counter()
-        realtimedata_manager.get_data(ticker='EURUSD', start=ex_start_date_intra, end=ex_end_date_intra, timeframe=ex_timeframe_intra)
+        realtimedata_manager.get_data(
+            ticker='EURUSD',
+            start=ex_start_date_intra,
+            end=ex_end_date_intra,
+            timeframe=ex_timeframe_intra)
         timings['get_data_intraday'].append(time.perf_counter() - t0)
 
     _write_timing_report(phase_times, timings)
@@ -263,33 +287,54 @@ def main():
 
     # Logging outputs
     if not is_empty_dataframe(dayclose_quote):
-        logger.bind(target='profiler').debug(
-            f"get_daily_close: ticker {ex_ticker} rows {shape_dataframe(dayclose_quote)[0]} "
-            f"date {get_dataframe_element(dayclose_quote, BASE_DATA_COLUMN_NAME.TIMESTAMP, 0)}"
-        )
+        logger.bind(
+            target='profiler').debug(
+            f"get_daily_close: ticker {ex_ticker} rows {
+                shape_dataframe(dayclose_quote)[0]} " f"date {
+                get_dataframe_element(
+                    dayclose_quote,
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    0)}")
     if not is_empty_dataframe(window_daily_ohlc):
-        logger.bind(target='profiler').debug(
-            f"get_daily_close (recent): ticker {ex_ticker} rows {shape_dataframe(window_daily_ohlc)[0]} "
-            f"date {get_dataframe_element(window_daily_ohlc, BASE_DATA_COLUMN_NAME.TIMESTAMP, 0)}"
-        )
+        logger.bind(
+            target='profiler').debug(
+            f"get_daily_close (recent): ticker {ex_ticker} rows {
+                shape_dataframe(window_daily_ohlc)[0]} " f"date {
+                get_dataframe_element(
+                    window_daily_ohlc,
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    0)}")
     if not is_empty_dataframe(window_limits_daily_ohlc):
-        logger.bind(target='profiler').debug(
-            f"get_daily_close (limits): ticker {ex_ticker} rows {shape_dataframe(window_limits_daily_ohlc)[0]} "
-            f"date {get_dataframe_element(window_limits_daily_ohlc, BASE_DATA_COLUMN_NAME.TIMESTAMP, 0)}"
-        )
+        logger.bind(
+            target='profiler').debug(
+            f"get_daily_close (limits): ticker {ex_ticker} rows {
+                shape_dataframe(window_limits_daily_ohlc)[0]} " f"date {
+                get_dataframe_element(
+                    window_limits_daily_ohlc,
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    0)}")
     if not is_empty_dataframe(window_data_ohlc):
-        logger.bind(target='profiler').debug(
-            f"get_data (tf): ticker {ex_ticker} timeframe {ex_timeframe_tf} rows {shape_dataframe(window_data_ohlc)[0]} "
-            f"start {get_dataframe_element(window_data_ohlc, BASE_DATA_COLUMN_NAME.TIMESTAMP, 0)}"
-        )
+        logger.bind(
+            target='profiler').debug(
+            f"get_data (tf): ticker {ex_ticker} timeframe {ex_timeframe_tf} rows {
+                shape_dataframe(window_data_ohlc)[0]} " f"start {
+                get_dataframe_element(
+                    window_data_ohlc,
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    0)}")
     if not is_empty_dataframe(window_data_ohlc_intraday):
-        logger.bind(target='profiler').debug(
-            f"get_data (intraday): ticker EURUSD timeframe {ex_timeframe_intra} rows {shape_dataframe(window_data_ohlc_intraday)[0]} "
-            f"start {get_dataframe_element(window_data_ohlc_intraday, BASE_DATA_COLUMN_NAME.TIMESTAMP, 0)}"
-        )
+        logger.bind(
+            target='profiler').debug(
+            f"get_data (intraday): ticker EURUSD timeframe {ex_timeframe_intra} rows {
+                shape_dataframe(window_data_ohlc_intraday)[0]} " f"start {
+                get_dataframe_element(
+                    window_data_ohlc_intraday,
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    0)}")
 
     logger.info("Profiling complete.")
     logger.info(f"All output files are in: {PROFILE_DIR}")
+
 
 if __name__ == '__main__':
     main()

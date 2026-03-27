@@ -151,9 +151,10 @@ class RealtimeManager:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
-    data_path: Union[str, Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
-                                        validator=validators.or_(validators.instance_of(str),
-                                                                 validators.instance_of(Path)))
+    data_path: Union[str,
+                     Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
+                                   validator=validators.or_(validators.instance_of(str),
+                                                            validators.instance_of(Path)))
 
     # internal parameters
     _dataframe_type = field(default=pandas_dataframe)
@@ -183,7 +184,11 @@ class RealtimeManager:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
 
-        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
+        if not _apply_config(
+                self,
+                kwargs,
+                _class_attributes_name,
+                _not_assigned_attrs_index_mask):
 
             # no config file is defined
             # call generated init
@@ -198,8 +203,7 @@ class RealtimeManager:
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()
         if (
-            not self.data_path.exists()
-            or
+            not self.data_path.exists() or
             not self.data_path.is_dir()
         ):
 
