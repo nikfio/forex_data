@@ -1085,52 +1085,49 @@ class HistoricalManagerDB:
                 self._tickers_years_dict[ticker][TICK_TIMEFRAME]
             ))
 
-            # if tick is missing --> download missing years
-            if year_tick_missing:
+            lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
 
-                lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
+            with FileLock(lock_file):
+                # Re-read the JSON file to fetch the latest state from disk
+                self._tickers_years_dict = self._db_connector.create_tickers_years_dict()
 
-                with FileLock(lock_file):
-                    # Re-read the JSON file to fetch the latest state from disk
-                    self._tickers_years_dict = self._db_connector.create_tickers_years_dict()
+                # Initialize ticker/timeframe in dict if not present after rebuild
+                if ticker not in self._tickers_years_dict:
+                    self._tickers_years_dict[ticker] = {}
+                if timeframe not in self._tickers_years_dict[ticker]:
+                    self._tickers_years_dict[ticker][timeframe] = []
+                if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
+                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
 
-                    # Initialize ticker/timeframe in dict if not present after rebuild
-                    if ticker not in self._tickers_years_dict:
-                        self._tickers_years_dict[ticker] = {}
-                    if timeframe not in self._tickers_years_dict[ticker]:
-                        self._tickers_years_dict[ticker][timeframe] = []
-                    if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-                        self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+                # Re-calculate missing years after re-reading
+                year_tick_missing = list(set(years_interval_req).difference(
+                    self._tickers_years_dict[ticker][TICK_TIMEFRAME]
+                ))
 
-                    # Re-calculate missing years
-                    year_tick_missing = list(set(years_interval_req).difference(
-                        self._tickers_years_dict[ticker][TICK_TIMEFRAME]
-                    ))
+                # ONLY download if it's STILL missing after re-reading
+                if year_tick_missing:
+                    self._download(
+                        ticker,
+                        year_tick_missing
+                    )
+                else:
+                    logger.bind(
+                        target='histmanager').info(
+                        f"Skipped downloading {ticker} {years_interval_req} as it was managed by another process.")
 
-                    # ONLY download if it's STILL missing after re-reading
-                    if year_tick_missing:
-                        self._download(
-                            ticker,
-                            year_tick_missing
-                        )
-                    else:
-                        logger.bind(
-                            target='histmanager').info(
-                            f"Skipped downloading {ticker} {years_interval_req} as it was managed by another process.")
+                # add timeframe and update db INSIDE the lock so that
+                # a concurrent process can't read a parquet that is still
+                # being written by this process
+                self.add_timeframe(timeframe)
+                self._update_db(ticker)
 
-            # add dataframe to the instance
-            self.add_timeframe(timeframe)
+                if not set(years_interval_req).issubset(
+                        self._tickers_years_dict[ticker][timeframe]):
 
-            # update database
-            self._update_db(ticker)
-
-            if not set(years_interval_req).issubset(
-                    self._tickers_years_dict[ticker][timeframe]):
-
-                logger.bind(target='histmanager').critical(
-                    f'processing year data completion for '
-                    f'{years_interval_req} not ok')
-                raise ValueError
+                    logger.bind(target='histmanager').critical(
+                        f'processing year data completion for '
+                        f'{years_interval_req} not ok')
+                    raise ValueError
 
         # execute a read query on database
         return self._db_connector.read_data(
