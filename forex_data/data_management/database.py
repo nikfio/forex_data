@@ -19,6 +19,7 @@ Created on Sun Feb 23 00:02:36 2025
 
 
 from adbc_driver_sqlite import dbapi as sqlite_dbapi
+from filelock import FileLock
 from .common import *
 from polars import (
     DataFrame as polars_dataframe,
@@ -1126,39 +1127,43 @@ class LocalDBConnector(DatabaseConnector):
                     items[DATA_KEY.TICKER_INDEX] /
                     filename)
 
-        if (
-                not filepath.exists() or
-            not filepath.is_file()
-        ):
+        # Per-file lock prevents concurrent processes from corrupting the
+        # parquet file by interleaving a read-existing + write sequence.
+        file_lock_path = str(filepath) + '.lock'
+        with FileLock(file_lock_path):
+            if (
+                    not filepath.exists() or
+                not filepath.is_file()
+            ):
 
-            filepath.parent.mkdir(parents=True,
-                                  exist_ok=True)
+                filepath.parent.mkdir(parents=True,
+                                      exist_ok=True)
 
-        else:
+            else:
+
+                if self.data_type == DATA_TYPE.CSV_FILETYPE:
+
+                    dataframe_ex = read_csv(self.engine, filepath)
+
+                elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+
+                    dataframe_ex = read_parquet(self.engine, filepath)
+
+                dataframe = concat_data([dataframe, dataframe_ex])
+                # clean duplicated timestamps rows, keep first by default
+                dataframe = dataframe.unique(
+                    subset=[
+                        BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                    keep='first').sort(
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP)
 
             if self.data_type == DATA_TYPE.CSV_FILETYPE:
 
-                dataframe_ex = read_csv(self.engine, filepath)
+                write_csv(dataframe, filepath)
 
             elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
 
-                dataframe_ex = read_parquet(self.engine, filepath)
-
-            dataframe = concat_data([dataframe, dataframe_ex])
-            # clean duplicated timestamps rows, keep first by default
-            dataframe = dataframe.unique(
-                subset=[
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP],
-                keep='first').sort(
-                BASE_DATA_COLUMN_NAME.TIMESTAMP)
-
-        if self.data_type == DATA_TYPE.CSV_FILETYPE:
-
-            write_csv(dataframe, filepath)
-
-        elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
-
-            write_parquet(dataframe, filepath)
+                write_parquet(dataframe, filepath)
 
     def read_data(self,
                   market: str,
@@ -1262,14 +1267,28 @@ class LocalDBConnector(DatabaseConnector):
             filepath.exists() and
             filepath.is_file()
         ):
+            # Per-file lock ensures we don't read while write_data is writing.
+            # IMPORTANT: for polars lazy engine, read_parquet() only creates a
+            # *scan plan* — the actual file I/O happens at .collect() time,
+            # which would be AFTER the lock is released. To close this race
+            # window we eagerly .collect() inside the lock and re-wrap as
+            # .lazy() so all downstream SQL / cast / collect calls work on
+            # an in-memory frame rather than a deferred file scan.
+            file_lock_path = str(filepath) + '.lock'
+            with FileLock(file_lock_path):
+                if self.data_type == DATA_TYPE.CSV_FILETYPE:
 
-            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                    dataframe = read_csv(self.engine, filepath)
+                    # Eagerly materialise inside the lock (see comment above)
+                    if hasattr(dataframe, 'collect'):
+                        dataframe = dataframe.collect().lazy()
 
-                dataframe = read_csv(self.engine, filepath)
+                elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
 
-            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
-
-                dataframe = read_parquet(self.engine, filepath)
+                    dataframe = read_parquet(self.engine, filepath)
+                    # Eagerly materialise inside the lock (see comment above)
+                    if hasattr(dataframe, 'collect'):
+                        dataframe = dataframe.collect().lazy()
 
             try:
 
