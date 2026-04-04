@@ -34,11 +34,9 @@ from forex_data import (
     BASE_DATA_COLUMN_NAME,
     SQL_COMPARISON_OPERATORS,
     SQL_CONDITION_AGGREGATION_MODES,
-    YEARS,
     POLARS_DTYPE_DICT,
     business_days_data,
     US_holiday_dates,
-    get_histdata_tickers,
     random_date_between,
     HISTORICAL_DB_MIN_DATE,
     HISTORICAL_DB_MAX_DATE
@@ -48,11 +46,11 @@ __all__ = ['TestHistoricalManagerDB']
 
 from pathlib import Path
 
-_base_path = Path.home() / ".test_database"
+_base_path = Path.cwd() / ".test_database"
 _data_path = _base_path
 _counter = 1
 while _data_path.exists():
-    _data_path = Path.home() / f".test_database_{_counter}"
+    _data_path = Path.cwd() / f".test_database_{_counter}"
     _counter += 1
 
 # Use a runtime defined config yaml file

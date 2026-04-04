@@ -46,11 +46,11 @@ if not alpha_vantage_key:
 if not polygon_io_key:
     raise ValueError("POLYGON_IO_API_KEY environment variable is required")
 
-_base_path = Path.home() / ".test_database"
+_base_path = Path.cwd() / ".test_database"
 _data_path = _base_path
 _counter = 1
 while _data_path.exists():
-    _data_path = Path.home() / f".test_database_{_counter}"
+    _data_path = Path.cwd() / f".test_database_{_counter}"
     _counter += 1
 
 test_config_yaml = f'''

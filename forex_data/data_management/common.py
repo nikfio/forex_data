@@ -240,7 +240,7 @@ HISTDATA_BASE_DOWNLOAD_METHOD = 'POST'
 
 MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December']
-YEARS = list(range(2001, datetime.now().year+1, 1))
+YEARS = list(range(2001, datetime.now().year + 1, 1))
 HISTORICAL_DB_MIN_DATE = datetime(2001, 1, 1)
 HISTORICAL_DB_MAX_DATE = datetime.now() - timedelta(weeks=8)
 
@@ -626,6 +626,7 @@ def check_timeframe_str(tf: str | Timedelta | DateOffset,
         logger.critical(f"Type check: Invalid engine: {engine}")
         raise ValueError
 
+
 # PAIR symbol functions
 def get_pair_symbols(ticker):
 
@@ -813,6 +814,7 @@ def get_date_interval(start=None,
 
         return start_date, end_date
 
+
 def random_date_between(start_date, end_date):
     """
     Get a random datetime between two datetime objects.
@@ -827,12 +829,14 @@ def random_date_between(start_date, end_date):
     delta = end_date - start_date
     random_seconds = random.randint(0, int(delta.total_seconds()))
     return start_date + timedelta(seconds=random_seconds)
-    
+
 # BASE OPERATIONS WITH DATAFRAME
 # depending on dataframe engine support
 # for supported engines see var SUPPORTED_DATA_ENGINES
 
 # DATA ENGINES TYPES DICTIONARY
+
+
 class DTYPE_DICT:
 
     TICK_DTYPE = {'ask': 'float32',
