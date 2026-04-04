@@ -758,9 +758,6 @@ class LocalDBConnector(DatabaseConnector):
 
         local_files_name = [file.name for file in local_files]
 
-        # check compliance of files to convention (see notes)
-        # TODO: warning if no compliant and filter out from files found
-
         return local_files, local_files_name
 
     def _list_tables(self) -> List[str]:
@@ -808,17 +805,27 @@ class LocalDBConnector(DatabaseConnector):
                           key)
             ]
 
-    def get_ticker_years_list(
+    def get_ticker_timeframes_list(
+            self,
+            ticker: str) -> List[str]:
+
+        local_files, local_files_name = self._list_local_data()
+
+        return list_remove_duplicates([
+            self._get_items_from_db_key(Path(key).stem)[DATA_KEY.TF_INDEX] for key in local_files_name
+            if search(f'{ticker.lower()}',
+                      key.lower())
+        ])
+
+    def _get_ticker_years_list_from_db(
             self,
             ticker: str,
             timeframe: str = TICK_TIMEFRAME) -> List[int]:
 
         ticker_years_list = []
         table = ''
-        key_found = False
 
         local_files, local_files_name = self._list_local_data()
-        ticker_keys = []
 
         files = [
             key for key in local_files
@@ -860,6 +867,20 @@ class LocalDBConnector(DatabaseConnector):
 
         return ticker_years_list
 
+    def get_ticker_years_list(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> List[int]:
+
+        # check ticker is present in cache
+        if ticker not in self.get_tickers_list():
+            logger.bind(target='localdb').error(
+                f'Ticker {ticker} not found in cache')
+            raise ValueError(f'Ticker {ticker} not found in cache')
+        # check if tickers years dict has data for ticker
+        # and optionally timeframe
+        return self._get_ticker_years_list_from_db(ticker, timeframe)
+
     def create_tickers_years_dict(self) -> Dict[str, Dict[str, List[int]]]:
         """
         Create a dictionary containing ticker years data, structured as:
@@ -886,7 +907,7 @@ class LocalDBConnector(DatabaseConnector):
             ]))
 
             for timeframe in timeframes:
-                years_list = self.get_ticker_years_list(ticker, timeframe)
+                years_list = self._get_ticker_years_list_from_db(ticker, timeframe)
                 if years_list:  # Only add if there are years
                     tickers_years_dict[ticker][timeframe] = years_list
 

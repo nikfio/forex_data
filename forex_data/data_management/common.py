@@ -553,7 +553,7 @@ def check_timeframe_str(tf: str | Timedelta | DateOffset,
                                         'polars_lazy',
                                         'pyarrow'] = 'pandas'):
 
-    if tf == 'TICK':
+    if tf == TICK_TIMEFRAME:
 
         return tf
 

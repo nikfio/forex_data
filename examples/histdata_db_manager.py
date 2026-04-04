@@ -161,7 +161,6 @@ def _try_line_profiler(manager: HistoricalManagerDB, ex_ticker: str) -> None:
 test_config_yaml = '''
 ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
-DATA_PATH: '~/.test_database'
 '''
 
 
