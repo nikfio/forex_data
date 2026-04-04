@@ -168,8 +168,13 @@ class HistoricalManagerDB:
 
         for handler_id in handlers_to_remove:
             # check handler id exists in logger before removing
-            if handler_id in [h[1]._id for h in logger._core.handlers.items()]:
-                logger.remove(handler_id)
+            try:
+                if handler_id in [h[1]._id for h in logger._core.handlers.items()]:
+                    logger.remove(handler_id)
+            except Exception:
+                # handler already removed or not found
+                # can proceed with no side effects
+                pass
 
         # Now add the handler
         logger.add(log_path,
