@@ -62,17 +62,9 @@ from requests import Session
 from io import BytesIO
 from shutil import rmtree
 
-from iteration_utilities import (
-    duplicates,
-    unique_everseen
-)
-
 # internally defined
 from .common import *
 from ..config import (
-    read_config_file,
-    read_config_string,
-    read_config_folder,
     _apply_config
 )
 
@@ -175,7 +167,9 @@ class HistoricalManagerDB:
                     handlers_to_remove.append(handler_id)
 
         for handler_id in handlers_to_remove:
-            logger.remove(handler_id)
+            # check handler id exists in logger before removing
+            if handler_id in [h[1]._id for h in logger._core.handlers.items()]:
+                logger.remove(handler_id)
 
         # Now add the handler
         logger.add(log_path,
@@ -266,8 +260,19 @@ class HistoricalManagerDB:
     def _get_ticker_list(self) -> List[str]:
 
         # return list of tickers elements as str
+        # check if tickers years dict has data for ticker
+        if self._tickers_years_dict:
+            return list(self._tickers_years_dict.keys())
+        else:
+            return self._db_connector.get_tickers_list()
 
-        return self._db_connector.get_tickers_list()
+    def _get_ticker_timeframes_list(
+            self,
+            ticker: str) -> List[str]:
+
+        # return list of ticker timeframes elements as str
+        # remove TICK_TIMEFRAME from list
+        return [tf for tf in self._db_connector.get_ticker_timeframes_list(ticker) if tf != TICK_TIMEFRAME]
 
     def _get_ticker_keys(
             self,
@@ -275,7 +280,6 @@ class HistoricalManagerDB:
             timeframe: Optional[str] = None) -> List[str]:
 
         # return list of ticker keys elements as str
-
         return self._db_connector.get_ticker_keys(ticker,
                                                   timeframe=timeframe)
 
@@ -287,8 +291,19 @@ class HistoricalManagerDB:
         # return list of ticker years covered in data elements as str
         # if timeframe is None means years in data in tick or 1m timeframe
 
-        return self._db_connector.get_ticker_years_list(ticker,
-                                                        timeframe=timeframe)
+        # check if tickers years dict has data for ticker
+        try:
+
+            ticker_years_list = self._tickers_years_dict[ticker][timeframe]
+
+        except Exception:
+
+            # in case data info is not present in internal dict
+            # try to retrieve it from db
+            ticker_years_list = self._db_connector.get_ticker_years_list(
+                ticker, timeframe=timeframe)
+
+        return ticker_years_list
 
     def _update_db(self, ticker: str = None) -> None:
 
@@ -1042,13 +1057,15 @@ class HistoricalManagerDB:
 
         # force ticker parameter to lower case
         ticker = ticker.lower()
-        timeframe = check_timeframe_str(timeframe, engine=self.engine).lower()
+
+        # force timeframe parameter to lower case
+        timeframe = timeframe.lower()
 
         if not check_timeframe_str(timeframe, engine=self.engine):
 
             logger.bind(target='histmanager').error(
                 f'timeframe request {timeframe} invalid')
-            raise ValueError
+            raise ValueError(f'timeframe request {timeframe} invalid')
 
         else:
 

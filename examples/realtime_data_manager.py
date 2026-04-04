@@ -48,7 +48,6 @@ if not polygon_io_key:
 
 test_config_yaml = f'''
 DATA_FILETYPE: 'parquet'
-
 ENGINE: 'polars_lazy'
 
 PROVIDERS_KEY:
