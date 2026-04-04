@@ -11,8 +11,8 @@ the functionality of the historical data manager including:
 """
 
 import unittest
-import random
 import shutil
+import random
 from loguru import logger
 
 from datetime import (
@@ -37,7 +37,11 @@ from forex_data import (
     YEARS,
     POLARS_DTYPE_DICT,
     business_days_data,
-    US_holiday_dates
+    US_holiday_dates,
+    get_histdata_tickers,
+    random_date_between,
+    HISTORICAL_DB_MIN_DATE,
+    HISTORICAL_DB_MAX_DATE
 )
 
 __all__ = ['TestHistoricalManagerDB']
@@ -408,7 +412,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         Test that clear_database wipes data for a specific ticker
         and verify that data can be correctly re-downloaded.
         """
-        ticker = 'GBPUSD'
+        ticker = random.choice(get_histdata_tickers())
         timeframe = '1W'
 
         # 1. Ensure GBPUSD data is present (pull some data)
@@ -434,12 +438,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         self.assertNotIn(ticker.lower(), self.hist_manager._get_ticker_list())
 
         # 4. Re-download data for a random 4-month timespan
-        # Pick 4 random consecutive months within a valid year
-        random_year = random.choice(YEARS)
-        random_month = random.randint(1, 12)
-        start_date = datetime(random_year, random_month, 1)
-        # approx 4 months later
-        end_date = start_date + timedelta(days=4 * 30)
+        # Pick a end date between HISTORICAL_DB_MIN_DATE and HISTORICAL_DB_MAX_DATE
+        end_date = random_date_between(HISTORICAL_DB_MIN_DATE, HISTORICAL_DB_MAX_DATE)
+        start_date = end_date - timedelta(days=4 * 30)
 
         logger.debug(f"Downloading data for {ticker} from {start_date}"
                      f" to {end_date} with timeframe {timeframe}")

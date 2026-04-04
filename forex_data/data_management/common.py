@@ -24,6 +24,7 @@ from typing import (
 )
 
 import requests
+import random
 from bs4 import BeautifulSoup
 
 from datetime import (
@@ -144,6 +145,8 @@ __all__ = [
     'SUPPORTED_BASE_DATA_COLUMN_NAME',
     'SQL_CONDITION_AGGREGATION_MODES',
     'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
+    'HISTORICAL_DB_MIN_DATE',
+    'HISTORICAL_DB_MAX_DATE',
 
     'validator_file_path',
     'validator_dir_path',
@@ -170,6 +173,7 @@ __all__ = [
     'get_pair_symbols',
     'to_source_symbol',
     'get_date_interval',
+    'random_date_between',
     'polygon_agg_to_dict',
     'get_histdata_tickers',
     'TickerNotFoundError',
@@ -236,7 +240,9 @@ HISTDATA_BASE_DOWNLOAD_METHOD = 'POST'
 
 MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December']
-YEARS = list(range(2001, datetime.now().year, 1))
+YEARS = list(range(2001, datetime.now().year+1, 1))
+HISTORICAL_DB_MIN_DATE = datetime(2001, 1, 1)
+HISTORICAL_DB_MAX_DATE = datetime.now() - timedelta(weeks=8)
 
 
 DATE_NO_HOUR_FORMAT = '%Y-%m-%d'
@@ -621,8 +627,6 @@ def check_timeframe_str(tf: str | Timedelta | DateOffset,
         raise ValueError
 
 # PAIR symbol functions
-
-
 def get_pair_symbols(ticker):
 
     components = findall(SINGLE_CURRENCY_PATTERN_STR, ticker)
@@ -809,7 +813,21 @@ def get_date_interval(start=None,
 
         return start_date, end_date
 
+def random_date_between(start_date, end_date):
+    """
+    Get a random datetime between two datetime objects.
 
+    Args:
+        start_date (datetime): The start date.
+        end_date (datetime): The end date.
+
+    Returns:
+        datetime: A random datetime between start_date and end_date.
+    """
+    delta = end_date - start_date
+    random_seconds = random.randint(0, int(delta.total_seconds()))
+    return start_date + timedelta(seconds=random_seconds)
+    
 # BASE OPERATIONS WITH DATAFRAME
 # depending on dataframe engine support
 # for supported engines see var SUPPORTED_DATA_ENGINES

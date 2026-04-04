@@ -17,6 +17,8 @@ __all__ = [
     'DEFAULT_PATHS',
     'SQL_COMPARISON_OPERATORS',
     'SQL_CONDITION_AGGREGATION_MODES',
+    'HISTORICAL_DB_MIN_DATE',
+    'HISTORICAL_DB_MAX_DATE',
     'empty_dataframe',
     'is_empty_dataframe',
     'shape_dataframe',
@@ -43,6 +45,7 @@ __all__ = [
     'get_class_attr_keys',
     'get_class_attr_values',
     'get_class_attr_dict',
+    'random_date_between'
 ]
 
 from . import common
@@ -56,6 +59,8 @@ from .common import (
     DEFAULT_PATHS,
     SQL_COMPARISON_OPERATORS,
     SQL_CONDITION_AGGREGATION_MODES,
+    HISTORICAL_DB_MIN_DATE,
+    HISTORICAL_DB_MAX_DATE,
     empty_dataframe,
     is_empty_dataframe,
     shape_dataframe,
@@ -78,7 +83,8 @@ from .common import (
     US_holiday_dates,
     get_class_attr_keys,
     get_class_attr_values,
-    get_class_attr_dict
+    get_class_attr_dict,
+    random_date_between
 )
 
 from .database import (
