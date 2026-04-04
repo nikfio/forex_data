@@ -26,6 +26,8 @@ from .data_management import (
     DEFAULT_PATHS,
     SQL_COMPARISON_OPERATORS,
     SQL_CONDITION_AGGREGATION_MODES,
+    HISTORICAL_DB_MIN_DATE,
+    HISTORICAL_DB_MAX_DATE,
     empty_dataframe,
     is_empty_dataframe,
     shape_dataframe,
@@ -48,7 +50,8 @@ from .data_management import (
     get_histdata_tickers,
     POLARS_DTYPE_DICT,
     business_days_data,
-    US_holiday_dates
+    US_holiday_dates,
+    random_date_between
 )
 
 __all__ = [
@@ -68,6 +71,8 @@ __all__ = [
     'DEFAULT_PATHS',
     'SQL_COMPARISON_OPERATORS',
     'SQL_CONDITION_AGGREGATION_MODES',
+    'HISTORICAL_DB_MIN_DATE',
+    'HISTORICAL_DB_MAX_DATE',
     'empty_dataframe',
     'is_empty_dataframe',
     'shape_dataframe',
@@ -90,5 +95,6 @@ __all__ = [
     'get_histdata_tickers',
     'POLARS_DTYPE_DICT',
     'business_days_data',
-    'US_holiday_dates'
+    'US_holiday_dates',
+    'random_date_between'
 ]

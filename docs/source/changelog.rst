@@ -7,10 +7,10 @@ All notable changes to the forex_data project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-Version 0.1.6 (Current)
+Version 0.1.8 (Current)
 =======================
 
-*Release Date: 01/03/2026*
+*Release Date: 04/04/2026*
 
 Tested with Python 3.12 and 3.13.
 Largely tested with default data parameters: engine 'polars-lazy' and file format 'parquet'.
@@ -52,6 +52,11 @@ Core Features
   * Override capabilities
   * Support for multiple configuration files
   * Template configuration included
+
+* **Concurrency runs support**:
+
+  * Support runs with multiprocessing or multithreading
+    interacting sharing the same cache location
 
 Data Management
 ^^^^^^^^^^^^^^^
@@ -121,6 +126,9 @@ Performance
 
 * Data engine and format files, all options testing 
 * Performance comparisons (Polars vs PyArrow vs Pandas)
+* Caching optimizations:
+
+  * db files organization by year, a file contains one year data
 
 Planned for v0.3.0
 ------------------
@@ -128,7 +136,6 @@ Planned for v0.3.0
 * DuckDB integration as engine for data caching
 * Robust connection between Historical and Real-time data managers if applicable
 * Data types outside raw price data available for query (e.g. volume, fundamentals information and others))
-* Caching optimizations (Enhance files organization and segmentation)
 
 Planned for v0.4.0
 ------------------
