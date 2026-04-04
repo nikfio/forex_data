@@ -42,10 +42,10 @@ run_profiling:
     echo "Profiling test suite execution..."
     poetry run pyinstrument --renderer html \
       --outfile test-results/profiling/full_test_suite.html \
-      -m pytest --flake8 -vv
+      -m pytest --flake8 -vvv
     poetry run pyinstrument --renderer json \
       --outfile test-results/profiling/full_test_suite.json \
-      -m pytest --flake8 -vv
+      -m pytest --flake8 -vvv
     echo "Profiling completed. Reports saved to test-results/profiling/"
   
 jobs:

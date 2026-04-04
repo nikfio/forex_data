@@ -1,17 +1,18 @@
 import unittest
 import shutil
 import concurrent.futures
+import multiprocessing
 from pathlib import Path
 from datetime import datetime
 from loguru import logger
 
 from forex_data import HistoricalManagerDB
 
-_base_path = Path.home() / ".test_database_concurrent"
+_base_path = Path.cwd() / ".test_database_concurrent"
 _data_path = _base_path
 _counter = 1
 while _data_path.exists():
-    _data_path = Path.home() / f".test_database_concurrent_{_counter}"
+    _data_path = Path.cwd() / f".test_database_concurrent_{_counter}"
     _counter += 1
 
 test_config_yaml = f'''
@@ -80,7 +81,7 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
     def setUpClass(cls):
         """Clean directory if it accidentally exists and set up shared manager."""
         # Broad cleanup of any legacy test directories matching the pattern
-        for p in Path.home().glob(".test_database_concurrent*"):
+        for p in Path.cwd().glob(".test_database_concurrent*"):
             if p.is_dir():
                 try:
                     shutil.rmtree(p)
@@ -110,8 +111,10 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
         num_workers = 4
         results = []
 
+        ctx = multiprocessing.get_context('spawn')
         with concurrent.futures.ProcessPoolExecutor(
-            max_workers=num_workers
+            max_workers=num_workers,
+            mp_context=ctx
         ) as executor:
             futures = [
                 executor.submit(worker_task_process, i, test_config_yaml)
