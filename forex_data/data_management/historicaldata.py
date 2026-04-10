@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 from uuid import uuid4
 from filelock import FileLock
+from textwrap import dedent
 
 from attrs import (
     define,
@@ -479,9 +480,11 @@ class HistoricalManagerDB:
 
             # here will be a warning log
             logger.bind(target='histmanager').error(
-                f'{ticker} - {year} - {MONTHS[month_num - 1]}: {e}')
+                dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]}: {e}
+                    url: {url}'''))
             raise TickerDataBadTypeException(
-                f"Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}")
+                dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}
+                    url: {url}'''))
 
         else:
 
@@ -816,12 +819,23 @@ class HistoricalManagerDB:
                 year=year,
                 month_num=month_num)
 
-            file = self._download_month_raw(
-                ticker,
-                url,
-                year,
-                month_num
-            )
+            file = None
+            try:
+                file = self._download_month_raw(
+                    ticker,
+                    url,
+                    year,
+                    month_num
+                )
+            except (BadZipFile, TickerDataBadTypeException):
+                if (
+                    year == datetime.now().year and
+                    month_num > datetime.now().month
+                ):
+                    logger.bind(target='histmanager').critical(
+                        f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data")
+                    break
+                raise
 
             if file and isinstance(file, ZipExtFile):
 
@@ -1077,12 +1091,27 @@ class HistoricalManagerDB:
             start = any_date_to_datetime64(start)
             end = any_date_to_datetime64(end)
 
+        # sanity checks on query dates specific to historical data
         if end < start:
 
             logger.bind(target='histmanager').error(
                 'date interval not coherent, '
                 'start must be older than end')
             return self._dataframe_type([])
+
+        if start < HISTORICAL_DB_MIN_DATE:
+
+            logger.bind(target='histmanager').error(
+                f'start date {start} is older than the minimum '
+                f'date in database {HISTORICAL_DB_MIN_DATE}')
+            return self._dataframe_type([])
+
+        if start > datetime.now():
+
+            logger.bind(target='histmanager').error(
+                f'start date {start} is newer than the maximum '
+                f'date in database {datetime.now()}')
+            raise ValueError(f'start date {start} is newer now date')
 
         # get years including interval requested
         years_interval_req = list(range(start.year, end.year + 1, 1))
@@ -1125,6 +1154,12 @@ class HistoricalManagerDB:
                 year_tick_missing = list(set(years_interval_req).difference(
                     self._tickers_years_dict[ticker][TICK_TIMEFRAME]
                 ))
+
+                # if datetime.now().year is in years_interval_req include
+                # it in missing anyways cause a new query will be used
+                # to update data up to the last month available
+                if datetime.now().year in years_interval_req:
+                    year_tick_missing.append(datetime.now().year)
 
                 # ONLY download if it's STILL missing after re-reading
                 if year_tick_missing:

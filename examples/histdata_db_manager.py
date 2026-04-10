@@ -186,8 +186,8 @@ def main():
 
     ex_ticker = choice(get_histdata_tickers())
     ex_timeframe_1 = '1D'
-    ex_start_date_1 = '2018-10-03 10:00:00'
-    ex_end_date_1 = '2018-12-03 10:00:00'
+    ex_start_date_1 = '2026-01-03 10:00:00'
+    ex_end_date_1 = '2026-12-03 10:00:00'
 
     with phase_timer("get_data (1D)", phase_times):
         yeardata1 = histmanager.get_data(
