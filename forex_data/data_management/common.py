@@ -146,7 +146,7 @@ __all__ = [
     'SQL_CONDITION_AGGREGATION_MODES',
     'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
     'HISTORICAL_DB_MIN_DATE',
-    'HISTORICAL_DB_MAX_DATE',
+    'HISTORICAL_DB_MIN_DATE',
 
     'validator_file_path',
     'validator_dir_path',
@@ -241,8 +241,7 @@ HISTDATA_BASE_DOWNLOAD_METHOD = 'POST'
 MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December']
 YEARS = list(range(2001, datetime.now().year + 1, 1))
-HISTORICAL_DB_MIN_DATE = datetime(2001, 1, 1)
-HISTORICAL_DB_MAX_DATE = datetime.now() - timedelta(weeks=8)
+HISTORICAL_DB_MIN_DATE = datetime(2000, 1, 1)
 
 
 DATE_NO_HOUR_FORMAT = '%Y-%m-%d'

@@ -38,8 +38,7 @@ from forex_data import (
     business_days_data,
     US_holiday_dates,
     random_date_between,
-    HISTORICAL_DB_MIN_DATE,
-    HISTORICAL_DB_MAX_DATE
+    HISTORICAL_DB_MIN_DATE
 )
 
 __all__ = ['TestHistoricalManagerDB']
@@ -436,8 +435,8 @@ class TestHistoricalManagerDB(unittest.TestCase):
         self.assertNotIn(ticker.lower(), self.hist_manager._get_ticker_list())
 
         # 4. Re-download data for a random 4-month timespan
-        # Pick a end date between HISTORICAL_DB_MIN_DATE and HISTORICAL_DB_MAX_DATE
-        end_date = random_date_between(HISTORICAL_DB_MIN_DATE, HISTORICAL_DB_MAX_DATE)
+        # Pick a end date between HISTORICAL_DB_MIN_DATE and datetime.now()
+        end_date = random_date_between(HISTORICAL_DB_MIN_DATE, datetime.now())
         start_date = end_date - timedelta(days=4 * 30)
 
         logger.debug(f"Downloading data for {ticker} from {start_date}"
@@ -870,6 +869,115 @@ class TestHistoricalManagerDB(unittest.TestCase):
         self.assertTrue(new_info_file.exists())
 
         new_manager.close()
+
+    def test_27_download_current_year_random_end_date(self):
+        """Test download with end_date randomly picked in current year."""
+        current_year = datetime.now().year
+        ticker = 'EURUSD'
+
+        # Remove current year from tickers_years_dict if present to force redownload
+        if (
+            hasattr(self.hist_manager, '_tickers_years_dict')
+            and ticker.lower() in self.hist_manager._tickers_years_dict
+        ):
+            ticker_dict = self.hist_manager._tickers_years_dict[ticker.lower()]
+            for tf in list(ticker_dict.keys()):
+                if current_year in ticker_dict[tf]:
+                    ticker_dict[tf].remove(current_year)
+
+        # Pick random end_date in current year
+        start_of_year = datetime(current_year, 1, 1)
+        # Ensure we don't pick a date in the future relative to "now"
+        end_limit = datetime.now() - timedelta(days=15)
+        if end_limit < start_of_year:
+            end_limit = datetime.now()
+
+        end_date = random_date_between(start_of_year, end_limit)
+        start_date = end_date - timedelta(days=30)
+        if start_date < start_of_year:
+            start_date = start_of_year
+
+        logger.debug(f"Test 27: Downloading {ticker} from {start_date} to {end_date}")
+        data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe='1D',
+            start=start_date,
+            end=end_date
+        )
+
+        self.assertIsNotNone(data)
+        if isinstance(data, polars_lazyframe):
+            data = data.collect()
+        msg = f"No data downloaded for {ticker} in {current_year}"
+        self.assertGreater(len(data), 0, msg=msg)
+
+    def test_28_redownload_current_year_same_ticker(self):
+        """
+        Test download with end_date randomly picked in current year
+        and querying the same ticker as in test 27.
+        """
+        current_year = datetime.now().year
+        # Use another common ticker
+        ticker = 'EURUSD'
+
+        # Pick random end_date in current year
+        start_of_year = datetime(current_year, 1, 1)
+        end_limit = datetime.now() - timedelta(days=2)
+        if end_limit < start_of_year:
+            end_limit = datetime.now()
+
+        end_date = random_date_between(start_of_year, end_limit)
+        start_date = end_date - timedelta(days=30)
+        if start_date < start_of_year:
+            start_date = start_of_year
+
+        logger.debug(f"Test 28: Downloading {ticker} from {start_date} to {end_date}")
+        data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe='1D',
+            start=start_date,
+            end=end_date
+        )
+
+        self.assertIsNotNone(data)
+        if isinstance(data, polars_lazyframe):
+            data = data.collect()
+        msg = f"No data downloaded for {ticker} in {current_year}"
+        self.assertGreater(len(data), 0, msg=msg)
+
+    def test_29_download_current_year_random_ticker(self):
+        """
+        Test download with end_date randomly picked in current year
+        and querying a random ticker.
+        """
+        current_year = datetime.now().year
+        # Use another common ticker
+        ticker = random.choice(get_histdata_tickers())
+
+        # Pick random end_date in current year
+        start_of_year = datetime(current_year, 1, 1)
+        end_limit = datetime.now() - timedelta(days=2)
+        if end_limit < start_of_year:
+            end_limit = datetime.now()
+
+        end_date = random_date_between(start_of_year, end_limit)
+        start_date = end_date - timedelta(days=30)
+        if start_date < start_of_year:
+            start_date = start_of_year
+
+        logger.debug(f"Test 29: Downloading {ticker} from {start_date} to {end_date}")
+        data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe='1D',
+            start=start_date,
+            end=end_date
+        )
+
+        self.assertIsNotNone(data)
+        if isinstance(data, polars_lazyframe):
+            data = data.collect()
+        msg = f"No data downloaded for {ticker} in {current_year}"
+        self.assertGreater(len(data), 0, msg=msg)
 
 
 if __name__ == '__main__':
