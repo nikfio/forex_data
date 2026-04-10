@@ -481,10 +481,10 @@ class HistoricalManagerDB:
             # here will be a warning log
             logger.bind(target='histmanager').error(
                 dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]}: {e}
-                    url: {url}'''))
+                           url: {url}'''))
             raise TickerDataBadTypeException(
                 dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}
-                    url: {url}'''))
+                           url: {url}'''))
 
         else:
 
@@ -827,7 +827,7 @@ class HistoricalManagerDB:
                     year,
                     month_num
                 )
-            except (BadZipFile, TickerDataBadTypeException):
+            except TickerDataBadTypeException:
                 if (
                     year == datetime.now().year and
                     month_num > datetime.now().month
