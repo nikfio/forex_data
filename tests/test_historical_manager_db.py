@@ -418,12 +418,17 @@ class TestHistoricalManagerDB(unittest.TestCase):
         start = datetime(test_year, 1, 1)
         end = datetime(test_year, 1, 15)
 
-        self.hist_manager.get_data(
-            ticker=ticker,
-            timeframe='1D',
-            start=start,
-            end=end
-        )
+        try:
+            self.hist_manager.get_data(
+                ticker=ticker,
+                timeframe='1D',
+                start=start,
+                end=end
+            )
+        except TickerDataBadTypeException:
+            # if the data is not available from source
+            # skip the test
+            self.skipTest(f"Data for {ticker} not available from source")
 
         # Verify it's in the ticker list
         self.assertIn(ticker.lower(), self.hist_manager._get_ticker_list())
@@ -436,17 +441,23 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
         # 4. Re-download data for a random 4-month timespan
         # Pick a end date between HISTORICAL_DB_MIN_DATE and datetime.now()
-        end_date = random_date_between(HISTORICAL_DB_MIN_DATE, datetime.now())
-        start_date = end_date - timedelta(days=4 * 30)
+        start_date = random_date_between(HISTORICAL_DB_MIN_DATE, datetime.now())
+        end_date = start_date + timedelta(days=4 * 30)
 
         logger.debug(f"Downloading data for {ticker} from {start_date}"
                      f" to {end_date} with timeframe {timeframe}")
-        data = self.hist_manager.get_data(
-            ticker=ticker,
-            timeframe=timeframe,
-            start=start_date,
-            end=end_date
-        )
+
+        try:
+            data = self.hist_manager.get_data(
+                ticker=ticker,
+                timeframe=timeframe,
+                start=start_date,
+                end=end_date
+            )
+        except TickerDataBadTypeException:
+            # if the data is not available from source
+            # skip the test
+            self.skipTest(f"Data for {ticker} not available from source")
 
         # 5. Verify data is successfully re-downloaded
         self.assertIsNotNone(data)
