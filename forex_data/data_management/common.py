@@ -240,7 +240,7 @@ HISTDATA_BASE_DOWNLOAD_METHOD = 'POST'
 
 MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December']
-YEARS = list(range(2001, datetime.now().year + 1, 1))
+YEARS = list(range(2000, datetime.now().year + 1, 1))
 HISTORICAL_DB_MIN_DATE = datetime(2000, 1, 1)
 
 

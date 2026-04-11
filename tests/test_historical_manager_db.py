@@ -46,11 +46,11 @@ __all__ = ['TestHistoricalManagerDB']
 
 from pathlib import Path
 
-_base_path = Path.cwd() / ".test_database"
+_base_path = Path.home() / ".test_database"
 _data_path = _base_path
 _counter = 1
 while _data_path.exists():
-    _data_path = Path.cwd() / f".test_database_{_counter}"
+    _data_path = Path.home() / f".test_database_{_counter}"
     _counter += 1
 
 # Use a runtime defined config yaml file
