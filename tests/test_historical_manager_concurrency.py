@@ -8,11 +8,11 @@ from loguru import logger
 
 from forex_data import HistoricalManagerDB
 
-_base_path = Path.cwd() / ".test_database_concurrent"
+_base_path = Path.home() / ".test_database_concurrent"
 _data_path = _base_path
 _counter = 1
 while _data_path.exists():
-    _data_path = Path.cwd() / f".test_database_concurrent_{_counter}"
+    _data_path = Path.home() / f".test_database_concurrent_{_counter}"
     _counter += 1
 
 test_config_yaml = f'''
