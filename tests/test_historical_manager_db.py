@@ -29,6 +29,7 @@ from polars import (
 from forex_data import (
     HistoricalManagerDB,
     TickerNotFoundError,
+    TickerDataBadTypeException,
     is_empty_dataframe,
     get_histdata_tickers,
     BASE_DATA_COLUMN_NAME,
