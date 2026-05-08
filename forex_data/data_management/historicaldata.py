@@ -78,7 +78,7 @@ from .database import (
 
 __all__ = ['HistoricalManagerDB']
 
-
+        
 # HISTORICAL DATA MANAGER
 @define(kw_only=True, slots=True)
 class HistoricalManagerDB:
