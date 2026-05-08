@@ -1096,7 +1096,7 @@ class HistoricalManagerDB:
 
             logger.bind(target='histmanager').error(
                 'date interval not coherent, '
-                'start must be older than end')
+                'end must be older than start')
             return self._dataframe_type([])
 
         if start < HISTORICAL_DB_MIN_DATE:
