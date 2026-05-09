@@ -71,8 +71,8 @@ from ..config import (
 
 from .database import (
     DatabaseConnector,
-    DuckDBConnector,
-    LocalDBConnector
+    LocalDBConnector,
+    LocalDBYearConnector
 )
 
 
@@ -94,6 +94,8 @@ class HistoricalManagerDB:
                      Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
                                    validator=validators.or_(validators.instance_of(str),
                                                             validators.instance_of(Path)))
+    db_files_year_segmentation: bool = field(default=True,
+                                     validator=validators.instance_of(bool))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -216,17 +218,17 @@ class HistoricalManagerDB:
         self._temporary_data_path.mkdir(parents=True, exist_ok=True)
 
         # instance database connector if selected
-        if self.data_type == DATA_TYPE.DUCKDB:
-
-            self._db_connector = DuckDBConnector(duckdb_filepath=str(
-                self._histdata_path / 'DuckDB' / 'marketdata.duckdb'))
-
-        elif (
+        if (
                 self.data_type == DATA_TYPE.CSV_FILETYPE or
             self.data_type == DATA_TYPE.PARQUET_FILETYPE
         ):
 
-            self._db_connector = LocalDBConnector(
+            if self.db_files_year_segmentation:
+                connector_type = LocalDBYearConnector
+            else:
+                connector_type = LocalDBConnector
+
+            self._db_connector = connector_type(
                 data_path=str(self._histdata_path / 'LocalDB'),
                 data_type=self.data_type,
                 engine=self.engine
@@ -322,26 +324,41 @@ class HistoricalManagerDB:
 
             years_tick = self._tickers_years_dict[ticker][TICK_TIMEFRAME]
 
+            # Collect all missing years per timeframe
+            missing_years_per_tf = {}
+            all_missing_years = set()
+            
             for tf in self._tf_list:
-
-                # Initialize ticker/timeframe in dict if not present
                 if tf not in self._tickers_years_dict[ticker]:
                     self._tickers_years_dict[ticker][tf] = []
-
+                
                 ticker_years_list = self._tickers_years_dict[ticker][tf]
+                missing_years = sorted(list(set(years_tick).difference(ticker_years_list)))
+                if missing_years:
+                    missing_years_per_tf[tf] = missing_years
+                    all_missing_years.update(missing_years)
 
-                if set(years_tick).difference(ticker_years_list):
-                    years = list(set(years_tick).difference(ticker_years_list))
+            if not all_missing_years:
+                continue
 
-                    end_year = max(years)
-                    start_year = min(years)
-
-                    year_start = f'{start_year}-01-01 00:00:00.000'
-                    year_end = f'{end_year + 1}-01-01 00:00:00.000'
-                    # read missing years from tick timeframe
+            if isinstance(self._db_connector, LocalDBYearConnector):
+                # Map each missing year to the timeframes that need it
+                year_to_tfs = {}
+                for tf, missing_years in missing_years_per_tf.items():
+                    for year in missing_years:
+                        if year not in year_to_tfs:
+                            year_to_tfs[year] = []
+                        year_to_tfs[year].append(tf)
+                
+                # Process each missing year once
+                for year in sorted(year_to_tfs.keys()):
+                    year_start = f'{year}-01-01 00:00:00.000'
+                    year_end = f'{year + 1}-01-01 00:00:00.000'
+                    
                     start = datetime.strptime(year_start, DATE_FORMAT_SQL)
                     end = datetime.strptime(year_end, DATE_FORMAT_SQL)
 
+                    # Read missing year from tick timeframe ONCE
                     dataframe = self._db_connector.read_data(
                         market='forex',
                         ticker=ticker,
@@ -350,32 +367,71 @@ class HistoricalManagerDB:
                         end=end
                     )
 
+                    for tf in year_to_tfs[year]:
+                        # reframe to timeframe
+                        dataframe_tf = reframe_data(dataframe, tf)
+
+                        # get data id key
+                        tf_key = self._db_connector._db_key(
+                            'forex',
+                            ticker,
+                            tf,
+                            year
+                        )
+
+                        # write to database
+                        self._db_connector.write_data(tf_key, dataframe_tf)
+
+                        # update metadata
+                        self._db_connector.add_tickers_years_info_to_file(ticker, tf, [year])
+                        if year not in self._tickers_years_dict[ticker][tf]:
+                            self._tickers_years_dict[ticker][tf].append(year)
+                            self._tickers_years_dict[ticker][tf].sort()
+
+                # After all years are processed, verify consistency for each TF
+                for tf, missing_years in missing_years_per_tf.items():
+                    if set(years_tick).difference(self._tickers_years_dict[ticker][tf]):
+                        logger.bind(target='histmanager').critical(
+                            f'ticker {ticker}: {tf} timeframe completing'
+                            ' operation FAILED')
+                        raise KeyError
+                    else:
+                        logger.bind(
+                            target='histmanager').trace(
+                            f'ticker {ticker}: {tf} timeframe completing operation successful for {missing_years}')
+            else:
+                # Standard connector: Read the full global range of missing years once
+                start_year = min(all_missing_years)
+                end_year = max(all_missing_years)
+
+                year_start = f'{start_year}-01-01 00:00:00.000'
+                year_end = f'{end_year + 1}-01-01 00:00:00.000'
+                
+                start = datetime.strptime(year_start, DATE_FORMAT_SQL)
+                end = datetime.strptime(year_end, DATE_FORMAT_SQL)
+
+                dataframe = self._db_connector.read_data(
+                    market='forex',
+                    ticker=ticker,
+                    timeframe=TICK_TIMEFRAME,
+                    start=start,
+                    end=end
+                )
+
+                for tf, missing_years in missing_years_per_tf.items():
                     # reframe to timeframe
                     dataframe_tf = reframe_data(dataframe, tf)
 
                     # get data id key
-                    tf_key = self._db_connector._db_key(
-                        'forex',
-                        ticker,
-                        tf
-                    )
+                    tf_key = self._db_connector._db_key('forex', ticker, tf)
 
-                    # write to database to complete the years
-                    # call to upload df to database
-                    self._db_connector.write_data(tf_key,
-                                                  dataframe_tf)
+                    # write to database
+                    self._db_connector.write_data(tf_key, dataframe_tf)
 
-                    # update years list in local info file
-                    self._db_connector.add_tickers_years_info_to_file(ticker,
-                                                                      tf,
-                                                                      years)
-
-                    # update internal ticker years list info
-                    self._tickers_years_dict[ticker][tf].extend(years)
-                    # sort and remove duplicates
-                    self._tickers_years_dict[ticker][tf].sort()
-                    self._tickers_years_dict[ticker][tf] = \
-                        list_remove_duplicates(self._tickers_years_dict[ticker][tf])
+                    # update metadata
+                    self._db_connector.add_tickers_years_info_to_file(ticker, tf, missing_years)
+                    self._tickers_years_dict[ticker][tf].extend(missing_years)
+                    self._tickers_years_dict[ticker][tf] = sorted(list(set(self._tickers_years_dict[ticker][tf])))
 
                     # REDO THE CHECK FOR CONSISTENCY
                     if set(years_tick).difference(self._tickers_years_dict[ticker][tf]):
@@ -389,7 +445,7 @@ class HistoricalManagerDB:
                     else:
                         logger.bind(
                             target='histmanager').trace(
-                            f'ticker {ticker}: {tf} timeframe completing operation successful for {years}')
+                            f'ticker {ticker}: {tf} timeframe completing operation successful for {missing_years}')
 
     def _download_month_raw(self,
                             ticker,
@@ -893,51 +949,85 @@ class HistoricalManagerDB:
         if not all(isinstance(year, int) for year in years):
             years = [int(year) for year in years]
 
-        # download data for each year
-        years_data_df = empty_dataframe(self.engine)
-        for year in years:
-
-            year_tick_df = self._download_year(
-                ticker,
-                year
-            )
-
-            # if first iteration, assign instead of concat
-            if is_empty_dataframe(years_data_df):
-
-                years_data_df = year_tick_df
-
-            else:
-
-                years_data_df = concat_data([years_data_df, year_tick_df])
-
-        # get data id key
-        tick_key = self._db_connector._db_key('forex',
-                                              ticker,
-                                              TICK_TIMEFRAME)
-
-        # call to upload df to database if not empty
-        if not is_empty_dataframe(years_data_df):
-            self._db_connector.write_data(tick_key,
-                                          years_data_df)
-
-            # update years list in local info file
-            self._db_connector.add_tickers_years_info_to_file(ticker,
-                                                              TICK_TIMEFRAME,
-                                                              years)
-
-            # update internal ticker years list info
-            self._tickers_years_dict[ticker][TICK_TIMEFRAME].extend(years)
-            # sort and remove duplicates
-            self._tickers_years_dict[ticker][TICK_TIMEFRAME].sort()
-            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = \
-                list_remove_duplicates(self._tickers_years_dict[ticker][TICK_TIMEFRAME])
-
+        # execute differently based on connector type
+        if isinstance(self._db_connector, LocalDBYearConnector):
+            # download and write data for each year
+            for year in years:
+    
+                year_tick_df = self._download_year(
+                    ticker,
+                    year
+                )
+    
+                # get data id key for the year
+                tick_key = self._db_connector._db_key('forex',
+                                                      ticker,
+                                                      TICK_TIMEFRAME,
+                                                      year)
+    
+                # call to upload df to database if not empty
+                if not is_empty_dataframe(year_tick_df):
+                    self._db_connector.write_data(tick_key,
+                                                  year_tick_df)
+    
+                    # update years list in local info file
+                    self._db_connector.add_tickers_years_info_to_file(ticker,
+                                                                      TICK_TIMEFRAME,
+                                                                      [year])
+    
+                    # update internal ticker years list info
+                    if year not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
+                        self._tickers_years_dict[ticker][TICK_TIMEFRAME].append(year)
+                        # sort
+                        self._tickers_years_dict[ticker][TICK_TIMEFRAME].sort()
+    
+                else:
+                    logger.bind(
+                        target='histmanager').warning(
+                        f'Data dataframe for {tick_key} is empty, skipping database write')
         else:
-            logger.bind(
-                target='histmanager').warning(
-                f'Years data dataframe for {tick_key} is empty, skipping database write')
-
+            # download data for each year and aggregate
+            years_data_df = empty_dataframe(self.engine)
+            for year in years:
+    
+                year_tick_df = self._download_year(
+                    ticker,
+                    year
+                )
+    
+                # if first iteration, assign instead of concat
+                if is_empty_dataframe(years_data_df):
+                    years_data_df = year_tick_df
+                else:
+                    years_data_df = concat_data([years_data_df, year_tick_df])
+    
+            # get data id key
+            tick_key = self._db_connector._db_key('forex',
+                                                  ticker,
+                                                  TICK_TIMEFRAME)
+    
+            # call to upload df to database if not empty
+            if not is_empty_dataframe(years_data_df):
+                self._db_connector.write_data(tick_key,
+                                              years_data_df)
+    
+                # update years list in local info file
+                self._db_connector.add_tickers_years_info_to_file(ticker,
+                                                                  TICK_TIMEFRAME,
+                                                                  years)
+    
+                # update internal ticker years list info
+                self._tickers_years_dict[ticker][TICK_TIMEFRAME].extend(years)
+                # sort and remove duplicates
+                self._tickers_years_dict[ticker][TICK_TIMEFRAME].sort()
+                self._tickers_years_dict[ticker][TICK_TIMEFRAME] = \
+                    list_remove_duplicates(self._tickers_years_dict[ticker][TICK_TIMEFRAME])
+    
+            else:
+                logger.bind(
+                    target='histmanager').warning(
+                    f'Years data dataframe for {tick_key} is empty, skipping database write')
+    
     def clear_database(self, filter: Optional[str] = None) -> None:
 
         self._db_connector.clear_database(filter=filter)
@@ -1022,8 +1112,16 @@ class HistoricalManagerDB:
         Args:
             ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'NZDUSD').
                 Case-insensitive.
-            timeframe (str): Candle timeframe for data aggregation. Supported values:
-                '1m', '5m', '15m', '30m', '1h', '4h', '1D', '1W', '1M'
+            timeframe (str): Candle timeframe for data aggregation. Supported frames:
+                1s (1 second)
+                1m (1 minute)
+                1h (1 hour)
+                1d (1 calendar day)
+                1w (1 calendar week)
+                1mo (1 calendar month)
+                1q (1 calendar quarter)
+                1y (1 calendar year)
+            and any multiple of these values by a positive integer, e.g.: '2m', '3m', '2h', '3h', etc.
             start (str | datetime): Start date for data retrieval. Accepts:
                 - ISO format: 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
                 - datetime object

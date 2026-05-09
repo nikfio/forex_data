@@ -255,6 +255,7 @@ DATE_FORMAT_HISTDATA_CSV = '%Y%m%d %H%M%S%f'
 DATA_KEY_TEMPLATE_STR = '{market}.{ticker}.{tf}'
 DATA_KEY_TEMPLATE_PATTERN = '^[A-Za-z0-9]_[A-Za-z]+.[A-Za-z0-9]+'
 FILENAME_STR = '{market}_{ticker}_{tf}.{file_ext}'
+FILENAME_YEAR_STR = '{ticker}_{tf}_{year}.{file_ext}'
 DEFAULT_TIMEZONE = 'utc'
 TICK_TIMEFRAME = 'tick'
 
@@ -346,6 +347,7 @@ class DATA_KEY:
     MARKET = 0
     TICKER_INDEX = 1
     TF_INDEX = 2
+    YEAR_INDEX = 3
 
 
 # filename template : <ticker>_Y<year>_<timeframe>.<filetype>
@@ -366,10 +368,8 @@ class DEFAULT_PATHS:
 
 
 class DATA_TYPE:
-
     CSV_FILETYPE = 'csv'
     PARQUET_FILETYPE = 'parquet'
-    DUCKDB = 'duckdb'
 
 
 class DATA_FILE_COLUMN_INDEX:
@@ -379,8 +379,7 @@ class DATA_FILE_COLUMN_INDEX:
 
 SUPPORTED_DATA_FILES = [
     DATA_TYPE.CSV_FILETYPE,
-    DATA_TYPE.PARQUET_FILETYPE,
-    DATA_TYPE.DUCKDB
+    DATA_TYPE.PARQUET_FILETYPE
 ]
 
 # supported dataframe engines
