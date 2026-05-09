@@ -29,7 +29,6 @@ __all__ = [
     'get_db_key_elements',
     'check_timeframe_str',
     'DatabaseConnector',
-    'DuckDBConnector',
     'LocalDBConnector',
     'concat_data',
     'validator_dir_path',
@@ -87,8 +86,8 @@ from .common import (
 
 from .database import (
     DatabaseConnector,
-    DuckDBConnector,
-    LocalDBConnector
+    LocalDBConnector,
+    LocalDBYearConnector
 )
 
 from .historicaldata import HistoricalManagerDB
