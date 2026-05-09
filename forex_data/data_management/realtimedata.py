@@ -128,7 +128,6 @@ class RealtimeManager:
     ssl_verify: bool = field(default=True,
                              validator=validators.instance_of(bool))
 
-
     # internal parameters
     _dataframe_type = field(default=pandas_dataframe)
     _realtimedata_path = field(
@@ -140,7 +139,6 @@ class RealtimeManager:
         validator=validators.optional(
             validators.instance_of(Path)))
     _session = field(factory=Session)
-
 
     # if a valid config file or string
     # is passed
@@ -174,12 +172,11 @@ class RealtimeManager:
         self.__attrs_post_init__()
 
     def __attrs_post_init__(self) -> None:
-        
+
         self._session.verify = self.ssl_verify
         if not self.ssl_verify:
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()

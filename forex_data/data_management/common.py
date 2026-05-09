@@ -1811,7 +1811,7 @@ def update_ticker_years_dict(
 
     # convert to int years_to_add items
     years_to_add = [int(y) for y in years_to_add]
-    
+
     # Initialize ticker if not present
     if ticker not in ticker_years_dict:
         ticker_years_dict[ticker] = {}

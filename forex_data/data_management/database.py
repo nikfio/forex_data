@@ -160,12 +160,8 @@ class DatabaseConnector:
         return file_items
 
 
-
-
-
 '''
 LOCAL DATA FILES MANAGER
-
 '''
 
 
@@ -256,8 +252,6 @@ class LocalDBConnector(DatabaseConnector):
         return '_'.join([market.lower(),
                          ticker.lower(),
                          timeframe.lower()])
-
-
 
     def _get_filename(self, market: str, ticker: str, tf: str) -> str:
 
@@ -1046,17 +1040,15 @@ class LocalDBYearConnector(DatabaseConnector):
                          timeframe.lower(),
                          str(year)])
 
-
-
     def _get_filename(self, market: str, ticker: str, tf: str, year: int) -> str:
 
         # based on standard filename template
         return FILENAME_YEAR_STR.format(
-                                        market=market.lower(),
-                                        ticker=ticker.lower(),
-                                        year=year,
-                                        tf=tf.lower(),
-                                        file_ext=self.data_type.lower())
+            market=market.lower(),
+            ticker=ticker.lower(),
+            year=year,
+            tf=tf.lower(),
+            file_ext=self.data_type.lower())
 
     def _list_local_data(self) -> List[PathType]:
 
@@ -1140,6 +1132,7 @@ class LocalDBYearConnector(DatabaseConnector):
             key for key in local_files
             if search(f'{ticker.lower()}',
                       str(key.stem)) and
+            len(self._get_items_from_db_key(str(key.stem))) > DATA_KEY.YEAR_INDEX and
             self._get_items_from_db_key(str(key.stem))[DATA_KEY.TF_INDEX] ==
             timeframe.lower()
         ]
@@ -1425,7 +1418,7 @@ class LocalDBYearConnector(DatabaseConnector):
         Thus the target_table must be composed by 4 items (market, ticker, timeframe and year).
         In this object performance is prioritized, the method writes a single year data but sanity check that it is a year
         must be done by the caller. This to avoid other calls especially to polars collect() calls.
-        
+
         Parameters
         ----------
         target_table : str
@@ -1556,7 +1549,7 @@ class LocalDBYearConnector(DatabaseConnector):
         for year in years:
             filename = self._get_filename(market, ticker, timeframe, year)
             filepath = (self.data_path / market / ticker / timeframe / filename)
-            
+
             if filepath.exists() and filepath.is_file():
                 file_lock_path = str(filepath) + '.lock'
                 with FileLock(file_lock_path):
@@ -1569,7 +1562,7 @@ class LocalDBYearConnector(DatabaseConnector):
         if not dataframes_list:
             logger.bind(target='localdb').critical(f'No files found for {market} {ticker} {timeframe} between {start} and {end}')
             raise FileNotFoundError(f"No files found for {market} {ticker} {timeframe} between {start} and {end}")
-            
+
         dataframe = concat(dataframes_list)
 
         try:

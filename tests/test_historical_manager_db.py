@@ -53,11 +53,12 @@ while _data_path.exists():
     _data_path = Path.home() / f".test_database_{_counter}"
     _counter += 1
 
-# Use a runtime defined config yaml file
 test_config_yaml = f'''
 DATA_PATH: '{_data_path}'
 DATA_FILETYPE: 'parquet'
 ENGINE: 'polars_lazy'
+DB_FILES_YEAR_PARTITIONING: True
+SSL_VERIFY: False
 '''
 
 
@@ -410,7 +411,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         Test that clear_database wipes data for a specific ticker
         and verify that data can be correctly re-downloaded.
         """
-        ticker = random.choice(get_histdata_tickers())
+        ticker = random.choice(get_histdata_tickers(verify=False))
         timeframe = '1W'
 
         # 1. Ensure GBPUSD data is present (pull some data)
@@ -474,7 +475,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
     def test_19_get_histdata_tickers(self):
         """Test retrieving available tickers from HistData.com."""
-        tickers = get_histdata_tickers()
+        tickers = get_histdata_tickers(verify=False)
 
         self.assertIsInstance(tickers, list)
         self.assertGreater(len(tickers), 0, msg="No tickers retrieved from HistData")
@@ -964,7 +965,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         """
         current_year = datetime.now().year
         # Use another common ticker
-        ticker = random.choice(get_histdata_tickers())
+        ticker = random.choice(get_histdata_tickers(verify=False))
 
         # Pick random end_date in current year
         start_of_year = datetime(current_year, 1, 1)

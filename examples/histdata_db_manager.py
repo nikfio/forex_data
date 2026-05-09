@@ -162,7 +162,7 @@ test_config_yaml = '''
 ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
 DATA_PATH: '~/.test_database_year_files'
-DB_FILES_YEAR_SEGMENTATION: True
+DB_FILES_YEAR_PARTITIONING: True
 SSL_VERIFY: False
 '''
 

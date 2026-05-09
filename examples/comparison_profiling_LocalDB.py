@@ -13,12 +13,10 @@ from pathlib import Path
 from sys import stdout
 
 from forex_data import (
-    HistoricalManagerDB,
-    get_histdata_tickers
+    HistoricalManagerDB
 )
 
 from loguru import logger
-from random import choice
 
 # ── Configuration ────────────────────────────────────────────────────────────
 N_STEPS = 5           # number of steps to time in the repeated loop
@@ -38,7 +36,7 @@ config_standard = '''
 ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
 DATA_PATH: '~/.test_database_files'
-DB_FILES_YEAR_SEGMENTATION: False
+DB_FILES_YEAR_PARTITIONING: False
 SSL_VERIFY: False
 '''
 
@@ -46,11 +44,12 @@ config_partitioned = '''
 ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
 DATA_PATH: '~/.test_database_year_files'
-DB_FILES_YEAR_SEGMENTATION: True
+DB_FILES_YEAR_PARTITIONING: True
 SSL_VERIFY: False
 '''
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 @contextmanager
 def phase_timer(label: str, results: dict):
@@ -58,10 +57,11 @@ def phase_timer(label: str, results: dict):
     yield
     results[label] = time.perf_counter() - t0
 
+
 def run_benchmark(config_str: str, label: str, ticker: str):
     logger.info(f"Starting benchmark for: {label}")
     phase_times: dict[str, float] = {}
-    
+
     with phase_timer("init", phase_times):
         manager = HistoricalManagerDB(config=config_str)
 
@@ -116,7 +116,7 @@ def run_benchmark(config_str: str, label: str, ticker: str):
         fetch_times_2.append(time.perf_counter() - t0)
 
     manager.close()
-    
+
     return {
         'label': label,
         'phase_times': phase_times,
@@ -130,13 +130,14 @@ def run_benchmark(config_str: str, label: str, ticker: str):
         'fetch_3D_max': max(fetch_times_2),
     }
 
+
 def print_report(res_standard, res_partitioned):
     lines = []
     lines.append("=" * 64)
     lines.append("  HistoricalManagerDB — LocalDB Connector Comparison Report")
     lines.append("=" * 64)
     lines.append("")
-    
+
     for res in [res_standard, res_partitioned]:
         lines.append(f"Results for: {res['label']}")
         lines.append("-" * 40)
@@ -145,8 +146,16 @@ def print_report(res_standard, res_partitioned):
             lines.append(f"  {k:<30s} {v * 1000:10.3f} ms")
         lines.append("")
         lines.append(f"Repeated Fetches ({N_STEPS} iterations):")
-        lines.append(f"  get_data 1D (avg)              {res['fetch_1D_avg'] * 1000:10.3f} ms (min: {res['fetch_1D_min'] * 1000:.3f}, max: {res['fetch_1D_max'] * 1000:.3f})")
-        lines.append(f"  get_data 3D (avg)              {res['fetch_3D_avg'] * 1000:10.3f} ms (min: {res['fetch_3D_min'] * 1000:.3f}, max: {res['fetch_3D_max'] * 1000:.3f})")
+        lines.append(
+            f"  get_data 1D (avg)              {res['fetch_1D_avg'] * 1000:10.3f} ms "
+            f"(min: {res['fetch_1D_min'] * 1000:.3f}, "
+            f"max: {res['fetch_1D_max'] * 1000:.3f})"
+        )
+        lines.append(
+            f"  get_data 3D (avg)              {res['fetch_3D_avg'] * 1000:10.3f} ms "
+            f"(min: {res['fetch_3D_min'] * 1000:.3f}, "
+            f"max: {res['fetch_3D_max'] * 1000:.3f})"
+        )
         lines.append("")
         lines.append("-" * 40)
         lines.append("")
@@ -155,6 +164,7 @@ def print_report(res_standard, res_partitioned):
     print("\n" + report)
     TIMING_TXT.write_text(report)
     logger.bind(target='profiler').info(f"Comparison report saved → {TIMING_TXT}")
+
 
 def _write_cprofile_report(profiler: cProfile.Profile) -> None:
     profiler.dump_stats(str(CPROFILE_BIN))
@@ -169,6 +179,7 @@ def _write_cprofile_report(profiler: cProfile.Profile) -> None:
     stats_text = buf.getvalue()
     CPROFILE_TXT.write_text(stats_text)
     logger.bind(target='profiler').info(f"cProfile stats saved  → {CPROFILE_TXT}")
+
 
 def main():
     logger.remove()
@@ -198,9 +209,10 @@ def main():
     _write_cprofile_report(profiler)
 
     print_report(res_standard, res_partitioned)
-    
+
     logger.info("Profiling complete.")
     logger.info(f"All output files are in: {PROFILE_DIR}")
+
 
 if __name__ == '__main__':
     main()
