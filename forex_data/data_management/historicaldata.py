@@ -417,6 +417,10 @@ class HistoricalManagerDB:
         """
 
         session = Session()
+        session.verify = False
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         r = session.get(url)
 
         token = None
