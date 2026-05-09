@@ -96,6 +96,8 @@ class HistoricalManagerDB:
                                                             validators.instance_of(Path)))
     db_files_year_segmentation: bool = field(default=True,
                                      validator=validators.instance_of(bool))
+    ssl_verify: bool = field(default=True,
+                             validator=validators.instance_of(bool))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -241,7 +243,7 @@ class HistoricalManagerDB:
             raise ValueError(f'Data type {self.data_type} not supported')
 
         # cache histdata tickers list at initialization
-        self._histdata_tickers_list = get_histdata_tickers()
+        self._histdata_tickers_list = get_histdata_tickers(verify=self.ssl_verify)
 
         # initialize tickers years dict info of data available
         # with the current connector
@@ -341,6 +343,14 @@ class HistoricalManagerDB:
             if not all_missing_years:
                 continue
 
+            # call read function optimized for years query
+            tick_dataframe = self._db_connector.read_data_year(
+                market='forex',
+                ticker=ticker,
+                timeframe=TICK_TIMEFRAME,
+                years=all_missing_years
+            )
+
             if isinstance(self._db_connector, LocalDBYearConnector):
                 # Map each missing year to the timeframes that need it
                 year_to_tfs = {}
@@ -358,13 +368,12 @@ class HistoricalManagerDB:
                     start = datetime.strptime(year_start, DATE_FORMAT_SQL)
                     end = datetime.strptime(year_end, DATE_FORMAT_SQL)
 
-                    # Read missing year from tick timeframe ONCE
-                    dataframe = self._db_connector.read_data(
-                        market='forex',
-                        ticker=ticker,
-                        timeframe=TICK_TIMEFRAME,
-                        start=start,
-                        end=end
+                    # Read missing year from tick_dataframe 
+                    # use filter to get just the year needed
+                    dataframe = tick_dataframe.filter(
+                        (col(BASE_DATA_COLUMN_NAME.TIMESTAMP) >= start) 
+                        &
+                        (col(BASE_DATA_COLUMN_NAME.TIMESTAMP) < end)
                     )
 
                     for tf in year_to_tfs[year]:
@@ -400,27 +409,10 @@ class HistoricalManagerDB:
                             target='histmanager').trace(
                             f'ticker {ticker}: {tf} timeframe completing operation successful for {missing_years}')
             else:
-                # Standard connector: Read the full global range of missing years once
-                start_year = min(all_missing_years)
-                end_year = max(all_missing_years)
-
-                year_start = f'{start_year}-01-01 00:00:00.000'
-                year_end = f'{end_year + 1}-01-01 00:00:00.000'
-                
-                start = datetime.strptime(year_start, DATE_FORMAT_SQL)
-                end = datetime.strptime(year_end, DATE_FORMAT_SQL)
-
-                dataframe = self._db_connector.read_data(
-                    market='forex',
-                    ticker=ticker,
-                    timeframe=TICK_TIMEFRAME,
-                    start=start,
-                    end=end
-                )
 
                 for tf, missing_years in missing_years_per_tf.items():
                     # reframe to timeframe
-                    dataframe_tf = reframe_data(dataframe, tf)
+                    dataframe_tf = reframe_data(tick_dataframe, tf)
 
                     # get data id key
                     tf_key = self._db_connector._db_key('forex', ticker, tf)
@@ -473,6 +465,11 @@ class HistoricalManagerDB:
         """
 
         session = Session()
+        session.verify = self.ssl_verify
+        if not self.ssl_verify:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
         r = session.get(url)
 
         token = None
@@ -886,7 +883,7 @@ class HistoricalManagerDB:
             except TickerDataBadTypeException:
                 if (
                     year == datetime.now().year and
-                    month_num > datetime.now().month
+                    month_num >= datetime.now().month
                 ):
                     logger.bind(target='histmanager').critical(
                         f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data")

@@ -100,6 +100,14 @@ class DatabaseConnector:
         """Read data from database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_data")
 
+    def read_data_year(self,
+                       market: str,
+                       ticker: str,
+                       timeframe: str,
+                       years: int | List[int]) -> polars_lazyframe:
+        """Read data for specific year(s) - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement read_data_year")
+
     def exec_sql(self) -> None:
         """Execute SQL - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement exec_sql")
@@ -286,7 +294,7 @@ class LocalDBConnector(DatabaseConnector):
 
         for filename in local_files_name:
 
-            items = self._get_file_details(filename)
+            items = self._get_file_items(filename)
             tickers_list.append(items[DATA_KEY.TICKER_INDEX])
 
         return list_remove_duplicates(tickers_list)
@@ -892,6 +900,61 @@ class LocalDBConnector(DatabaseConnector):
 
         return dataframe
 
+    def read_data_year(self,
+                       market: str,
+                       ticker: str,
+                       timeframe: str,
+                       years: int | List[int]) -> polars_lazyframe:
+        """
+        Read data for specific year(s) using SQL YEAR() filter.
+        """
+        if isinstance(years, int):
+            years_list = [years]
+        else:
+            years_list = sorted(years)
+
+        filename = self._get_filename(market, ticker, timeframe)
+        filepath = (self.data_path / market / ticker / filename)
+
+        if not (filepath.exists() and filepath.is_file()):
+            logger.bind(target='localdb').critical(f'File not found: {filepath}')
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+        # Per-file lock ensures we don't read while write_data is writing.
+        file_lock_path = str(filepath) + '.lock'
+        with FileLock(file_lock_path):
+            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                dataframe = read_csv(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                dataframe = read_parquet(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+
+        # Apply year filter via SQL
+        year_filter_str = ", ".join([str(y) for y in years_list])
+        query = f'''SELECT * FROM self
+                WHERE
+                EXTRACT(YEAR FROM {BASE_DATA_COLUMN_NAME.TIMESTAMP}) IN ({year_filter_str})
+                ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}
+                '''
+
+        try:
+            dataframe = dataframe.sql(query)
+        except Exception as e:
+            logger.bind(target='localdb').error(
+                f'executing query {query} failed: {e}')
+            raise
+
+        # Cast types
+        if timeframe == TICK_TIMEFRAME:
+            dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+        else:
+            dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        return dataframe
+
 
 @define(kw_only=True, slots=True)
 class LocalDBYearConnector(DatabaseConnector):
@@ -988,7 +1051,9 @@ class LocalDBYearConnector(DatabaseConnector):
     def _get_filename(self, market: str, ticker: str, tf: str, year: int) -> str:
 
         # based on standard filename template
-        return FILENAME_YEAR_STR.format(ticker=ticker.lower(),
+        return FILENAME_YEAR_STR.format(
+                                        market=market.lower(),
+                                        ticker=ticker.lower(),
                                         year=year,
                                         tf=tf.lower(),
                                         file_ext=self.data_type.lower())
@@ -1020,7 +1085,7 @@ class LocalDBYearConnector(DatabaseConnector):
 
         for filename in local_files_name:
 
-            items = self._get_file_details(filename)
+            items = self._get_file_items(filename)
             tickers_list.append(items[DATA_KEY.TICKER_INDEX])
 
         return list_remove_duplicates(tickers_list)
@@ -1068,9 +1133,7 @@ class LocalDBYearConnector(DatabaseConnector):
             ticker: str,
             timeframe: str = TICK_TIMEFRAME) -> List[int]:
 
-        ticker_years_list = []
-        table = ''
-
+        years_list = []
         local_files, local_files_name = self._list_local_data()
 
         files = [
@@ -1082,10 +1145,10 @@ class LocalDBYearConnector(DatabaseConnector):
         ]
 
         # read year info from file name
-        years_list = [self._get_items_from_db_key(str(key.stem))[DATA_KEY.YEAR_INDEX] for key in files]
+        years_list = [int(self._get_items_from_db_key(str(key.stem))[DATA_KEY.YEAR_INDEX]) for key in files]
         years_list = sorted(list(set(years_list)))
 
-        return ticker_years_list
+        return years_list
 
     def get_ticker_years_list(
             self,
@@ -1483,9 +1546,13 @@ class LocalDBYearConnector(DatabaseConnector):
             raise ValueError(
                 f'Engine {self.engine} or data type {self.data_type} not supported')
 
+        # set the years to read
+        # in order to know which files to look for
         years = list(range(start.year, end.year + 1))
+
         dataframes_list = []
-        
+
+        # iterate over the years and read the data
         for year in years:
             filename = self._get_filename(market, ticker, timeframe, year)
             filepath = (self.data_path / market / ticker / timeframe / filename)
@@ -1494,14 +1561,10 @@ class LocalDBYearConnector(DatabaseConnector):
                 file_lock_path = str(filepath) + '.lock'
                 with FileLock(file_lock_path):
                     if self.data_type == DATA_TYPE.CSV_FILETYPE:
-                        df_part = read_csv(self.engine, filepath)
-                        if hasattr(df_part, 'collect'):
-                            df_part = df_part.collect().lazy()
+                        df_year = read_csv(self.engine, filepath)
                     elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
-                        df_part = read_parquet(self.engine, filepath)
-                        if hasattr(df_part, 'collect'):
-                            df_part = df_part.collect().lazy()
-                    dataframes_list.append(df_part)
+                        df_year = read_parquet(self.engine, filepath)
+                    dataframes_list.append(df_year)
 
         if not dataframes_list:
             logger.bind(target='localdb').critical(f'No files found for {market} {ticker} {timeframe} between {start} and {end}')
@@ -1550,5 +1613,63 @@ class LocalDBYearConnector(DatabaseConnector):
                 dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
             else:
                 dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        return dataframe
+
+    def read_data_year(self,
+                       market: str,
+                       ticker: str,
+                       timeframe: str,
+                       years: int | List[int]) -> polars_lazyframe:
+        """
+        Read data for specific year(s) using SQL YEAR() filter.
+        """
+        if isinstance(years, int):
+            years_list = [years]
+        else:
+            years_list = sorted(years)
+
+        dataframes_list = []
+        for y in years_list:
+            filename = self._get_filename(market, ticker, timeframe, y)
+            filepath = (self.data_path / market / ticker / timeframe / filename)
+
+            if filepath.exists():
+                file_lock_path = str(filepath) + '.lock'
+                with FileLock(file_lock_path):
+                    if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                        df_year = read_csv(self.engine, filepath)
+                    elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                        df_year = read_parquet(self.engine, filepath)
+                    dataframes_list.append(df_year)
+
+        if not dataframes_list:
+            logger.bind(target='localdb').critical(
+                f'No files found for {market} {ticker} {timeframe} for years {years_list}')
+            raise FileNotFoundError(
+                f"No files found for {market} {ticker} {timeframe} for years {years_list}")
+
+        dataframe = concat(dataframes_list)
+
+        # Apply year filter via SQL
+        year_filter_str = ", ".join([str(y) for y in years_list])
+        query = f'''SELECT * FROM self
+                WHERE
+                EXTRACT(YEAR FROM {BASE_DATA_COLUMN_NAME.TIMESTAMP}) IN ({year_filter_str})
+                ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}
+                '''
+
+        try:
+            dataframe = dataframe.sql(query)
+        except Exception as e:
+            logger.bind(target='localdb').error(
+                f'executing query {query} failed: {e}')
+            raise
+
+        # Cast types
+        if timeframe == TICK_TIMEFRAME:
+            dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+        else:
+            dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
 
         return dataframe

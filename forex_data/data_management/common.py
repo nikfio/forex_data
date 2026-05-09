@@ -132,6 +132,7 @@ __all__ = [
     'DATA_KEY',
     'TICK_TIMEFRAME',
     'FILENAME_STR',
+    'FILENAME_YEAR_STR',
     'REALTIME_DATA_PROVIDER',
     'ALPHA_VANTAGE_API_KEY',
     'CANONICAL_INDEX',
@@ -255,7 +256,7 @@ DATE_FORMAT_HISTDATA_CSV = '%Y%m%d %H%M%S%f'
 DATA_KEY_TEMPLATE_STR = '{market}.{ticker}.{tf}'
 DATA_KEY_TEMPLATE_PATTERN = '^[A-Za-z0-9]_[A-Za-z]+.[A-Za-z0-9]+'
 FILENAME_STR = '{market}_{ticker}_{tf}.{file_ext}'
-FILENAME_YEAR_STR = '{ticker}_{tf}_{year}.{file_ext}'
+FILENAME_YEAR_STR = '{market}_{ticker}_{tf}_{year}.{file_ext}'
 DEFAULT_TIMEZONE = 'utc'
 TICK_TIMEFRAME = 'tick'
 
@@ -1683,25 +1684,34 @@ def list_remove_duplicates(list_in):
 # Analyze the Histdata Forex download base page
 # https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes
 # and get a list of all avilable tickers in the form as the example "EURUSD"
-def get_histdata_tickers() -> List[str]:
+def get_histdata_tickers(verify: bool = True) -> List[str]:
     """
     Get all available tickers from HistData.com.
+
+    Parameters
+    ----------
+    verify : bool, optional
+        Whether to verify SSL certificates. Default is True.
 
     Returns
     -------
     List[str]
         List of all available tickers (e.g., ['EURUSD', 'GBPUSD', ...]).
     """
+    if not verify:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     url = "https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes"
 
     try:
-        requests.head(url, timeout=5)
-    except requests.RequestException:
-        logger.error(f'Failed to connect to {url}')
+        requests.head(url, timeout=5, verify=verify)
+    except requests.RequestException as e:
+        logger.error(f'Failed to connect to {url}: {e}')
         return []
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, verify=verify)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -1798,6 +1808,10 @@ def update_ticker_years_dict(
     bool
         True if any changes were made, False otherwise
     """
+
+    # convert to int years_to_add items
+    years_to_add = [int(y) for y in years_to_add]
+    
     # Initialize ticker if not present
     if ticker not in ticker_years_dict:
         ticker_years_dict[ticker] = {}
