@@ -243,7 +243,7 @@ class HistoricalManagerDB:
                 # connector_id assigned -> prepare connector to use a dedicated
                 # independent data folder under LocalDB
                 self._db_connector = connector_type(
-                    data_path=str(self._histdata_path / 'LocalDB' / self.connector_id),
+                    data_path=str(self._histdata_path / f'LocalDB_{self.connector_id}'),
                     data_type=self.data_type,
                     engine=self.engine
                 )
