@@ -160,8 +160,13 @@ class HistoricalManagerDB:
 
         # set up log sink for historical manager
         # Remove existing handlers for this sink to prevent duplicate log entries
+        if self.connector_id:
+            log_file = f'forexhistdata_{self.connector_id}.log'
+        else:
+            log_file = 'forexhistdata.log'
+
         self._histdata_path = self.data_path / DEFAULT_PATHS.HIST_DATA_FOLDER
-        log_path = self._histdata_path / 'log' / 'forexhistdata.log'
+        log_path = self._histdata_path / 'log' / log_file
 
         # Remove handlers that match this log file path
         # logger.remove() without args would remove ALL handlers including stderr

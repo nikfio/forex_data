@@ -163,7 +163,6 @@ ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
 DATA_PATH: '~/.test_database_year_files'
 DB_FILES_YEAR_PARTITIONING: True
-CONNECTOR_ID: '1'
 SSL_VERIFY: False
 '''
 
