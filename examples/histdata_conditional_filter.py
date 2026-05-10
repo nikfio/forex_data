@@ -146,8 +146,11 @@ def _try_line_profiler(manager: HistoricalManagerDB, ex_ticker: str) -> None:
 
 # Use a runtime defined config yaml file
 test_config_yaml = '''
-DATA_FILETYPE: 'parquet'
 ENGINE: 'polars_lazy'
+DATA_TYPE: 'parquet'
+DATA_PATH: '~/.test_database_year_files'
+DB_FILES_YEAR_PARTITIONING: True
+SSL_VERIFY: False
 '''
 
 

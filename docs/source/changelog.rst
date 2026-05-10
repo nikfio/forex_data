@@ -133,7 +133,6 @@ Performance
 Planned for v0.3.0
 ------------------
 
-* DuckDB integration as engine for data caching
 * Robust connection between Historical and Real-time data managers if applicable
 * Data types outside raw price data available for query (e.g. volume, fundamentals information and others))
 

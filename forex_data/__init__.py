@@ -38,7 +38,6 @@ from .data_management import (
     get_db_key_elements,
     check_timeframe_str,
     DatabaseConnector,
-    DuckDBConnector,
     LocalDBConnector,
     concat_data,
     validator_dir_path,

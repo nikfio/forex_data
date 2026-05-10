@@ -13,6 +13,7 @@ from datetime import datetime
 from uuid import uuid4
 from shutil import rmtree
 from io import StringIO
+from requests import Session
 
 from attrs import (
     define,
@@ -124,6 +125,8 @@ class RealtimeManager:
                      Path] = field(default=str(DEFAULT_PATHS.BASE_PATH),
                                    validator=validators.or_(validators.instance_of(str),
                                                             validators.instance_of(Path)))
+    ssl_verify: bool = field(default=True,
+                             validator=validators.instance_of(bool))
 
     # internal parameters
     _dataframe_type = field(default=pandas_dataframe)
@@ -135,6 +138,7 @@ class RealtimeManager:
         default=None,
         validator=validators.optional(
             validators.instance_of(Path)))
+    _session = field(factory=Session)
 
     # if a valid config file or string
     # is passed
@@ -168,6 +172,11 @@ class RealtimeManager:
         self.__attrs_post_init__()
 
     def __attrs_post_init__(self) -> None:
+
+        self._session.verify = self.ssl_verify
+        if not self.ssl_verify:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()
