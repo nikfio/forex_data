@@ -906,7 +906,7 @@ class HistoricalManagerDB:
                     year == datetime.now().year and
                     month_num >= datetime.now().month
                 ):
-                    logger.bind(target='histmanager').critical(
+                    logger.bind(target='histmanager').warning(
                         f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data")
                     break
                 raise
@@ -1271,13 +1271,7 @@ class HistoricalManagerDB:
                     self._tickers_years_dict[ticker][TICK_TIMEFRAME]
                 ))
 
-                # if datetime.now().year is in years_interval_req include
-                # it in missing anyways cause a new query will be used
-                # to update data up to the last month available
-                if datetime.now().year in years_interval_req:
-                    year_tick_missing.append(datetime.now().year)
-
-                # ONLY download if it's STILL missing after re-reading
+                # ONLY download years not already in the database
                 if year_tick_missing:
                     self._download(
                         ticker,

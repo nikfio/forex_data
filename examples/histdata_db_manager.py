@@ -187,10 +187,15 @@ def main():
     with phase_timer("init", phase_times):
         histmanager = HistoricalManagerDB(config=test_config_yaml)
 
+    histmanager.add_timeframe('1W')
+    histmanager.add_timeframe('1d')
+    histmanager.add_timeframe('1h')
+    histmanager.add_timeframe('30m')
+
     ex_ticker = choice(get_histdata_tickers(verify=False))
     ex_timeframe_1 = '1D'
-    ex_start_date_1 = '2022-01-03 10:00:00'
-    ex_end_date_1 = '2022-12-03 10:00:00'
+    ex_start_date_1 = '2026-01-01 10:00:00'
+    ex_end_date_1 = '2026-06-01 10:00:00'
 
     with phase_timer("get_data (1D)", phase_times):
         yeardata1 = histmanager.get_data(
@@ -199,8 +204,6 @@ def main():
             start=ex_start_date_1,
             end=ex_end_date_1
         )
-
-    histmanager.add_timeframe('1W')
 
     ex_timeframe_2 = '3D'
     ex_start_date_2 = '2018-10-03 10:00:00'
