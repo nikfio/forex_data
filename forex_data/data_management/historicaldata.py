@@ -99,7 +99,7 @@ class HistoricalManagerDB:
     ssl_verify: bool = field(default=True,
                              validator=validators.instance_of(bool))
     connector_id: str = field(default='',
-                                validator=validators.optional(validators.instance_of(str)))
+                              validator=validators.optional(validators.instance_of(str)))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
