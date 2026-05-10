@@ -161,6 +161,10 @@ def _try_line_profiler(manager: HistoricalManagerDB, ex_ticker: str) -> None:
 test_config_yaml = '''
 ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
+DATA_PATH: '~/.test_database_year_files'
+DB_FILES_YEAR_PARTITIONING: True
+CONNECTOR_ID: '1'
+SSL_VERIFY: False
 '''
 
 
@@ -184,10 +188,10 @@ def main():
     with phase_timer("init", phase_times):
         histmanager = HistoricalManagerDB(config=test_config_yaml)
 
-    ex_ticker = choice(get_histdata_tickers())
+    ex_ticker = choice(get_histdata_tickers(verify=False))
     ex_timeframe_1 = '1D'
-    ex_start_date_1 = '2026-01-03 10:00:00'
-    ex_end_date_1 = '2026-12-03 10:00:00'
+    ex_start_date_1 = '2022-01-03 10:00:00'
+    ex_end_date_1 = '2022-12-03 10:00:00'
 
     with phase_timer("get_data (1D)", phase_times):
         yeardata1 = histmanager.get_data(

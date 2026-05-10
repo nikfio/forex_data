@@ -36,6 +36,15 @@ config_standard = '''
 ENGINE: 'polars_lazy'
 DATA_TYPE: 'parquet'
 DATA_PATH: '~/.test_database_files'
+DB_FILES_YEAR_PARTITIONING: False
+SSL_VERIFY: False
+'''
+
+config_partitioned = '''
+ENGINE: 'polars_lazy'
+DATA_TYPE: 'parquet'
+DATA_PATH: '~/.test_database_year_files'
+DB_FILES_YEAR_PARTITIONING: True
 SSL_VERIFY: False
 '''
 
@@ -122,14 +131,14 @@ def run_benchmark(config_str: str, label: str, ticker: str):
     }
 
 
-def print_report(res_standard):
+def print_report(res_standard, res_partitioned):
     lines = []
     lines.append("=" * 64)
     lines.append("  HistoricalManagerDB — LocalDB Connector Comparison Report")
     lines.append("=" * 64)
     lines.append("")
 
-    for res in [res_standard]:
+    for res in [res_standard, res_partitioned]:
         lines.append(f"Results for: {res['label']}")
         lines.append("-" * 40)
         lines.append("Phase Breakdown (First Runs, includes download if missing):")
@@ -194,11 +203,12 @@ def main():
     profiler.enable()
 
     res_standard = run_benchmark(config_standard, "Standard (Non-Partitioned)", ticker)
+    res_partitioned = run_benchmark(config_partitioned, "Year-Partitioned", ticker)
 
     profiler.disable()
     _write_cprofile_report(profiler)
 
-    print_report(res_standard)
+    print_report(res_standard, res_partitioned)
 
     logger.info("Profiling complete.")
     logger.info(f"All output files are in: {PROFILE_DIR}")

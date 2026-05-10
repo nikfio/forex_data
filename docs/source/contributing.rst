@@ -264,7 +264,7 @@ Features
 * 📊 Additional timeframe support
 * 🎨 Enhanced plotting capabilities
 * ⚡ Performance optimizations
-* 🗄️ Database backends (PostgreSQL, DuckDB, etc.)
+* 🗄️ Database backends (PostgreSQL, etc.)
 
 Bug Fixes
 ---------
@@ -295,9 +295,6 @@ Current Focus Areas
 
 Based on the project roadmap, priority areas include:
 
-1. **Database Integration**
-   
-   * DuckDB integration
    * Cache data location in cloud services persistent storage (S3, Google Cloud Storage, etc.)
    
 2. **Enhanced Real-time Manager**

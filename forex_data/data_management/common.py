@@ -132,6 +132,7 @@ __all__ = [
     'DATA_KEY',
     'TICK_TIMEFRAME',
     'FILENAME_STR',
+    'FILENAME_YEAR_STR',
     'REALTIME_DATA_PROVIDER',
     'ALPHA_VANTAGE_API_KEY',
     'CANONICAL_INDEX',
@@ -255,6 +256,7 @@ DATE_FORMAT_HISTDATA_CSV = '%Y%m%d %H%M%S%f'
 DATA_KEY_TEMPLATE_STR = '{market}.{ticker}.{tf}'
 DATA_KEY_TEMPLATE_PATTERN = '^[A-Za-z0-9]_[A-Za-z]+.[A-Za-z0-9]+'
 FILENAME_STR = '{market}_{ticker}_{tf}.{file_ext}'
+FILENAME_YEAR_STR = '{market}_{ticker}_{tf}_{year}.{file_ext}'
 DEFAULT_TIMEZONE = 'utc'
 TICK_TIMEFRAME = 'tick'
 
@@ -346,6 +348,7 @@ class DATA_KEY:
     MARKET = 0
     TICKER_INDEX = 1
     TF_INDEX = 2
+    YEAR_INDEX = 3
 
 
 # filename template : <ticker>_Y<year>_<timeframe>.<filetype>
@@ -366,10 +369,8 @@ class DEFAULT_PATHS:
 
 
 class DATA_TYPE:
-
     CSV_FILETYPE = 'csv'
     PARQUET_FILETYPE = 'parquet'
-    DUCKDB = 'duckdb'
 
 
 class DATA_FILE_COLUMN_INDEX:
@@ -379,8 +380,7 @@ class DATA_FILE_COLUMN_INDEX:
 
 SUPPORTED_DATA_FILES = [
     DATA_TYPE.CSV_FILETYPE,
-    DATA_TYPE.PARQUET_FILETYPE,
-    DATA_TYPE.DUCKDB
+    DATA_TYPE.PARQUET_FILETYPE
 ]
 
 # supported dataframe engines
@@ -1684,14 +1684,14 @@ def list_remove_duplicates(list_in):
 # Analyze the Histdata Forex download base page
 # https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes
 # and get a list of all avilable tickers in the form as the example "EURUSD"
-def get_histdata_tickers(verify: bool = False) -> List[str]:
+def get_histdata_tickers(verify: bool = True) -> List[str]:
     """
     Get all available tickers from HistData.com.
 
     Parameters
     ----------
     verify : bool, optional
-        Whether to verify SSL certificates. Default is False.
+        Whether to verify SSL certificates. Default is True.
 
     Returns
     -------
@@ -1808,6 +1808,10 @@ def update_ticker_years_dict(
     bool
         True if any changes were made, False otherwise
     """
+
+    # convert to int years_to_add items
+    years_to_add = [int(y) for y in years_to_add]
+
     # Initialize ticker if not present
     if ticker not in ticker_years_dict:
         ticker_years_dict[ticker] = {}

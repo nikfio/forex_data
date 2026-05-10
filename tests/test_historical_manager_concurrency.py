@@ -17,8 +17,10 @@ while _data_path.exists():
 
 test_config_yaml = f'''
 DATA_PATH: '{_data_path}'
-DATA_FILETYPE: 'parquet'
+DATA_TYPE: 'parquet'
 ENGINE: 'polars_lazy'
+DB_FILES_YEAR_PARTITIONING: True
+SSL_VERIFY: False
 '''
 
 
