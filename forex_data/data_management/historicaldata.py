@@ -98,6 +98,8 @@ class HistoricalManagerDB:
                                              validator=validators.instance_of(bool))
     ssl_verify: bool = field(default=True,
                              validator=validators.instance_of(bool))
+    connector_id: str = field(default='',
+                                validator=validators.optional(validators.instance_of(str)))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -230,11 +232,25 @@ class HistoricalManagerDB:
             else:
                 connector_type = LocalDBConnector
 
-            self._db_connector = connector_type(
-                data_path=str(self._histdata_path / 'LocalDB'),
-                data_type=self.data_type,
-                engine=self.engine
-            )
+            # set instance id if provided by config or arguments
+            if self.connector_id:
+
+                # connector_id assigned -> prepare connector to use a dedicated
+                # independent data folder under LocalDB
+                self._db_connector = connector_type(
+                    data_path=str(self._histdata_path / 'LocalDB' / self.connector_id),
+                    data_type=self.data_type,
+                    engine=self.engine
+                )
+
+            else:
+
+                # no id provided so set id=0 as default
+                self._db_connector = connector_type(
+                    data_path=str(self._histdata_path / 'LocalDB'),
+                    data_type=self.data_type,
+                    engine=self.engine
+                )
 
         else:
 
