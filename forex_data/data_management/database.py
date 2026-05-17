@@ -51,12 +51,17 @@ from ..config import _apply_config
 BASE CONNECTOR
 '''
 
-
 @define(kw_only=True, slots=True)
 class DatabaseConnector:
 
     data_path: Union[str, Path] = field(default='', validator=validators.or_(
         validators.instance_of(str), validators.instance_of(Path)))
+    data_type: str = field(default='parquet',
+                           validator=validators.in_(SUPPORTED_DATA_FILES))
+    engine: str = field(default='polars_lazy',
+                        validator=validators.in_(SUPPORTED_DATA_ENGINES))
+
+    _tickers_years_info_filepath = field(default=Path('.'))
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -108,159 +113,6 @@ class DatabaseConnector:
         """Read data for specific year(s) - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_data_year")
 
-    def exec_sql(self) -> None:
-        """Execute SQL - must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement exec_sql")
-
-    def _db_key(self, market: str, ticker: str, timeframe: str) -> str:
-        """Generate database key - must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement _db_key")
-
-    def get_tickers_list(self) -> List[str]:
-        """Get list of tickers - must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement get_tickers_list")
-
-    def get_ticker_keys(
-            self,
-            ticker: str,
-            timeframe: Optional[str] = None) -> List[str]:
-        """Get ticker keys - must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement get_ticker_keys")
-
-    def get_ticker_years_list(
-            self,
-            ticker: str,
-            timeframe: str = TICK_TIMEFRAME) -> List[int]:
-        """Get years list for ticker - must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement get_ticker_years_list")
-
-    def clear_database(self, filter: Optional[str] = None) -> None:
-        """Clear database - must be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement clear_database")
-
-    def _get_items_from_db_key(self,
-                               key
-                               ) -> tuple:
-
-        return tuple(key.split('_'))
-
-    def _get_file_items(self, filename: str) -> tuple:
-
-        if not (
-                isinstance(filename, str)
-        ):
-
-            logger.bind(target='localdb').error(
-                'filename {filename} invalid type: required str')
-            raise TypeError(f'filename {filename} invalid type: required str')
-
-        file_items = self._get_items_from_db_key(filename)
-
-        # return each file details
-        return file_items
-
-
-'''
-LOCAL DATA FILES MANAGER
-'''
-
-
-@define(kw_only=True, slots=True)
-class LocalDBConnector(DatabaseConnector):
-
-    data_type: str = field(default='parquet',
-                           validator=validators.in_(SUPPORTED_DATA_FILES))
-    engine: str = field(default='polars_lazy',
-                        validator=validators.in_(SUPPORTED_DATA_ENGINES))
-
-    _tickers_years_info_filepath = field(default=Path('.'))
-
-    def __init__(self, **kwargs: Any) -> None:
-
-        _class_attributes_name = get_attrs_names(self, **kwargs)
-        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
-
-        if not _apply_config(
-                self,
-                kwargs,
-                _class_attributes_name,
-                _not_assigned_attrs_index_mask):
-
-            # no config file is defined
-            # call generated init
-            self.__attrs_init__(**kwargs)  # type: ignore[attr-defined]
-
-        validate(self)
-
-        self.__attrs_post_init__(**kwargs)
-
-    def __attrs_post_init__(self, **kwargs: Any) -> None:
-
-        super().__attrs_post_init__()
-
-        # set up log sink for LocalDB
-        # Remove existing handlers for this sink to prevent duplicate log entries
-        log_path = Path(self.data_path) / 'log' / 'localdb.log'
-
-        handlers_to_remove = []
-        for handler_id, handler in logger._core.handlers.items():
-            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
-                if str(handler._sink._path) == str(log_path):
-                    handlers_to_remove.append(handler_id)
-
-        for handler_id in handlers_to_remove:
-            try:
-                logger.remove(handler_id)
-            except ValueError:
-                # Handler already removed by another thread
-                pass
-
-        logger.add(log_path,
-                   level="TRACE",
-                   rotation="5 MB",
-                   filter=lambda record: ('localdb' == record['extra'].get('target') and
-                                          bool(record["extra"].get('target'))))
-
-        self.data_path = Path(self.data_path)
-        self._tickers_years_info_filepath = self.data_path / 'tickers_years_info.json'
-
-    def _db_key(self,
-                market: str,
-                ticker: str,
-                timeframe: str
-                ) -> str:
-        """
-
-        get a str key of dotted divided elements
-
-        key template = ticker.timeframe.data_type
-
-        Parameters
-        ----------
-        ticker : TYPE
-            DESCRIPTION.
-        year : TYPE
-            DESCRIPTION.
-        data_type : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
-        """
-        return '_'.join([market.lower(),
-                         ticker.lower(),
-                         timeframe.lower()])
-
-    def _get_filename(self, market: str, ticker: str, tf: str) -> str:
-
-        # based on standard filename template
-        return FILENAME_STR.format(market=market.lower(),
-                                   ticker=ticker.lower(),
-                                   tf=tf.lower(),
-                                   file_ext=self.data_type.lower())
-
     def _list_local_data(self) -> List[PathType]:
 
         local_files = []
@@ -279,6 +131,37 @@ class LocalDBConnector(DatabaseConnector):
         local_files, tables_list = self._list_local_data()
 
         return tables_list
+    def _get_items_from_db_key(self,
+                            key
+                            ) -> tuple:
+
+        return tuple(key.split('_'))
+
+    def _get_file_items(self, filename: str) -> tuple:
+
+        if not (
+                isinstance(filename, str)
+        ):
+
+            logger.bind(target='localdb').error(
+                'filename {filename} invalid type: required str')
+            raise TypeError(f'filename {filename} invalid type: required str')
+
+        file_items = self._get_items_from_db_key(filename)
+
+        # return each file details
+        return file_items
+
+    def _db_key(self, market: str, ticker: str, timeframe: str) -> str:
+        """Generate database key - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement _db_key")
+
+    def _get_ticker_years_list_from_db(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> List[int]:
+        """Get list of years for ticker and timeframe - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement _get_ticker_years_list_from_db")
 
     def get_tickers_list(self) -> List[str]:
 
@@ -323,6 +206,7 @@ class LocalDBConnector(DatabaseConnector):
             self,
             ticker: str) -> List[str]:
 
+        """Get timeframes list for ticker - must be implemented by subclasses."""
         local_files, local_files_name = self._list_local_data()
 
         return list_remove_duplicates([
@@ -331,60 +215,11 @@ class LocalDBConnector(DatabaseConnector):
                       key.lower())
         ])
 
-    def _get_ticker_years_list_from_db(
-            self,
-            ticker: str,
-            timeframe: str = TICK_TIMEFRAME) -> List[int]:
-
-        ticker_years_list = []
-        table = ''
-
-        local_files, local_files_name = self._list_local_data()
-
-        files = [
-            key for key in local_files
-            if search(f'{ticker.lower()}',
-                      str(key.stem)) and
-            self._get_items_from_db_key(str(key.stem))[DATA_KEY.TF_INDEX] ==
-            timeframe.lower()
-        ]
-
-        dataframe = None
-
-        if len(files) == 1:
-
-            if self.data_type == DATA_TYPE.CSV_FILETYPE:
-
-                dataframe = read_csv(self.engine, files[0])
-
-            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
-
-                dataframe = read_parquet(self.engine, files[0])
-
-            try:
-
-                query = f'''SELECT DISTINCT STRFTIME({
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP}, '%Y')
-                            AS YEAR
-                            FROM self'''
-                read = dataframe.sql(query)
-
-            except Exception as e:
-
-                logger.bind(target='localdb').error(
-                    f'Error querying table {table}: {e}')
-                raise
-
-            else:
-
-                ticker_years_list = [int(row[0]) for row in read.collect().iter_rows()]
-
-        return ticker_years_list
-
     def get_ticker_years_list(
             self,
             ticker: str,
-            timeframe: str = TICK_TIMEFRAME) -> List[int]:
+            timeframe: str = TICK_TIMEFRAME
+    ) -> List[int]:
 
         # check ticker is present in cache
         if ticker not in self.get_tickers_list():
@@ -472,7 +307,11 @@ class LocalDBConnector(DatabaseConnector):
                     self._tickers_years_info_filepath}: {e}')
 
     def add_tickers_years_info_to_file(
-            self, ticker: str, timeframe: str, year: Union[int, List[int]]) -> None:
+            self,
+            ticker: str,
+            timeframe: str,
+            year: Union[int, List[int]]
+    ) -> None:
         """
         In local info filepath, update just the years list of the given ticker and timeframe
         by adding the year(s) specified if not already present
@@ -643,6 +482,150 @@ class LocalDBConnector(DatabaseConnector):
             raise IOError(
                 f'Error reading ticker years data from {
                     self._tickers_years_info_filepath}: {e}')
+
+
+'''
+LOCAL DATABASE CONNECTOR CLASS
+'''
+
+@define(kw_only=True, slots=True)
+class LocalDBConnector(DatabaseConnector):
+
+    def __init__(self, **kwargs: Any) -> None:
+
+        _class_attributes_name = get_attrs_names(self, **kwargs)
+        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
+
+        if not _apply_config(
+                self,
+                kwargs,
+                _class_attributes_name,
+                _not_assigned_attrs_index_mask):
+
+            # no config file is defined
+            # call generated init
+            self.__attrs_init__(**kwargs)  # type: ignore[attr-defined]
+
+        validate(self)
+
+        self.__attrs_post_init__(**kwargs)
+
+    def __attrs_post_init__(self, **kwargs: Any) -> None:
+
+        super().__attrs_post_init__()
+
+        # set up log sink for LocalDB
+        # Remove existing handlers for this sink to prevent duplicate log entries
+        log_path = Path(self.data_path) / 'log' / 'localdb.log'
+
+        handlers_to_remove = []
+        for handler_id, handler in logger._core.handlers.items():
+            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
+                if str(handler._sink._path) == str(log_path):
+                    handlers_to_remove.append(handler_id)
+
+        for handler_id in handlers_to_remove:
+            try:
+                logger.remove(handler_id)
+            except ValueError:
+                # Handler already removed by another thread
+                pass
+
+        logger.add(log_path,
+                   level="TRACE",
+                   rotation="5 MB",
+                   filter=lambda record: ('localdb' == record['extra'].get('target') and
+                                          bool(record["extra"].get('target'))))
+
+        self.data_path = Path(self.data_path)
+        self._tickers_years_info_filepath = self.data_path / 'tickers_years_info.json'
+
+    def _db_key(self,
+                market: str,
+                ticker: str,
+                timeframe: str
+                ) -> str:
+        """
+
+        get a str key of dotted divided elements
+
+        key template = ticker.timeframe.data_type
+
+        Parameters
+        ----------
+        ticker : TYPE
+            DESCRIPTION.
+        year : TYPE
+            DESCRIPTION.
+        data_type : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        return '_'.join([market.lower(),
+                         ticker.lower(),
+                         timeframe.lower()])
+
+    def _get_filename(self, market: str, ticker: str, tf: str) -> str:
+
+        # based on standard filename template
+        return FILENAME_STR.format(market=market.lower(),
+                                   ticker=ticker.lower(),
+                                   tf=tf.lower(),
+                                   file_ext=self.data_type.lower())
+
+    def _get_ticker_years_list_from_db(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> List[int]:
+
+        ticker_years_list = []
+        table = ''
+
+        local_files, local_files_name = self._list_local_data()
+
+        files = [
+            key for key in local_files
+            if search(f'{ticker.lower()}',
+                      str(key.stem)) and
+            self._get_items_from_db_key(str(key.stem))[DATA_KEY.TF_INDEX] ==
+            timeframe.lower()
+        ]
+
+        dataframe = None
+
+        if len(files) == 1:
+
+            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+
+                dataframe = read_csv(self.engine, files[0])
+
+            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+
+                dataframe = read_parquet(self.engine, files[0])
+
+            try:
+
+                query = f'''SELECT DISTINCT STRFTIME({
+                    BASE_DATA_COLUMN_NAME.TIMESTAMP}, '%Y')
+                            AS YEAR
+                            FROM self'''
+                read = dataframe.sql(query)
+
+            except Exception as e:
+
+                logger.bind(target='localdb').error(
+                    f'Error querying table {table}: {e}')
+                raise
+
+            else:
+
+                ticker_years_list = [int(row[0]) for row in read.collect().iter_rows()]
+
+        return ticker_years_list
 
     def write_data(
         self,
@@ -953,13 +936,6 @@ class LocalDBConnector(DatabaseConnector):
 @define(kw_only=True, slots=True)
 class LocalDBYearConnector(DatabaseConnector):
 
-    data_type: str = field(default='parquet',
-                           validator=validators.in_(SUPPORTED_DATA_FILES))
-    engine: str = field(default='polars_lazy',
-                        validator=validators.in_(SUPPORTED_DATA_ENGINES))
-
-    _tickers_years_info_filepath = field(default=Path('.'))
-
     def __init__(self, **kwargs: Any) -> None:
 
         _class_attributes_name = get_attrs_names(self, **kwargs)
@@ -1050,76 +1026,6 @@ class LocalDBYearConnector(DatabaseConnector):
             tf=tf.lower(),
             file_ext=self.data_type.lower())
 
-    def _list_local_data(self) -> List[PathType]:
-
-        local_files = []
-        local_files_name = []
-
-        # list for all data filetypes supported
-        local_files = [file for file in list(self.data_path.rglob(f'*'))
-                       if search(self.data_type + '$', file.suffix)]
-
-        local_files_name = [file.name for file in local_files]
-
-        return local_files, local_files_name
-
-    def _list_tables(self) -> List[str]:
-
-        local_files, tables_list = self._list_local_data()
-
-        return tables_list
-
-    def get_tickers_list(self) -> List[str]:
-
-        tickers_list = []
-
-        local_files, local_files_name = self._list_local_data()
-
-        for filename in local_files_name:
-
-            items = self._get_file_items(filename)
-            tickers_list.append(items[DATA_KEY.TICKER_INDEX])
-
-        return list_remove_duplicates(tickers_list)
-
-    def get_ticker_keys(
-            self,
-            ticker: str,
-            timeframe: Optional[str] = None) -> List[str]:
-
-        local_files, local_files_name = self._list_local_data()
-
-        keys = [Path(key).stem for key in local_files_name]
-        if timeframe:
-
-            return [
-                key for key in keys
-                if search(f'{ticker}',
-                          key) and
-                self._get_items_from_db_key(key)[DATA_KEY.TF_INDEX] ==
-                timeframe
-            ]
-
-        else:
-
-            return [
-                key for key in keys
-                if search(f'{ticker}',
-                          key)
-            ]
-
-    def get_ticker_timeframes_list(
-            self,
-            ticker: str) -> List[str]:
-
-        local_files, local_files_name = self._list_local_data()
-
-        return list_remove_duplicates([
-            self._get_items_from_db_key(Path(key).stem)[DATA_KEY.TF_INDEX] for key in local_files_name
-            if search(f'{ticker.lower()}',
-                      key.lower())
-        ])
-
     def _get_ticker_years_list_from_db(
             self,
             ticker: str,
@@ -1142,269 +1048,6 @@ class LocalDBYearConnector(DatabaseConnector):
         years_list = sorted(list(set(years_list)))
 
         return years_list
-
-    def get_ticker_years_list(
-            self,
-            ticker: str,
-            timeframe: str = TICK_TIMEFRAME) -> List[int]:
-
-        # check ticker is present in cache
-        if ticker not in self.get_tickers_list():
-            logger.bind(target='localdb').error(
-                f'Ticker {ticker} not found in cache')
-            raise ValueError(f'Ticker {ticker} not found in cache')
-        # check if tickers years dict has data for ticker
-        # and optionally timeframe
-        return self._get_ticker_years_list_from_db(ticker, timeframe)
-
-    def create_tickers_years_dict(self) -> Dict[str, Dict[str, List[int]]]:
-        """
-        Create a dictionary containing ticker years data, structured as:
-        {ticker: {timeframe: [year1, year2, ...]}}
-
-        If no data files exist yet, returns an empty dictionary.
-        """
-
-        tickers_years_dict = {}
-
-        tickers_list = self.get_tickers_list()
-
-        # If no tickers exist yet, return empty dict
-        if not tickers_list:
-            return tickers_years_dict
-
-        for ticker in tickers_list:
-            tickers_years_dict[ticker] = {}
-            # Get all keys for this ticker and extract timeframes
-            ticker_keys = self.get_ticker_keys(ticker)
-            timeframes = list(set([
-                self._get_items_from_db_key(key)[DATA_KEY.TF_INDEX]
-                for key in ticker_keys
-            ]))
-
-            for timeframe in timeframes:
-                years_list = self._get_ticker_years_list_from_db(ticker, timeframe)
-                if years_list:  # Only add if there are years
-                    tickers_years_dict[ticker][timeframe] = years_list
-
-        # save tickers years info to file
-        self.save_tickers_years_info(tickers_years_dict)
-        return tickers_years_dict
-
-    def save_tickers_years_info(
-        self,
-        ticker_years_dict: Dict[str, Dict[str, List[int]]],
-    ) -> None:
-        """
-        Save ticker years list to a JSON file.
-
-        Parameters
-        ----------
-        ticker_years_dict : Dict[str, Dict[str, List[int]]]
-            Dictionary containing ticker years data, structured as:
-            {ticker: {timeframe: [year1, year2, ...]}}
-        filename : str, optional
-            Name of the JSON file to save the data, by default 'tickers_years.json'
-
-        Raises
-        ------
-        TypeError
-            If ticker_years_dict is not a dictionary
-        IOError
-            If there's an error writing the file
-        """
-        if not isinstance(ticker_years_dict, dict):
-            logger.bind(target='localdb').error(
-                f'ticker_years_dict must be a dictionary, got {type(ticker_years_dict)}'
-            )
-            raise TypeError(
-                f'ticker_years_dict must be a dictionary, got {
-                    type(ticker_years_dict)}')
-
-        try:
-            with open(self._tickers_years_info_filepath, 'w') as f:
-                json.dump(ticker_years_dict, f, indent=2)
-        except Exception as e:
-            logger.bind(
-                target='localdb').error(
-                f'Error writing ticker years data to {
-                    self._tickers_years_info_filepath}: {e}')
-            raise IOError(
-                f'Error writing ticker years data to {
-                    self._tickers_years_info_filepath}: {e}')
-
-    def add_tickers_years_info_to_file(
-            self, ticker: str, timeframe: str, year: Union[int, List[int]]) -> None:
-        """
-        In local info filepath, update just the years list of the given ticker and timeframe
-        by adding the year(s) specified if not already present
-
-        Parameters
-        ----------
-        ticker : str
-            The ticker symbol to update
-        timeframe : str
-            The timeframe for the ticker data
-        year : Union[int, List[int]]
-            The year or list of years to add to the years list
-
-        Raises
-        ------
-        TypeError
-            If year is not an integer or list of integers
-        """
-        # Normalize year to a list
-        if isinstance(year, int):
-            years_to_add = [year]
-        elif isinstance(year, list):
-            # Validate all items in list are integers
-            if not all(isinstance(y, int) for y in year):
-                logger.bind(target='localdb').error(
-                    f'All items in year list must be integers'
-                )
-                raise TypeError(f'All items in year list must be integers')
-            years_to_add = year
-        else:
-            logger.bind(target='localdb').error(
-                f'year must be an integer or list of integers, got {type(year)}'
-            )
-            raise TypeError(
-                f'year must be an integer or list of integers, got {type(year)}')
-
-        # Load existing data or create new dict if file doesn't exist
-        if self._tickers_years_info_filepath.exists():
-            ticker_years_dict = self.load_tickers_years_info()
-        else:
-            ticker_years_dict = {}
-            logger.bind(
-                target='localdb').info(
-                f'File {
-                    self._tickers_years_info_filepath} does not exist. Creating new dict.')
-
-        # Update the dictionary with the new years
-        _, changes_made = update_ticker_years_dict(
-            ticker_years_dict,
-            ticker,
-            timeframe,
-            years_to_add
-        )
-
-        # Only save if changes were made
-        if changes_made:
-            self.save_tickers_years_info(ticker_years_dict)
-
-    def clear_tickers_years_info(self, filter: Optional[str] = None) -> None:
-        """
-        Clear the tickers years info file.
-        If filter is specified, it has to be a ticker value and so
-        only the tickers years info related to the filter are cleared.
-        If filter is not specified, the entire file is cleared.
-        Parameters
-        ----------
-        filter : Optional[str], optional
-            Filter to apply to the tickers years info file, by default None
-            Filter has to be a ticker value
-        """
-        if filter:
-            ticker_years_dict = self.load_tickers_years_info()
-            ticker_years_dict = {
-                k: v for k,
-                v in ticker_years_dict.items() if filter.lower() != k.lower()}
-            self.save_tickers_years_info(ticker_years_dict)
-        else:
-            self._tickers_years_info_filepath.unlink(missing_ok=True)
-
-    def clear_database(self, filter: Optional[str] = None) -> None:
-        """
-        Clear database files
-        If filter is provided and is a ticker present in database (files present)
-        delete only files related to that ticker
-        """
-
-        # create a list of data files
-        # with extension matching either one of the supported data types
-        data_files = [
-            file for file in self.data_path.rglob('*')
-            if file.is_file() and any(
-                search(suffix, file.suffix, IGNORECASE)
-                for suffix in SUPPORTED_DATA_FILES
-            )
-        ]
-
-        if filter:
-
-            # in local path search for files having filter in path stem
-            # and delete them
-            # list all files in local path ending with data_type
-            # and use re.search to catch matches
-            if isinstance(filter, str):
-
-                if data_files:
-                    for file in data_files:
-                        if search(filter, file.stem, IGNORECASE):
-                            file.unlink(missing_ok=True)
-
-                    # clear just ticker years info in all tickers years info json file
-                    self.clear_tickers_years_info(filter=filter)
-                else:
-                    logger.bind(target='localdb').info(
-                        f'No data files found in {self.data_path} with filter {filter}')
-
-            else:
-                logger.bind(target='localdb').error(
-                    f'Filter {filter} invalid type: required str')
-
-        else:
-
-            # clear all data files in data path
-            for file in data_files:
-                file.unlink(missing_ok=True)
-
-            # clear the json file containing tickers years info
-            self.clear_tickers_years_info()
-
-    def load_tickers_years_info(self) -> Dict[str, Dict[str, List[int]]]:
-        """
-        Load ticker years list from a JSON file.
-
-        Returns
-        -------
-        Dict[str, Dict[str, List[int]]]
-            Dictionary containing ticker years data, structured as:
-            {ticker: {timeframe: [year1, year2, ...]}}
-
-        Raises
-        ------
-        FileNotFoundError
-            If the JSON file doesn't exist
-        IOError
-            If there's an error reading the file
-        """
-        if not self._tickers_years_info_filepath.exists():
-            logger.bind(target='localdb').error(
-                f'File {self._tickers_years_info_filepath} not found'
-            )
-            raise FileNotFoundError(
-                f'File {self._tickers_years_info_filepath} not found')
-
-        try:
-            with open(self._tickers_years_info_filepath, 'r') as f:
-                ticker_years_dict = json.load(f)
-            return ticker_years_dict
-        except json.JSONDecodeError as e:
-            logger.bind(target='localdb').error(
-                f'Error decoding JSON from {self._tickers_years_info_filepath}: {e}'
-            )
-            raise IOError(
-                f'Error decoding JSON from {self._tickers_years_info_filepath}: {e}')
-        except Exception as e:
-            logger.bind(
-                target='localdb').error(
-                f'Error reading ticker years data from {
-                    self._tickers_years_info_filepath}: {e}')
-            raise IOError(
-                f'Error reading ticker years data from {
-                    self._tickers_years_info_filepath}: {e}')
 
     def write_data(
         self,
@@ -1666,3 +1309,6 @@ class LocalDBYearConnector(DatabaseConnector):
             dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
 
         return dataframe
+
+
+
