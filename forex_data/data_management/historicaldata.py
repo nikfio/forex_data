@@ -36,8 +36,8 @@ from pyarrow import (
 from polars import (
     String as polars_string,
     col,
-    DataFrame as polars_dataframe,
-    LazyFrame as polars_lazyframe
+    DataFrame as PolarsDataFrame,
+    LazyFrame as PolarsLazyFrame
 )
 
 from zipfile import (
@@ -75,6 +75,11 @@ from .database import (
     LocalDBYearConnector
 )
 
+from .remoteconnector import (
+    HistDataConnector,
+    DukascopyConnector
+)
+
 
 __all__ = ['HistoricalManagerDB']
 
@@ -103,6 +108,7 @@ class HistoricalManagerDB:
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
+    _histdata_connector = field(factory=list, validator=validators.instance_of(list))
     _tf_list = field(factory=list, validator=validators.instance_of(list))
     _dataframe_type = field(default=pandas_dataframe)
     _histdata_path = field(
@@ -206,11 +212,11 @@ class HistoricalManagerDB:
 
         elif self.engine == 'polars':
 
-            self._dataframe_type = polars_dataframe
+            self._dataframe_type = PolarsDataFrame
 
         elif self.engine == 'polars_lazy':
 
-            self._dataframe_type = polars_lazyframe
+            self._dataframe_type = PolarsLazyFrame
 
         else:
 
@@ -263,8 +269,29 @@ class HistoricalManagerDB:
                 f'Data type {self.data_type} not supported')
             raise ValueError(f'Data type {self.data_type} not supported')
 
-        # cache histdata tickers list at initialization
-        self._histdata_tickers_list = get_histdata_tickers(verify=self.ssl_verify)
+        # initialize histdata connectors
+        self._histdata_connector = [
+            HistDataConnector(
+                ssl_verify=self.ssl_verify,
+                data_path=str(self._histdata_path)
+            ),
+            DukascopyConnector(
+                ssl_verify=self.ssl_verify,
+                data_path=str(self._histdata_path)
+            )
+        ]
+
+        # cache histdata tickers list at initialization (merged from all connectors)
+        tickers_set = set()
+        for conn in self._histdata_connector:
+            try:
+                for ticker in conn.get_available_tickers():
+                    tickers_set.add(ticker.upper())
+            except Exception as e:
+                logger.bind(target='histmanager').warning(
+                    f"Failed to get tickers from connector {conn.__class__.__name__}: {e}"
+                )
+        self._histdata_tickers_list = sorted(list(tickers_set))
 
         # initialize tickers years dict info of data available
         # with the current connector
@@ -460,425 +487,10 @@ class HistoricalManagerDB:
                             target='histmanager').trace(
                             f'ticker {ticker}: {tf} timeframe completing operation successful for {missing_years}')
 
-    def _download_month_raw(self,
-                            ticker,
-                            url,
-                            year,
-                            month_num
-                            ) -> bytes:
-        """
-
-        Download a month data
-
-
-        Parameters
-        ----------
-        year : TYPE
-            DESCRIPTION.
-        month_num : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        TYPE
-            DESCRIPTION.
-
-        """
-
-        session = Session()
-        session.verify = self.ssl_verify
-        if not self.ssl_verify:
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-        r = session.get(url)
-
-        token = None
-        try:
-            token = search('id="tk" value="(.*?)"', r.text).groups()[0]
-        except AttributeError:
-            logger.bind(target='histmanager').critical(
-                f'token value was not found scraping '
-                f'url {url}: {ticker} not existing or'
-                f'not supported by histdata.com: {ticker} - '
-                f'{year}-{MONTHS[month_num - 1]}')
-
-        # If exception was caught, token will still be None
-        if token is None:
-            raise TickerNotFoundError(
-                f"Ticker {ticker} not found or not supported by histdata.com")
-
-        ''' Alternative: using BeautifulSoup parser
-        r = session.get(url, allow_redirects=True)
-        soup = BeautifulSoup(r.content, 'html.parser')
-
-        with logger.catch(exception=AttributeError,
-                          level='CRITICAL',
-                          message=f'token value was not found scraping url {url}'):
-
-            token = soup.find('input', {'id': 'tk'}).attrs['value']
-
-        '''
-
-        headers = {'Referer': url}
-        data = {
-            'tk': token,
-            'date': year,
-            'datemonth': "%d%02d" % (year, month_num),
-            'platform': 'ASCII',
-            'timeframe': 'T',
-            'fxpair': ticker
-        }
-
-        # logger trace ticker year and month specifed are being downloaded
-        logger.bind(target='histmanager').trace(
-            f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
-        r = session.request(
-            HISTDATA_BASE_DOWNLOAD_METHOD,
-            HISTDATA_BASE_DOWNLOAD_URL,
-            data=data,
-            headers=headers,
-            stream=True
-        )
-
-        bio = BytesIO()
-
-        # write content to stream
-        bio.write(r.content)
-
-        try:
-
-            zf = ZipFile(bio)
-
-        except BadZipFile as e:
-
-            # here will be a warning log
-            logger.bind(target='histmanager').error(
-                dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]}: {e}
-                           url: {url}'''))
-            raise TickerDataBadTypeException(
-                dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}
-                           url: {url}'''))
-
-        else:
-
-            # return opened zip file
-            try:
-                ExtFile = zf.open(zf.namelist()[0])
-            except Exception as e:
-                logger.bind(target='histmanager').error(
-                    f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
-                    f'not found or invalid download: {e}')
-                raise TickerDataNotFoundError(
-                    f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
-
-            else:
-                if isinstance(ExtFile, ZipExtFile):
-                    return ExtFile
-                else:
-                    logger.bind(target='histmanager').error(
-                        f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
-                        f'data type not expected')
-                    raise TickerDataBadTypeException(
-                        f"Data {ticker} - {year} - {MONTHS[month_num - 1]} type not expected")
-
-    def _raw_zipfile_to_df(self, raw_file, temp_filepath,
-                           engine='polars') -> Union[polars_dataframe, polars_lazyframe]:
-        """
-
-
-        Parameters
-        ----------
-        raw_files_list : TYPE, optional
-            DESCRIPTION. The default is None.
-
-        Returns
-        -------
-        None.
-
-        """
-
-        if engine == 'pandas':
-
-            # pandas with python engine can read a runtime opened
-            # zip file
-
-            # funtions is specific for format of files downloaded
-            # parse file passed as input
-
-            df = read_csv(
-                'pandas',
-                raw_file,
-                sep=',',
-                names=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                dtype=DTYPE_DICT.TICK_DTYPE,
-                parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
-                date_format=DATE_FORMAT_HISTDATA_CSV,
-                engine='c'
-            )
-
-            # calculate 'p'
-            df['p'] = (df['ask'] + df['bid']) / 2
-
-        elif engine == 'pyarrow':
-
-            # no way found to directly open a runtime zip file
-            # with pyarrow
-            # strategy rolls back to temporary file download
-            # open and read all
-            # delete temporary file
-
-            # alternative using pyarrow
-            buf = BufferReader(raw_file.read())
-
-            if (
-                Path(temp_filepath).exists() and
-                Path(temp_filepath).is_file()
-            ):
-
-                Path(temp_filepath).unlink(missing_ok=True)
-
-            else:
-
-                # create temporary files directory if not present
-                tempdir_path = Path(temp_filepath).parent
-                tempdir_path.mkdir(exist_ok=True)
-
-            # download buffer to file
-            buf.download(temp_filepath)
-
-            # from histdata raw files column 'p' is not present
-            # raw_file_dtypes = DTYPE_DICT.TICK_DTYPE.copy()
-            # raw_file_dtypes.pop('p')
-
-            # read temporary csv file
-
-            # use panda read_csv an its options with
-            # engine = 'pyarrow'
-            # dtype_backend = 'pyarrow'
-            # df = read_csv(
-            #             'pyarrow',
-            #             temp_filepath,
-            #             sep=',',
-            #             index_col=0,
-            #             names=DATA_COLUMN_NAMES.TICK_DATA,
-            #             dtype=raw_file_dtypes,
-            #             parse_dates=[0],
-            #             date_format=DATE_FORMAT_HISTDATA_CSV,
-            #             engine = 'pyarrow',
-            #             dtype_backend = 'pyarrow'
-            # )
-            # perform step to convert index
-            # into a datetime64 dtype
-            # df.index = any_date_to_datetime64(df.index,
-            #                         date_format=DATE_FORMAT_HISTDATA_CSV,
-            #                         unit='ms')
-
-            # use pyarrow native options
-            read_opts = arrow_csv.ReadOptions(
-                use_threads=True,
-                column_names=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-
-            )
-
-            parse_opts = arrow_csv.ParseOptions(
-                delimiter=','
-            )
-
-            modtypes = PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-            modtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = pyarrow_string()
-            modtypes.pop(BASE_DATA_COLUMN_NAME.P_VALUE)
-
-            convert_opts = arrow_csv.ConvertOptions(
-                column_types=modtypes
-            )
-
-            # at first read file with timestmap as a string
-            df = read_csv(
-                'pyarrow',
-                temp_filepath,
-                read_options=read_opts,
-                parse_options=parse_opts,
-                convert_options=convert_opts
-            )
-
-            # convert timestamp  string array to pyarrow timestamp('ms')
-
-            # pandas/numpy solution
-            # std_datetime = to_datetime(df[BASE_DATA_COLUMN_NAME.TIMESTAMP].to_numpy(),
-            #                            format=DATE_FORMAT_HISTDATA_CSV)
-
-            # timecol = pyarrow_array(std_datetime,
-            #                         type=pyarrow_timestamp('ms'))
-
-            # all pyarrow ops solution
-            # suggested here
-            # https://github.com/apache/arrow/issues/41132#issuecomment-2052555361
-
-            mod_format = DATE_FORMAT_HISTDATA_CSV.removesuffix('%f')
-            ts2 = pc.strptime(pc.utf8_slice_codeunits(
-                df[BASE_DATA_COLUMN_NAME.TIMESTAMP], 0, 15), format=mod_format, unit="ms")
-            d = pc.utf8_slice_codeunits(df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
-                                        15,
-                                        99).cast(pyarrow_int64()).cast(duration("ms"))
-            timecol = pc.add(ts2, d)
-
-            # calculate 'p'
-            p_value = pc.divide(
-                pc.add_checked(df['ask'], df['bid']),
-                2
-            )
-
-            # aggregate in a new table
-            df = Table.from_arrays(
-                [
-                    timecol,
-                    df[BASE_DATA_COLUMN_NAME.ASK],
-                    df[BASE_DATA_COLUMN_NAME.BID],
-                    df[BASE_DATA_COLUMN_NAME.VOL],
-                    p_value
-                ],
-                schema=schema(PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy().items())
-            )
-
-        elif engine == 'polars':
-
-            # download to temporary csv file
-            # for best performance with polars
-
-            # alternative using pyarrow
-            buf = BufferReader(raw_file.read())
-
-            if (
-                Path(temp_filepath).exists() and
-                Path(temp_filepath).is_file()
-            ):
-
-                Path(temp_filepath).unlink(missing_ok=True)
-
-            else:
-
-                # create temporary files directory if not present
-                tempdir_path = Path(temp_filepath).parent
-                tempdir_path.mkdir(exist_ok=True)
-
-            buf.download(temp_filepath)
-
-            # from histdata raw files column 'p' is not present
-            raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-            raw_file_dtypes.pop('p')
-            raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
-
-            # read file
-            # set schema for columns but avoid timestamp columns
-            df = read_csv(
-                'polars',
-                temp_filepath,
-                separator=',',
-                has_header=False,
-                new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                schema=raw_file_dtypes,
-                use_pyarrow=True
-            )
-
-            # convert timestamp column to datetime data type
-            df = df.with_columns(
-                col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
-                    polars_datetime('ms'),
-                    format=DATE_FORMAT_HISTDATA_CSV
-                )
-            )
-
-            # calculate 'p'
-            df = df.with_columns(
-                ((col('ask') + col('bid')) / 2).alias('p')
-            )
-
-            # final cast to standard dtypes
-            df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
-
-            # clean duplicated timestamps rows, keep first by default
-            df = df.unique(subset=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
-                           keep='first')
-
-            # remove business days
-            df = business_days_data(df)
-
-        elif engine == 'polars_lazy':
-
-            # download to temporary csv file
-            # for best performance with polars
-
-            # alternative using pyarrow
-            buf = BufferReader(raw_file.read())
-
-            if (
-                Path(temp_filepath).exists() and
-                Path(temp_filepath).is_file()
-            ):
-
-                Path(temp_filepath).unlink(missing_ok=True)
-
-            else:
-
-                # create temporary files directory if not present
-                tempdir_path = Path(temp_filepath).parent
-                tempdir_path.mkdir(exist_ok=True)
-
-            # download buffer to file
-            buf.download(temp_filepath)
-
-            # from histdata raw files column 'p' is not present
-            raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-            raw_file_dtypes.pop('p')
-            raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
-
-            # read file
-            # set schema for columns but avoid timestamp columns
-            df = read_csv(
-                'polars_lazy',
-                temp_filepath,
-                separator=',',
-                has_header=False,
-                new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                schema=raw_file_dtypes
-            )
-
-            # convert timestamp column to datetime data type
-            df = df.with_columns(
-                col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
-                    polars_datetime('ms'),
-                    format=DATE_FORMAT_HISTDATA_CSV
-                )
-            )
-
-            # calculate 'p'
-            df = df.with_columns(
-                ((col('ask') + col('bid')) / 2).alias('p')
-            )
-
-            # final cast to standard dtypes
-            df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
-
-            # clean duplicated timestamps rows, keep first by default
-            df = df.unique(subset=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
-                           keep='first')
-
-            # remove business days
-            df = business_days_data(df)
-
-        else:
-
-            logger.bind(target='histmanager').error(f'Engine {engine} is not supported')
-            raise TypeError
-
-        # return dataframe
-        return df
-
     def _download_year(self,
                        ticker,
-                       year) -> Union[polars_dataframe,
-                                      polars_lazyframe,
+                       year) -> Union[PolarsDataFrame,
+                                      PolarsLazyFrame,
                                       pandas_dataframe,
                                       Table,
                                       None]:
@@ -888,40 +500,68 @@ class HistoricalManagerDB:
         for month in MONTHS:
 
             month_num = MONTHS.index(month) + 1
-            url = HISTDATA_URL_TICKDATA_TEMPLATE.format(
-                ticker=ticker.lower(),
-                year=year,
-                month_num=month_num)
 
-            file = None
-            try:
-                file = self._download_month_raw(
-                    ticker,
-                    url,
-                    year,
-                    month_num
-                )
-            except TickerDataBadTypeException:
+            month_data = None
+            last_err = None
+            for connector in self._histdata_connector:
+                try:
+                    if ticker.upper() not in connector.get_available_tickers():
+                        continue
+                except Exception:
+                    continue
+
+                try:
+                    conn_engine = self.engine
+                    if isinstance(connector, DukascopyConnector) and conn_engine not in ('polars', 'polars_lazy'):
+                        conn_engine = 'polars'
+
+                    month_data = connector.download_month_raw(
+                        ticker,
+                        year,
+                        month_num,
+                        temp_filepath=str(self._temporary_data_path /
+                                          (f'{ticker}_' +
+                                           f'{year}_' +
+                                           f'{month}_' +
+                                           TEMP_CSV_FILE)
+                                          ),
+                        engine=conn_engine
+                    )
+
+                    if isinstance(connector, DukascopyConnector) and self.engine not in ('polars', 'polars_lazy'):
+                        if self.engine == 'pandas':
+                            month_data = month_data.to_pandas()
+                        elif self.engine == 'pyarrow':
+                            month_data = month_data.to_arrow()
+
+                    last_err = None
+                    break
+                except TickerDataBadTypeException as e:
+                    last_err = e
+                    logger.bind(target='histmanager').warning(
+                        f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
+                    )
+                except Exception as e:
+                    last_err = e
+                    logger.bind(target='histmanager').warning(
+                        f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
+                    )
+
+            if last_err is not None:
                 if (
                     year == datetime.now().year and
                     month_num >= datetime.now().month
                 ):
                     logger.bind(target='histmanager').warning(
-                        f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data")
+                        f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data"
+                    )
                     break
-                raise
+                if isinstance(last_err, TickerDataBadTypeException):
+                    raise last_err
+                else:
+                    raise last_err
 
-            if file and isinstance(file, ZipExtFile):
-
-                month_data = self._raw_zipfile_to_df(file,
-                                                     str(self._temporary_data_path /
-                                                         (f'{ticker}_' +
-                                                             f'{year}_' +
-                                                             f'{month}_' +
-                                                             TEMP_CSV_FILE)
-                                                         ),
-                                                     engine=self.engine
-                                                     )
+            if month_data is not None and not is_empty_dataframe(month_data):
 
                 # if first iteration, assign instead of concat
                 if is_empty_dataframe(year_tick_df):
@@ -931,13 +571,6 @@ class HistoricalManagerDB:
                 else:
 
                     year_tick_df = concat_data([year_tick_df, month_data])
-
-            else:
-
-                logger.bind(target='histmanager').critical(
-                    f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} data not found or invalid")
-                raise TickerDataInvalidException(
-                    f"Ticker {ticker} - {year} - {MONTHS[month_num - 1]} data not found or invalid: generic error")
 
         return sort_dataframe(year_tick_df,
                               BASE_DATA_COLUMN_NAME.TIMESTAMP)
@@ -1119,7 +752,7 @@ class HistoricalManagerDB:
         check_level: List[int | float] | int | float | None = None,
         comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
         aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None,
-    ) -> Union[polars_dataframe, polars_lazyframe]:
+    ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """
         Retrieve OHLC historical data for the specified ticker and timeframe.
 
@@ -1151,7 +784,7 @@ class HistoricalManagerDB:
             aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None): Aggregation mode for data retrieval. Default is None.
 
         Returns:
-            polars.DataFrame | polars.LazyFrame: DataFrame containing OHLC data with columns:
+            PolarsDataFrame | PolarsLazyFrame: DataFrame containing OHLC data with columns:
                 - timestamp: datetime column with candle timestamps
                 - open: Opening price (float32)
                 - high: Highest price (float32)

@@ -17,16 +17,27 @@ Created on Sun Feb 23 00:02:36 2025
         OSS versions for windows required
 '''
 
-
+import polars as pl
+import time
+import requests
+from requests import Session
 from filelock import FileLock
-from .common import *
+from io import BytesIO
+from zipfile import (
+    ZipFile,
+    ZipExtFile,
+    BadZipFile
+)
+from textwrap import dedent
+from bs4 import BeautifulSoup
+
 from polars import (
-    DataFrame as polars_dataframe,
-    LazyFrame as polars_lazyframe,
+    DataFrame as PolarsDataFrame,
+    LazyFrame as PolarsLazyFrame,
     concat
 )
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path as PathType
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from numpy import array
@@ -44,12 +55,12 @@ from attrs import (
 from loguru import logger
 from pathlib import Path
 
+
 from ..config import _apply_config
+from .common import *
 
+# BASE CONNECTOR
 
-'''
-BASE CONNECTOR
-'''
 
 @define(kw_only=True, slots=True)
 class DatabaseConnector:
@@ -89,8 +100,8 @@ class DatabaseConnector:
 
     def write_data(self,
                    target_table: str,
-                   dataframe: Union[polars_dataframe,
-                                    polars_lazyframe],
+                   dataframe: Union[PolarsDataFrame,
+                                    PolarsLazyFrame],
                    clean: bool = False) -> None:
         """Write data to database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement write_data")
@@ -101,7 +112,7 @@ class DatabaseConnector:
             ticker: str,
             timeframe: str,
             start: datetime,
-            end: datetime) -> polars_lazyframe:
+            end: datetime) -> PolarsLazyFrame:
         """Read data from database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_data")
 
@@ -109,7 +120,7 @@ class DatabaseConnector:
                        market: str,
                        ticker: str,
                        timeframe: str,
-                       years: int | List[int]) -> polars_lazyframe:
+                       years: int | List[int]) -> PolarsLazyFrame:
         """Read data for specific year(s) - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_data_year")
 
@@ -131,10 +142,8 @@ class DatabaseConnector:
         local_files, tables_list = self._list_local_data()
 
         return tables_list
-    def _get_items_from_db_key(self,
-                            key
-                            ) -> tuple:
 
+    def _get_items_from_db_key(self, key) -> tuple:
         return tuple(key.split('_'))
 
     def _get_file_items(self, filename: str) -> tuple:
@@ -484,9 +493,8 @@ class DatabaseConnector:
                     self._tickers_years_info_filepath}: {e}')
 
 
-'''
-LOCAL DATABASE CONNECTOR CLASS
-'''
+# LOCAL DATABASE CONNECTOR CLASS
+
 
 @define(kw_only=True, slots=True)
 class LocalDBConnector(DatabaseConnector):
@@ -630,7 +638,7 @@ class LocalDBConnector(DatabaseConnector):
     def write_data(
         self,
         target_table: str,
-        dataframe: Union[polars_dataframe, polars_lazyframe],
+        dataframe: Union[PolarsDataFrame, PolarsLazyFrame],
         clean: bool = False
     ) -> None:
 
@@ -693,7 +701,7 @@ class LocalDBConnector(DatabaseConnector):
                   check_level: List[int | float] | int | float | None = None,
                   comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
                   comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
-                  ) -> polars_lazyframe:
+                  ) -> PolarsLazyFrame:
 
         comparisons_len = 0
 
@@ -755,7 +763,7 @@ class LocalDBConnector(DatabaseConnector):
 
             comparisons_len = len(comparison_column_name)
 
-        dataframe = polars_lazyframe()
+        dataframe = PolarsLazyFrame()
 
         filename = self._get_filename(market,
                                       ticker,
@@ -768,11 +776,11 @@ class LocalDBConnector(DatabaseConnector):
 
         if self.engine == 'polars':
 
-            dataframe = polars_dataframe()
+            dataframe = PolarsDataFrame()
 
         elif self.engine == 'polars_lazy':
 
-            dataframe = polars_lazyframe()
+            dataframe = PolarsLazyFrame()
 
         else:
 
@@ -881,7 +889,7 @@ class LocalDBConnector(DatabaseConnector):
                        market: str,
                        ticker: str,
                        timeframe: str,
-                       years: int | List[int]) -> polars_lazyframe:
+                       years: int | List[int]) -> PolarsLazyFrame:
         """
         Read data for specific year(s) using SQL YEAR() filter.
         """
@@ -1052,7 +1060,7 @@ class LocalDBYearConnector(DatabaseConnector):
     def write_data(
         self,
         target_table: str,
-        dataframe: Union[polars_dataframe, polars_lazyframe],
+        dataframe: Union[PolarsDataFrame, PolarsLazyFrame],
         clean: bool = False
     ) -> None:
         '''
@@ -1066,7 +1074,7 @@ class LocalDBYearConnector(DatabaseConnector):
         ----------
         target_table : str
             Target table name
-        dataframe : Union[polars_dataframe, polars_lazyframe]
+        dataframe : Union[PolarsDataFrame, PolarsLazyFrame]
             Data to write
         clean : bool, optional
             Clean data before writing, by default False
@@ -1116,7 +1124,7 @@ class LocalDBYearConnector(DatabaseConnector):
                   check_level: List[int | float] | int | float | None = None,
                   comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
                   comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
-                  ) -> polars_lazyframe:
+                  ) -> PolarsLazyFrame:
 
         comparisons_len = 0
 
@@ -1173,9 +1181,9 @@ class LocalDBYearConnector(DatabaseConnector):
             comparisons_len = len(comparison_column_name)
 
         if self.engine == 'polars':
-            dataframe = polars_dataframe()
+            dataframe = PolarsDataFrame()
         elif self.engine == 'polars_lazy':
-            dataframe = polars_lazyframe()
+            dataframe = PolarsLazyFrame()
         else:
             logger.bind(target='localdb').error(
                 f'Engine {self.engine} or data type {self.data_type} not supported')
@@ -1256,7 +1264,7 @@ class LocalDBYearConnector(DatabaseConnector):
                        market: str,
                        ticker: str,
                        timeframe: str,
-                       years: int | List[int]) -> polars_lazyframe:
+                       years: int | List[int]) -> PolarsLazyFrame:
         """
         Read data for specific year(s) using SQL YEAR() filter.
         """
@@ -1309,6 +1317,3 @@ class LocalDBYearConnector(DatabaseConnector):
             dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
 
         return dataframe
-
-
-

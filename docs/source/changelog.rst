@@ -33,9 +33,7 @@ Core Features
 * **Real-time Data Management**: 
 
   * Current and recent market data access
-  * Alpha Vantage integration
-  * Polygon.io integration
-  * Support for multiple data providers with automatic failover
+  * Twelve Data integration
   * Rate limit management
 
 * **Multi-Engine Support**: 
@@ -118,8 +116,7 @@ Database Integration
 Enhanced Features
 ^^^^^^^^^^^^^^^^^
 
-* Twelve data provider integration
-* Real-time data providers caching as in Historical manager
+* Real-time data provider caching as in Historical manager
 
 Performance
 ^^^^^^^^^^^

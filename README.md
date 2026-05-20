@@ -40,8 +40,7 @@ A minimal free or trial offering is proposed, but they rely on premium subscript
 * how much history of a ticker 
 * and many other parameters ...
 
-As of now, just [alpha-vantage](https://www.alphavantage.co/documentation/) and [polygon-io](https://polygon.io/docs/forex/getting-started) are managed. The intention is to make the most out of them and their free tier access to data.
-[Twelve data](https://twelvedata.com/) interface is under development.
+As of now, [Twelve Data](https://twelvedata.com/) is integrated for real-time market data access. The intention is to make the most out of their free tier access to data.
 
 ## INSTALLATION
 
@@ -130,11 +129,8 @@ If not provided, a default location is used (`~/.database/`).
 
 To use real-time sources you need to provide an API key.
 
-Look here to register and create a key from Alpha-Vantage provider
-[Alpha-Vantage free API registration](https://www.alphavantage.co/support/#api-key)
-
-Look here to register and create a key from Polygon-IO provider
-[Polygon-IO home page](https://polygon.io/)
+Look here to register and create a key from Twelve Data provider
+[Twelve Data API registration](https://twelvedata.com/)
 
 ## LOGGING
 
@@ -155,10 +151,9 @@ To run the examples:
 # Historical data example
 poetry run python examples/histdata_db_manager.py
 
-# Real-time data example (requires API keys as environment variables)
-export ALPHA_VANTAGE_API_KEY="your_key_here"
-export POLYGON_IO_API_KEY="your_key_here"
-poetry run python examples/realtime_data_manager.py
+# Real-time data example (requires Twelve Data API key as environment variable)
+export TWELVE_DATA_API_KEY="your_key_here"
+poetry run python examples/realtime/realtime_twelvedata_connector.py
 ```
 
 #### Historical data 
@@ -293,20 +288,18 @@ Let's walk through the [example for historical data source](examples/histdata_db
 
 #### Real-Time data
 
-Let's walk through the [example for real-time data source](examples/realtime_data_manager.py):
+Let's walk through the [example for real-time data source](examples/realtime/realtime_twelvedata_connector.py):
 
-**Important:** This example requires API keys set as environment variables:
+**Important:** This example requires Twelve Data API key set as an environment variable:
 ```bash
-export ALPHA_VANTAGE_API_KEY="your_alphavantage_key"
-export POLYGON_IO_API_KEY="your_polygon_io_key"
+export TWELVE_DATA_API_KEY="your_twelvedata_key"
 ```
 
 1. **Configuration with API keys**
     ```python
     from os import getenv
     
-    alpha_vantage_key = getenv('ALPHA_VANTAGE_API_KEY')
-    polygon_io_key = getenv('POLYGON_IO_API_KEY')
+    twelve_data_key = getenv('TWELVE_DATA_API_KEY')
     
     test_config_yaml = f'''
     DATA_FILETYPE: 'parquet'
@@ -316,8 +309,7 @@ export POLYGON_IO_API_KEY="your_polygon_io_key"
     DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'
     
     PROVIDERS_KEY:
-        ALPHA_VANTAGE_API_KEY : {alpha_vantage_key},
-        POLYGON_IO_API_KEY    : {polygon_io_key}
+        TWELVE_DATA_API_KEY : {twelve_data_key}
     '''
     ```
     Configuration includes API keys for real-time data providers.

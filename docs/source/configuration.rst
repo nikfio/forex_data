@@ -30,8 +30,7 @@ Create a YAML configuration file ending with ``data_config.yaml`` file with the 
    
    # API keys for real-time data providers
    PROVIDERS_KEY:
-     ALPHA_VANTAGE_API_KEY: your_alphavantage_key
-     POLYGON_IO_API_KEY: your_polygon_key
+     TWELVE_DATA_API_KEY: your_twelvedata_key
 
 Configuration Options
 =====================
@@ -138,33 +137,24 @@ Contains API keys for real-time data providers.
 **Type**: Dictionary
 
 **Supported Providers**:
-  * ``ALPHA_VANTAGE_API_KEY`` - Alpha Vantage API key
-  * ``POLYGON_IO_API_KEY`` - Polygon.io API key
+  * ``TWELVE_DATA_API_KEY`` - Twelve Data API key
 
 **Example**:
 
 .. code-block:: yaml
 
    PROVIDERS_KEY:
-     ALPHA_VANTAGE_API_KEY: YOUR_API_KEY_HERE
-     POLYGON_IO_API_KEY: YOUR_API_KEY_HERE
+     TWELVE_DATA_API_KEY: YOUR_API_KEY_HERE
 
 Getting API Keys
 ^^^^^^^^^^^^^^^^
 
-**Alpha Vantage**
+**Twelve Data**
 
-1. Visit `Alpha Vantage <https://www.alphavantage.co/support/#api-key>`_
-2. Enter your email and organization (can be personal)
-3. Get your free API key instantly
-4. Free tier: 25 requests per day
-
-**Polygon.io**
-
-1. Visit `Polygon.io <https://polygon.io/>`_
+1. Visit `Twelve Data <https://twelvedata.com/>`_
 2. Sign up for a free account
 3. Navigate to your dashboard to get your API key
-4. Free tier: Limited historical data access
+4. Free tier: 8 requests per minute
 
 .. important::
    Keep your API keys secure! Don't commit them to version control.
@@ -246,8 +236,8 @@ For sensitive data like API keys, consider using environment variables:
        config = yaml.safe_load(f)
    
    # Override with environment variables
-   if 'ALPHA_VANTAGE_API_KEY' in os.environ:
-       config['PROVIDERS_KEY']['ALPHA_VANTAGE_API_KEY'] = os.environ['ALPHA_VANTAGE_API_KEY']
+   if 'TWELVE_DATA_API_KEY' in os.environ:
+       config['PROVIDERS_KEY']['TWELVE_DATA_API_KEY'] = os.environ['TWELVE_DATA_API_KEY']
 
 Configuration Best Practices
 =============================
@@ -274,8 +264,7 @@ Here's a recommended production configuration:
    
    # API keys (use environment variables in real production!)
    PROVIDERS_KEY:
-     ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY}
-     POLYGON_IO_API_KEY: ${POLYGON_IO_API_KEY}
+     TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY}
 
 Troubleshooting
 ===============

@@ -42,7 +42,7 @@ Key Features
 * 📊 **Unified OHLC Format**: All data sources return consistent timestamp, open, high, low, close format
 * 🕐 **Multiple Timeframes**: Easily aggregate data into any timeframe (1m, 5m, 1h, 1D, 1W, etc.)
 * 📈 **Historical Data**: Access 20+ years of historical data from sources like histdata.com
-* ⚡ **Real-time Data**: Get up-to-date market data from Alpha Vantage and Polygon.io
+* ⚡ **Real-time Data**: Get up-to-date market data from Twelve Data
 * 🔍 **Conditional Filtering**: Filter data directly during retrieval with SQL-like conditions
 * 🚀 **High Performance**: Built on Polars, PyArrow, or Pandas for lightning-fast data processing
 * 💾 **Smart Caching**: Intelligent data caching for optimal performance

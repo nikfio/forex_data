@@ -8,7 +8,6 @@ Created on Sat Jul 16 01:31:35 2022
 __all__ = [
     'common',
     'HistoricalManagerDB',
-    'RealtimeManager',
     'YEARS',
     'MONTHS',
     'TICK_TIMEFRAME',
@@ -43,7 +42,10 @@ __all__ = [
     'get_class_attr_keys',
     'get_class_attr_values',
     'get_class_attr_dict',
-    'random_date_between'
+    'random_date_between',
+    'RealTimeDBConnectorTwelveData',
+    'HistDataConnector',
+    'DukascopyConnector'
 ]
 
 from . import common
@@ -90,6 +92,10 @@ from .database import (
     LocalDBYearConnector
 )
 
-from .historicaldata import HistoricalManagerDB
+from .remoteconnector import (
+    RealTimeDBConnectorTwelveData,
+    HistDataConnector,
+    DukascopyConnector
+)
 
-from .realtimedata import RealtimeManager
+from .historicaldata import HistoricalManagerDB

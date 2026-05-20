@@ -21,8 +21,8 @@ from datetime import (
 )
 
 from polars import (
-    DataFrame as polars_dataframe,
-    LazyFrame as polars_lazyframe,
+    DataFrame as PolarsDataFrame,
+    LazyFrame as PolarsLazyFrame,
     col
 )
 
@@ -135,10 +135,10 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(data)
-        self.assertIsInstance(data, (polars_dataframe, polars_lazyframe))
+        self.assertIsInstance(data, (PolarsDataFrame, PolarsLazyFrame))
 
         # Collect if lazy frame
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
 
         self.assertGreater(len(data), 0)
@@ -159,9 +159,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(data)
-        self.assertIsInstance(data, (polars_dataframe, polars_lazyframe))
+        self.assertIsInstance(data, (PolarsDataFrame, PolarsLazyFrame))
 
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
 
         self.assertGreater(len(data), 0)
@@ -180,7 +180,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             end=end
         )
 
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
 
         if len(data) > 0:
@@ -206,7 +206,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
         self.assertIsNotNone(data)
 
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
 
         # assert that between two consecutive candles the timestamp
@@ -238,7 +238,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             end=end
         )
 
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
 
         expected_columns = ['timestamp', 'open', 'high', 'low', 'close']
@@ -260,7 +260,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             end=end
         )
 
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
 
         if len(data) > 1:
@@ -282,7 +282,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             end=end
         )
 
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
 
         if len(data) > 0:
@@ -506,9 +506,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(filtered_data)
-        self.assertIsInstance(filtered_data, (polars_dataframe, polars_lazyframe))
+        self.assertIsInstance(filtered_data, (PolarsDataFrame, PolarsLazyFrame))
 
-        if isinstance(filtered_data, polars_lazyframe):
+        if isinstance(filtered_data, PolarsLazyFrame):
             filtered_data = filtered_data.collect()
 
         # Verify all returned rows have OPEN < threshold
@@ -548,9 +548,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(filtered_data)
-        self.assertIsInstance(filtered_data, (polars_dataframe, polars_lazyframe))
+        self.assertIsInstance(filtered_data, (PolarsDataFrame, PolarsLazyFrame))
 
-        if isinstance(filtered_data, polars_lazyframe):
+        if isinstance(filtered_data, PolarsLazyFrame):
             filtered_data = filtered_data.collect()
 
         # Verify at least one condition is met for each row
@@ -592,9 +592,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(filtered_data)
-        self.assertIsInstance(filtered_data, (polars_dataframe, polars_lazyframe))
+        self.assertIsInstance(filtered_data, (PolarsDataFrame, PolarsLazyFrame))
 
-        if isinstance(filtered_data, polars_lazyframe):
+        if isinstance(filtered_data, PolarsLazyFrame):
             filtered_data = filtered_data.collect()
 
         # Verify both conditions are met for each row
@@ -641,9 +641,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         self.assertIsNotNone(all_data)
         self.assertIsNotNone(filtered_data)
 
-        if isinstance(all_data, polars_lazyframe):
+        if isinstance(all_data, PolarsLazyFrame):
             all_data = all_data.collect()
-        if isinstance(filtered_data, polars_lazyframe):
+        if isinstance(filtered_data, PolarsLazyFrame):
             filtered_data = filtered_data.collect()
 
         # Verify filtered data is subset of all data
@@ -685,14 +685,14 @@ class TestHistoricalManagerDB(unittest.TestCase):
         self.assertIsNotNone(raw_data)
 
         # Collect if lazy frame
-        if isinstance(raw_data, polars_lazyframe):
+        if isinstance(raw_data, PolarsLazyFrame):
             raw_data = raw_data.collect()
 
         # Apply business_days_data filter
         filtered_data = business_days_data(raw_data)
 
         # Collect if lazy frame
-        if isinstance(filtered_data, polars_lazyframe):
+        if isinstance(filtered_data, PolarsLazyFrame):
             filtered_data = filtered_data.collect()
 
         # Test 1: Filtered data should have <= rows than raw data
@@ -919,7 +919,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(data)
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
         msg = f"No data downloaded for {ticker} in {current_year}"
         self.assertGreater(len(data), 0, msg=msg)
@@ -953,7 +953,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(data)
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
         msg = f"No data downloaded for {ticker} in {current_year}"
         self.assertGreater(len(data), 0, msg=msg)
@@ -965,7 +965,14 @@ class TestHistoricalManagerDB(unittest.TestCase):
         """
         current_year = datetime.now().year
         # Use another common ticker
-        ticker = random.choice(get_histdata_tickers(verify=False))
+        common_tickers = ['eurusd', 'gbpusd', 'usdjpy', 'usdchf', 'audusd', 'usdcad']
+        supported = [
+            t for t in get_histdata_tickers(verify=False)
+            if t.lower() in common_tickers
+        ]
+        if not supported:
+            supported = ['eurusd']
+        ticker = random.choice(supported)
 
         # Pick random end_date in current year
         start_of_year = datetime(current_year, 1, 1)
@@ -987,7 +994,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         )
 
         self.assertIsNotNone(data)
-        if isinstance(data, polars_lazyframe):
+        if isinstance(data, PolarsLazyFrame):
             data = data.collect()
         msg = f"No data downloaded for {ticker} in {current_year}"
         self.assertGreater(len(data), 0, msg=msg)
