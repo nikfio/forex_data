@@ -86,15 +86,10 @@ from polars import (
     len as polars_len,
     read_parquet as polars_read_parquet,
     from_arrow,
-    DataFrame as polars_dataframe,
-    LazyFrame as polars_lazyframe,
+    DataFrame as PolarsDataFrame,
+    LazyFrame as PolarsLazyFrame,
     scan_csv as polars_scan_csv,
     scan_parquet as polars_scan_parquet
-)
-
-# POLYGON real time provider
-from polygon.rest.models.aggs import (
-    Agg as polygon_agg
 )
 
 from dateutil.rrule import (
@@ -134,19 +129,19 @@ __all__ = [
     'FILENAME_STR',
     'FILENAME_YEAR_STR',
     'REALTIME_DATA_PROVIDER',
-    'ALPHA_VANTAGE_API_KEY',
-    'CANONICAL_INDEX',
+    'DATA_PROVIDER_PLAN_LIST',
+    'TWELVE_DATA_CHUNK_SIZE',
+    'TWELVE_DATA_FREE_TIER_MINUTE_RATE_LIMIT',
+    'TWELVE_DATA_FREE_TIER_DAY_RATE_LIMIT',
+    'TWELVE_DATA_PRO_MINUTE_RATE_LIMIT',
+    'TWELVE_DATA_PRO_DAY_RATE_LIMIT',
+    'TWELVE_DATA_LIMIT_DATE',
     'DATE_NO_HOUR_FORMAT',
-    'POLYGON_IO_API_KEY',
-    'AV_LIST_URL',
-    'PAIR_ALPHAVANTAGE_FORMAT',
-    'PAIR_POLYGON_FORMAT',
     'SQL_COMPARISON_OPERATORS',
     'SUPPORTED_SQL_COMPARISON_OPERATORS',
     'SUPPORTED_BASE_DATA_COLUMN_NAME',
     'SQL_CONDITION_AGGREGATION_MODES',
     'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
-    'HISTORICAL_DB_MIN_DATE',
     'HISTORICAL_DB_MIN_DATE',
 
     'validator_file_path',
@@ -175,7 +170,6 @@ __all__ = [
     'to_source_symbol',
     'get_date_interval',
     'random_date_between',
-    'polygon_agg_to_dict',
     'get_histdata_tickers',
     'TickerNotFoundError',
     'TickerDataNotFoundError',
@@ -265,22 +259,6 @@ SINGLE_CURRENCY_PATTERN_STR = '[A-Za-z]{3}'
 TICKER_PATTERN = '^' + SINGLE_CURRENCY_PATTERN_STR  \
     + SINGLE_CURRENCY_PATTERN_STR + '$'
 PAIR_GENERIC_FORMAT = '{TO}/{FROM}'
-
-# ALPHAVANTAGE
-PAIR_ALPHAVANTAGE_FORMAT = '{TO}/{FROM}'
-PAIR_ALPHAVANTAGE_PATTERN = '^' + SINGLE_CURRENCY_PATTERN_STR + '/' \
-    + SINGLE_CURRENCY_PATTERN_STR + '$'
-ALPHA_VANTAGE_API_KEY = 'ALPHA_VANTAGE_API_KEY'
-AV_LIST_URL = (
-    'https://www.alphavantage.co/query?'
-    'function=LISTING_STATUS&apikey={api_key}'
-)
-
-# PAIR POLYGON IO
-PAIR_POLYGON_FORMAT = 'C:{TO}{FROM}'
-PAIR_POLYGON_PATTERN = '^C:' + SINGLE_CURRENCY_PATTERN_STR + \
-    SINGLE_CURRENCY_PATTERN_STR + '$'
-POLYGON_IO_API_KEY = 'POLYGON_IO_API_KEY'
 
 # TIME PATTERN
 TIME_WINDOW_PATTERN_STR = '^[-+]?[0-9]+[A-Za-z]{1,}$'
@@ -408,8 +386,6 @@ class DATA_COLUMN_NAMES:
     TF_DATA = ['timestamp', 'open', 'high', 'low', 'close']
     TICK_DATA_TIME_INDEX = ['ask', 'bid', 'vol', 'p']
     TF_DATA_TIME_INDEX = ['open', 'high', 'low', 'close']
-    POLYGON_IO_AGGS = ['open', 'high', 'low', 'close', 'volume', 'vwap',
-                               'timestamp', 'transactions']
 
 
 # SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE
@@ -421,7 +397,9 @@ class REALTIME_DATA_PROVIDER:
 
     TWELVE_DATA = 'TWELVE_DATA'
 
+
 REALTIME_DATA_PROVIDER_LIST = [REALTIME_DATA_PROVIDER.TWELVE_DATA]
+
 
 class DB_MODE:
 
@@ -435,6 +413,7 @@ class ASSET_TYPE:
     STOCK = 'STOCK'
     ETF = 'ETF'
     FOREX = 'FOREX'
+
 
 class BASE_DATA_COLUMN_NAME:
 
@@ -451,6 +430,7 @@ class BASE_DATA_COLUMN_NAME:
     VWAP = 'vwap'
     OTC = 'otc'
 
+
 SUPPORTED_BASE_DATA_COLUMN_NAME = Literal[
     BASE_DATA_COLUMN_NAME.TIMESTAMP,
     BASE_DATA_COLUMN_NAME.OPEN,
@@ -466,11 +446,6 @@ SUPPORTED_BASE_DATA_COLUMN_NAME = Literal[
     BASE_DATA_COLUMN_NAME.OTC
 ]
 
-class CANONICAL_INDEX:
-
-    AV_LATEST_DATA_INDEX = 0
-    AV_DF_DATA_INDEX = 0
-    AV_DICT_INFO_INDEX = 1
 
 class SQL_COMPARISON_OPERATORS:
 
@@ -481,6 +456,7 @@ class SQL_COMPARISON_OPERATORS:
     EQUAL = '=='
     NOT_EQUAL = '!='
 
+
 SUPPORTED_SQL_COMPARISON_OPERATORS = Literal[
     SQL_COMPARISON_OPERATORS.GREATER_THAN,
     SQL_COMPARISON_OPERATORS.LESS_THAN,
@@ -490,10 +466,12 @@ SUPPORTED_SQL_COMPARISON_OPERATORS = Literal[
     SQL_COMPARISON_OPERATORS.NOT_EQUAL
 ]
 
+
 class SQL_CONDITION_AGGREGATION_MODES:
 
     AND = 'AND'
     OR = 'OR'
+
 
 SUPPORTED_SQL_CONDITION_AGGREGATION_MODES = Literal[
     SQL_CONDITION_AGGREGATION_MODES.AND,
@@ -504,6 +482,8 @@ SUPPORTED_SQL_CONDITION_AGGREGATION_MODES = Literal[
 # auxiliary functions
 
 # get elements from db key
+
+
 def get_db_key_elements(key):
 
     res = fullmatch(DATA_KEY_TEMPLATE_STR, key)
@@ -631,19 +611,9 @@ def get_pair_symbols(ticker):
 
 def check_symbol(symbol, source):
 
-    if source == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
+    if source == REALTIME_DATA_PROVIDER.TWELVE_DATA:
 
-        if fullmatch(PAIR_ALPHAVANTAGE_PATTERN, symbol):
-
-            return True
-
-        else:
-
-            return False
-
-    elif source == REALTIME_DATA_PROVIDER.POLYGON_IO:
-
-        if fullmatch(PAIR_POLYGON_FORMAT, symbol):
+        if fullmatch(PAIR_TWELVE_DATA_PATTERN, symbol):
 
             return True
 
@@ -653,7 +623,7 @@ def check_symbol(symbol, source):
 
     else:
 
-        if fullmatch(PAIR_POLYGON_FORMAT, symbol):
+        if fullmatch(PAIR_TWELVE_DATA_PATTERN, symbol):
 
             return True
 
@@ -666,19 +636,7 @@ def to_source_symbol(ticker, source):
 
     to_symbol, from_symbol = get_pair_symbols(ticker)
 
-    if source == REALTIME_DATA_PROVIDER.ALPHA_VANTAGE:
-
-        return PAIR_ALPHAVANTAGE_FORMAT.format(TO=to_symbol,
-                                               FROM=from_symbol)
-
-    elif source == REALTIME_DATA_PROVIDER.POLYGON_IO:
-
-        return PAIR_POLYGON_FORMAT.format(TO=to_symbol,
-                                          FROM=from_symbol)
-
-    else:
-
-        return PAIR_GENERIC_FORMAT.format(TO=to_symbol,
+    return PAIR_TWELVE_DATA_FORMAT.format(TO=to_symbol,
                                           FROM=from_symbol)
 
 
@@ -905,11 +863,11 @@ def empty_dataframe(engine):
 
     elif engine == 'polars':
 
-        return polars_dataframe()
+        return PolarsDataFrame()
 
     elif engine == 'polars_lazy':
 
-        return polars_lazyframe()
+        return PolarsLazyFrame()
 
     else:
 
@@ -928,11 +886,11 @@ def is_empty_dataframe(dataframe):
 
         return (not bool(dataframe))
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe.is_empty()
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return dataframe.collect().is_empty()
 
@@ -954,11 +912,11 @@ def shape_dataframe(dataframe):
 
         return dataframe.shape
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe.shape
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return (
             dataframe.select(polars_len()).collect().item(0, 0),
@@ -983,11 +941,11 @@ def sort_dataframe(dataframe, column):
 
         return dataframe.sort_by(column)
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe.sort(column, nulls_last=True)
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return dataframe.sort(column, nulls_last=True)
 
@@ -1009,11 +967,11 @@ def get_dataframe_column(dataframe, column):
 
         return dataframe[column]
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe[column]
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return dataframe.select(column).collect()
 
@@ -1034,11 +992,11 @@ def get_dataframe_row(dataframe, row):
 
         return dataframe.slice(row, 1)
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe.slice(row, 1)
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return dataframe.slice(row, 1)
 
@@ -1059,11 +1017,11 @@ def get_dataframe_element(dataframe, column, row):
 
         return dataframe[column][row]
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe[column][row]
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return dataframe.select(column).collect().item(row, 0)
 
@@ -1090,11 +1048,11 @@ def astype(dataframe, dtype_dict):
 
         return dataframe.cast(dtype_dict_to_pyarrow_schema(dtype_dict))
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe.cast(dtype_dict)
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return dataframe.cast(dtype_dict)
 
@@ -1155,7 +1113,7 @@ def write_parquet(dataframe, filepath):
             logger.exception(f'pyarrow write parquet failed: {e}')
             raise
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         try:
 
@@ -1166,7 +1124,7 @@ def write_parquet(dataframe, filepath):
             logger.exception(f'polars write parquet failed: {e}')
             raise
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         try:
 
@@ -1250,7 +1208,7 @@ def write_csv(dataframe, file, **kwargs):
                              f' with data type {type(dataframe)}: {e}')
             raise IOError
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         try:
 
@@ -1262,7 +1220,7 @@ def write_csv(dataframe, file, **kwargs):
                              f' with data type {type(dataframe)}: {e}')
             raise IOError
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         try:
 
@@ -1302,11 +1260,11 @@ def concat_data(data_list=field(validator=validators.instance_of(list))):
 
         return concat_tables(data_list)
 
-    elif isinstance(data_list[0], polars_dataframe):
+    elif isinstance(data_list[0], PolarsDataFrame):
 
         return polars_concat(data_list, how='vertical')
 
-    elif isinstance(data_list[0], polars_lazyframe):
+    elif isinstance(data_list[0], PolarsLazyFrame):
 
         return polars_concat(data_list, how='vertical')
 
@@ -1334,11 +1292,11 @@ def to_pandas_dataframe(dataframe):
 
         return dataframe.to_pandas()
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         return dataframe.to_pandas(use_pyarrow_extension_array=True)
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         return dataframe.collect().to_pandas(use_pyarrow_extension_array=True)
 
@@ -1481,7 +1439,7 @@ def reframe_data(dataframe, tf):
         # convert to arrow Table and return
         return reframe_data(dataframe, tf).to_arrow()
 
-    elif isinstance(dataframe, polars_dataframe):
+    elif isinstance(dataframe, PolarsDataFrame):
 
         # assert timeframe input value
         tf = check_timeframe_str(tf, engine='polars')
@@ -1519,7 +1477,7 @@ def reframe_data(dataframe, tf):
                          f'or {DATA_COLUMN_NAMES.TF_DATA}')
             raise ValueError
 
-    elif isinstance(dataframe, polars_lazyframe):
+    elif isinstance(dataframe, PolarsLazyFrame):
 
         tf = tf.lower()
 
@@ -1722,28 +1680,6 @@ def get_histdata_tickers(verify: bool = True) -> List[str]:
         logger.error(f"Failed to retrieve tickers from HistData: {e}")
         return []
 
-# REAL TIME PROVIDERS UTILITIES
-
-
-def polygon_agg_to_dict(agg):
-
-    if not isinstance(agg, polygon_agg):
-
-        logger.error('argument invalid type, required '
-                     'polygon.rest.models.aggs.Agg')
-
-    return {
-        BASE_DATA_COLUMN_NAME.TIMESTAMP: agg.timestamp,
-        BASE_DATA_COLUMN_NAME.OPEN: agg.open,
-        BASE_DATA_COLUMN_NAME.HIGH: agg.high,
-        BASE_DATA_COLUMN_NAME.LOW: agg.low,
-        BASE_DATA_COLUMN_NAME.CLOSE: agg.close,
-        BASE_DATA_COLUMN_NAME.VOL: agg.volume,
-        BASE_DATA_COLUMN_NAME.TRANSACTIONS: agg.transactions,
-        BASE_DATA_COLUMN_NAME.VWAP: agg.vwap,
-        BASE_DATA_COLUMN_NAME.OTC: agg.otc
-    }
-
 
 # MARKETS FUNCTIONS
 
@@ -1752,8 +1688,8 @@ US_HOLIDAYS = country_holidays('US', years=YEARS)
 US_holiday_dates = [holiday_date for holiday_date in US_HOLIDAYS.keys()]
 
 
-def business_days_data(dataframe: polars_lazyframe |
-                       polars_dataframe) -> polars_dataframe | polars_lazyframe:
+def business_days_data(dataframe: PolarsLazyFrame |
+                       PolarsDataFrame) -> PolarsDataFrame | PolarsLazyFrame:
     '''
     Remove non-business days data from the input dataframe.
     Filter out weekends data: saturday and sunday.
@@ -1823,3 +1759,29 @@ def update_ticker_years_dict(
         ticker_years_dict[ticker][timeframe].sort()
 
     return ticker_years_dict, changes_made
+
+
+'''
+REALTIME DATA PROVIDERS
+'''
+
+# TWELVE DATA
+PAIR_TWELVE_DATA_FORMAT = PAIR_GENERIC_FORMAT
+PAIR_TWELVE_DATA_PATTERN = '^' + SINGLE_CURRENCY_PATTERN_STR + \
+    SINGLE_CURRENCY_PATTERN_STR + '$'
+
+TWELVE_DATA_CHUNK_SIZE = 5000
+
+# LIST OF AVAILABLE PLANS ON TWELVE DATA
+DATA_PROVIDER_PLAN_LIST = ["free", "grow", "pro", "ultra"]
+
+# FREE TIER CONSTANTS
+TWELVE_DATA_FREE_TIER_MINUTE_RATE_LIMIT = 8  # api calls per minute
+TWELVE_DATA_FREE_TIER_DAY_RATE_LIMIT = 800  # api calls per day
+
+# PAID SUBSCRIPTION CONSTANTS
+TWELVE_DATA_PRO_MINUTE_RATE_LIMIT = 55  # api calls per minute
+TWELVE_DATA_PRO_DAY_RATE_LIMIT = 5000  # api calls per day
+
+# TWELVE DATA LIMIT DATE
+TWELVE_DATA_LIMIT_DATE = datetime(2020, 1, 1)

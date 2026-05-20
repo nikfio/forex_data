@@ -34,8 +34,7 @@ Create a file ending with ``data_config.yaml``:
    DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY' # Optional custom path
    
    PROVIDERS_KEY:
-     ALPHA_VANTAGE_API_KEY: your_api_key_here
-     POLYGON_IO_API_KEY: your_api_key_here
+     TWELVE_DATA_API_KEY: your_api_key_here
 
 .. tip::
    Use **parquet** for better performance and **polars** for the fastest data processing!
@@ -134,8 +133,8 @@ Working with Real-time Data
 The real-time data manager provides access to current market data.
 
 .. important::
-   You need API keys from Alpha Vantage and/or Polygon.io to use real-time data.
-   Add them to your ``appconfig.yaml`` file.
+   You need an API key from Twelve Data to use real-time data.
+   Add it to your ``appconfig.yaml`` file.
 
 Basic Usage
 -----------
