@@ -18,7 +18,9 @@ Created on Sun Feb 23 00:02:36 2025
 #
 
 import os
+import shutil
 import time
+from uuid import uuid4
 import requests
 from requests import Session
 from io import BytesIO
@@ -48,6 +50,8 @@ from loguru import logger
 from .common import (
     PolarsDataFrame,
     PolarsLazyFrame,
+    TEMP_FOLDER,
+    TEMP_CSV_FILE,
     SUPPORTED_DATA_FILES,
     SUPPORTED_DATA_ENGINES,
     DATA_COLUMN_NAMES,
@@ -91,6 +95,7 @@ class RemoteConnector:
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
 
     _tickers_years_info_filepath = field(default=Path('.'))
+    _temporary_data_path = field(default=Path('.'))
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -108,6 +113,17 @@ class RemoteConnector:
             self.data_path.mkdir(parents=True,
                                  exist_ok=True)
 
+        # Each instance gets its own unique temp subfolder under Temp/
+        # so that parallel HistoricalManagerDB instances never share or
+        # conflict on the same temporary directory.
+        self._temporary_data_path = (
+            self.data_path / TEMP_FOLDER / str(uuid4())
+        )
+
+        # remove any left over files in case of previous crash
+        self.clear_temporary_folder()
+        self._temporary_data_path.mkdir(parents=True, exist_ok=False)
+
     def connect(self) -> Any:
         """Connect to database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement connect")
@@ -115,6 +131,9 @@ class RemoteConnector:
     def check_connection(self) -> bool:
         """Check database connection - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement check_connection")
+
+    def clear_temporary_folder(self) -> None:
+        shutil.rmtree(self._temporary_data_path, ignore_errors=True)
 
     def get_available_tickers(self) -> List[str]:
         """Get available tickers - must be implemented by subclasses."""
@@ -133,7 +152,6 @@ class RemoteConnector:
         ticker: str,
         year: int,
         month_num: int,
-        temp_filepath: str = '',
         engine: str = 'polars_lazy'
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """Download a single month of tick data from histdata.com and
@@ -152,9 +170,6 @@ class RemoteConnector:
             The year of the data to download (e.g. 2023).
         month_num : int
             The month number (1-12) of the data to download.
-        temp_filepath : str or Path, optional
-            Optional filepath to save the raw downloaded ZIP before parsing.
-            If empty, uses the connector's temporary data path.
         engine : str, optional
             The DataFrame engine to use: 'pandas' for pandas.DataFrame
             or 'polars' for PolarsDataFrame. Defaults to 'polars'.
@@ -209,7 +224,7 @@ class HistDataConnector(RemoteConnector):
         super().__attrs_post_init__()
 
         # set up log sink for histdata connector
-        log_path = Path(self.data_path) / 'log' / 'histdata.log'
+        log_path = self.data_path / 'log' / 'histdata.log'
 
         handlers_to_remove = []
         for handler_id, handler in logger._core.handlers.items():
@@ -230,7 +245,6 @@ class HistDataConnector(RemoteConnector):
                    filter=lambda record: ('histdata' == record['extra'].get('target') and
                                           bool(record["extra"].get('target'))))
 
-        self.data_path = Path(self.data_path)
         self.connect()
 
     def connect(self) -> None:
@@ -306,7 +320,6 @@ class HistDataConnector(RemoteConnector):
         ticker: str,
         year: int,
         month_num: int,
-        temp_filepath: str = '',
         engine: str = 'polars_lazy'
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """
@@ -322,14 +335,10 @@ class HistDataConnector(RemoteConnector):
         ----------
         ticker : str
             Forex pair symbol (e.g. 'eurusd').
-        url : str
-            The histdata.com page URL for this ticker/year/month.
         year : int
             Data year.
         month_num : int
             Month number (1-12).
-        temp_filepath : str
-            Path for temporary CSV file used during parsing.
         engine : str
             DataFrame engine to use for parsing.
             One of 'pandas', 'pyarrow', 'polars', 'polars_lazy'.
@@ -351,6 +360,14 @@ class HistDataConnector(RemoteConnector):
         TickerDataInvalidException
             If the extracted file type is unexpected.
         """
+
+        temp_filepath = str(
+            self._temporary_data_path /
+            (f'{ticker}_' +
+             f'{year}_' +
+             f'{MONTHS[month_num - 1]}_' +
+             TEMP_CSV_FILE)
+        )
 
         url = HISTDATA_URL_TICKDATA_TEMPLATE.format(
             ticker=ticker.lower(),
@@ -745,14 +762,12 @@ class DukascopyConnector(RemoteConnector):
 
         validate(self)
 
-        self.__attrs_post_init__(**kwargs)
-
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
         super().__attrs_post_init__()
 
         # set up log sink for dukascopy connector
-        log_path = Path(self.data_path) / 'log' / 'dukascopy.log'
+        log_path = self.data_path / 'log' / 'dukascopy.log'
 
         handlers_to_remove = []
         for handler_id, handler in logger._core.handlers.items():
@@ -772,13 +787,19 @@ class DukascopyConnector(RemoteConnector):
                    filter=lambda record: ('dukascopy' == record['extra'].get('target') and
                                           bool(record["extra"].get('target'))))
 
-        self.data_path = Path(self.data_path)
         self.connect()
 
     def connect(self) -> None:
         """Configure session and tick_vault base directory."""
         self._session = Session()
         self._session.verify = self.ssl_verify
+        self._session.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        })
         if not self.ssl_verify:
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -786,17 +807,28 @@ class DukascopyConnector(RemoteConnector):
         # Configure tick_vault if it's imported
         try:
             from tick_vault import reload_config
-            reload_config(base_directory=str(self.data_path / 'dukascopy_vault'))
+            reload_config(
+                base_directory=str(self._temporary_data_path),
+                worker_per_proxy=1
+            )
         except ImportError:
             logger.bind(target='dukascopy').warning("tick_vault is not installed. Please install it to use DukascopyConnector.")
 
     def check_connection(self) -> bool:
         """Test connectivity to dukascopy.com."""
-        url = "https://datafeed.dukascopy.com/datafeed/"
+        url = "https://www.dukascopy.com/swiss/english/marketwatch/historical/"
         try:
-            self._session.head(url, timeout=5)
-            return True
+            response = self._session.head(url, timeout=30)
+            if response.status_code == 200:
+                return True
+        except Exception:
+            pass
+
+        try:
+            response = self._session.get(url, timeout=30)
+            return response.status_code == 200
         except Exception as e:
+
             logger.bind(target='dukascopy').error(
                 f'Failed to connect to {url}: {e}')
             return False
@@ -824,11 +856,12 @@ class DukascopyConnector(RemoteConnector):
             logger.bind(target='dukascopy').warning("Failed to import pipet size registry from tick_vault.")
 
         # 2. Scrape tickers from Dukascopy tools page
-        scrape_url = "https://www.dukascopy.com/swiss/english/fx-market-tools/historical-data/"
+        scrape_url = "https://www.dukascopy.com/swiss/english/marketwatch/historical/"
         try:
             from bs4 import BeautifulSoup
             import re
-            response = self._session.get(scrape_url, timeout=5)
+            response = self._session.get(scrape_url, timeout=30)
+
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, 'html.parser')
                 links = soup.find_all('a', href=re.compile(r'/charts/'))
@@ -863,8 +896,6 @@ class DukascopyConnector(RemoteConnector):
             Year of the data to download.
         month_num: int
             Month of the data (1-12).
-        temp_filepath: str
-            Unused, kept for compatibility.
         engine: str
             Either 'polars' or 'polars_lazy'.
 
@@ -983,7 +1014,10 @@ class DukascopyConnector(RemoteConnector):
             logger.bind(target='dukascopy').error("tick_vault is not installed. Cannot fetch recent data.")
             raise RuntimeError("tick_vault is not installed.")
 
-        end = datetime.now()
+        from datetime import timezone
+        # Subtract 2 hours from current UTC time because Dukascopy CDN historical files
+        # are uploaded with some latency (usually up to 1-2 hours).
+        end = datetime.now(timezone.utc) - timedelta(hours=2)
         start = end - interval_window
 
         # Run async download process

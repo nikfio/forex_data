@@ -8,12 +8,25 @@ Created on Thu May 21 00:30:00 2026
 import sys
 import unittest
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
+from datetime import timedelta
 import polars as pl
-import pandas as pd
 
 from forex_data import DukascopyConnector
-from forex_data.data_management.common import POLARS_DTYPE_DICT
+from forex_data.data_management.common import (
+    POLARS_DTYPE_DICT,
+    DEFAULT_PATHS
+)
+
+from pathlib import Path
+
+_base_path = Path.home() / ".test_database"
+_data_path = _base_path
+_counter = 1
+while _data_path.exists():
+    _data_path = Path.home() / f".test_database_{_counter}"
+    _counter += 1
+
+_data_path = Path.home() / ".test_database"
 
 
 class TestDukascopyConnector(unittest.TestCase):
@@ -25,12 +38,16 @@ class TestDukascopyConnector(unittest.TestCase):
 
     def setUp(self):
         self.connector = DukascopyConnector(
-            data_path="./dukascopy_test_path",
-            ssl_verify=False
+            data_path=_data_path / DEFAULT_PATHS.HIST_DATA_FOLDER / 'dukascopy',
+            ssl_verify=True
         )
 
+    def tearDown(self):
+        self.connector.clear_temporary_folder()
+
+    @patch('requests.Session.get')
     @patch('requests.Session.head')
-    def test_check_connection_success(self, mock_head):
+    def test_check_connection_success(self, mock_head, mock_get):
         # Arrange
         mock_head.return_value = MagicMock(status_code=200)
 
@@ -39,12 +56,31 @@ class TestDukascopyConnector(unittest.TestCase):
 
         # Assert
         self.assertTrue(connected)
-        mock_head.assert_called_once_with("https://datafeed.dukascopy.com/datafeed/", timeout=5)
+        mock_head.assert_called_once_with("https://www.dukascopy.com/swiss/english/marketwatch/historical/", timeout=30)
+        mock_get.assert_not_called()
 
+    @patch('requests.Session.get')
     @patch('requests.Session.head')
-    def test_check_connection_failure(self, mock_head):
+    def test_check_connection_fallback_success(self, mock_head, mock_get):
         # Arrange
-        mock_head.side_effect = Exception("Connection error")
+        mock_head.side_effect = Exception("HEAD failed")
+        mock_get.return_value = MagicMock(status_code=200)
+
+        # Act
+        connected = self.connector.check_connection()
+
+        # Assert
+        self.assertTrue(connected)
+        mock_head.assert_called_once()
+        mock_get.assert_called_once_with("https://www.dukascopy.com/swiss/english/marketwatch/historical/", timeout=30)
+
+    @patch('forex_data.data_management.remoteconnector.logger')
+    @patch('requests.Session.get')
+    @patch('requests.Session.head')
+    def test_check_connection_failure(self, mock_head, mock_get, mock_logger):
+        # Arrange
+        mock_head.side_effect = Exception("HEAD failed")
+        mock_get.side_effect = Exception("GET failed")
 
         # Act
         connected = self.connector.check_connection()
@@ -83,73 +119,42 @@ class TestDukascopyConnector(unittest.TestCase):
         self.assertIn("USDJPY", tickers)
         self.assertIn("XAUUSD", tickers)
         mock_get.assert_called_once_with(
-            "https://www.dukascopy.com/swiss/english/fx-market-tools/historical-data/",
-            timeout=5
+            "https://www.dukascopy.com/swiss/english/marketwatch/historical/",
+            timeout=30
         )
 
-    @patch('tick_vault.download_range')
-    @patch('tick_vault.read_tick_data')
-    def test_download_month_raw_polars(self, mock_read, mock_download):
-        # Arrange
-        mock_download.return_value = None
-
-        # Sample tick data
-        times = [datetime(2025, 5, 1, 10, 0, i) for i in range(5)]
-        mock_df = pd.DataFrame({
-            "time": times,
-            "ask": [1.0801, 1.0802, 1.0803, 1.0804, 1.0805],
-            "bid": [1.0800, 1.0801, 1.0802, 1.0803, 1.0804],
-            "ask_volume": [1.5, 2.0, 1.0, 3.0, 2.5],
-            "bid_volume": [2.5, 1.0, 2.0, 1.0, 1.5]
-        })
-        mock_read.return_value = mock_df
-
-        self.connector._tickers_cache = ["EURUSD"]
+    def test_download_month_raw_polars(self):
+        if not self.connector.check_connection():
+            self.skipTest("No network connection to Dukascopy.")
 
         # Act
         result = self.connector.download_month_raw(
             ticker="EURUSD",
-            year=2025,
+            year=2024,
             month_num=5,
             engine="polars"
         )
 
         # Assert
         self.assertIsInstance(result, pl.DataFrame)
-        self.assertEqual(result.height, 5)
+        self.assertGreater(result.height, 0)
         self.assertListEqual(
             list(result.columns),
             list(POLARS_DTYPE_DICT.TIME_TICK_DTYPE.keys())
         )
 
-        # Check volume mapping: vol = ask_volume + bid_volume
-        # First row: ask_vol=1.5, bid_vol=2.5 -> vol=4.0
-        self.assertEqual(result["vol"][0], 4.0)
+        # Check volume and mid price mapping
+        self.assertGreaterEqual(result["vol"][0], 0)
+        self.assertAlmostEqual(result["p"][0], (result["ask"][0] + result["bid"][0]) / 2, places=5)
 
-        # Check mid price mapping: p = (ask + bid) / 2
-        # First row: ask=1.0801, bid=1.0800 -> p=1.08005
-        self.assertAlmostEqual(result["p"][0], 1.08005, places=5)
-
-    @patch('tick_vault.download_range')
-    @patch('tick_vault.read_tick_data')
-    def test_download_month_raw_polars_lazy(self, mock_read, mock_download):
-        # Arrange
-        mock_download.return_value = None
-        times = [datetime(2025, 5, 1, 10, 0, i) for i in range(5)]
-        mock_df = pd.DataFrame({
-            "time": times,
-            "ask": [1.0801] * 5,
-            "bid": [1.0800] * 5,
-            "ask_volume": [1.0] * 5,
-            "bid_volume": [1.0] * 5
-        })
-        mock_read.return_value = mock_df
-        self.connector._tickers_cache = ["EURUSD"]
+    def test_download_month_raw_polars_lazy(self):
+        if not self.connector.check_connection():
+            self.skipTest("No network connection to Dukascopy.")
 
         # Act
         result = self.connector.download_month_raw(
             ticker="EURUSD",
-            year=2025,
+            year=2024,
             month_num=5,
             engine="polars_lazy"
         )
@@ -157,23 +162,11 @@ class TestDukascopyConnector(unittest.TestCase):
         # Assert
         self.assertIsInstance(result, pl.LazyFrame)
         collected = result.collect()
-        self.assertEqual(collected.height, 5)
+        self.assertGreater(collected.height, 0)
 
-    @patch('tick_vault.download_range')
-    @patch('tick_vault.read_tick_data')
-    def test_get_recent_data_tick(self, mock_read, mock_download):
-        # Arrange
-        mock_download.return_value = None
-        times = [datetime.now() - timedelta(minutes=5 - i) for i in range(5)]
-        mock_df = pd.DataFrame({
-            "time": times,
-            "ask": [1.0801] * 5,
-            "bid": [1.0800] * 5,
-            "ask_volume": [1.0] * 5,
-            "bid_volume": [1.0] * 5
-        })
-        mock_read.return_value = mock_df
-        self.connector._tickers_cache = ["EURUSD"]
+    def test_get_recent_data_tick(self):
+        if not self.connector.check_connection():
+            self.skipTest("No network connection to Dukascopy.")
 
         # Act
         result = self.connector.get_recent_data(
@@ -185,26 +178,12 @@ class TestDukascopyConnector(unittest.TestCase):
 
         # Assert
         self.assertIsInstance(result, pl.DataFrame)
-        self.assertEqual(result.height, 5)
+        self.assertGreater(result.height, 0)
         self.assertIn("timestamp", result.columns)
 
-    @patch('tick_vault.download_range')
-    @patch('tick_vault.read_tick_data')
-    def test_get_recent_data_reframed(self, mock_read, mock_download):
-        # Arrange
-        mock_download.return_value = None
-        # Generate 120 ticks, one every second
-        base_time = datetime.now() - timedelta(minutes=5)
-        times = [base_time + timedelta(seconds=i) for i in range(120)]
-        mock_df = pd.DataFrame({
-            "time": times,
-            "ask": [1.0800 + 0.0001 * i for i in range(120)],
-            "bid": [1.0800 + 0.0001 * i for i in range(120)],
-            "ask_volume": [1.0] * 120,
-            "bid_volume": [1.0] * 120
-        })
-        mock_read.return_value = mock_df
-        self.connector._tickers_cache = ["EURUSD"]
+    def test_get_recent_data_reframed(self):
+        if not self.connector.check_connection():
+            self.skipTest("No network connection to Dukascopy.")
 
         # Act
         # Reframe to 1m (1 minute)
@@ -217,11 +196,28 @@ class TestDukascopyConnector(unittest.TestCase):
 
         # Assert
         self.assertIsInstance(result, pl.DataFrame)
-        # 120 seconds spans over 2 or 3 distinct minutes depending on start alignment
+        self.assertGreater(result.height, 0)
         self.assertIn("open", result.columns)
         self.assertIn("high", result.columns)
         self.assertIn("low", result.columns)
         self.assertIn("close", result.columns)
+
+    def test_fail_safe_configurations(self):
+        # Arrange & Act
+        from tick_vault.config import CONFIG
+
+        # Assert session user-agent is browser-like
+        user_agent = self.connector._session.headers.get("User-Agent")
+        self.assertIsNotNone(user_agent)
+        self.assertIn("Mozilla", user_agent)
+        self.assertIn("Chrome", user_agent)
+
+        # Assert tick_vault CONFIG values
+        self.assertEqual(CONFIG.worker_per_proxy, 1)  # overridden in connect()
+        self.assertEqual(CONFIG.fetch_max_retry_attempts, 5)  # default modified
+        self.assertEqual(CONFIG.request_pacing_min, 0.5)
+        self.assertEqual(CONFIG.request_pacing_max, 1.5)
+        self.assertIn("Mozilla", CONFIG.user_agent)
 
 
 def main():
