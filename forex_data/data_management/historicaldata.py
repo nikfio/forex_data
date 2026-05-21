@@ -224,14 +224,6 @@ class HistoricalManagerDB:
                 f'Engine {self.engine} not supported')
             raise ValueError(f'Engine {self.engine} not supported')
 
-        # Each instance gets its own unique temp subfolder under Temp/
-        # so that parallel HistoricalManagerDB instances never share or
-        # conflict on the same temporary directory.
-        self._temporary_data_path = (
-            self._histdata_path / TEMP_FOLDER / str(uuid4())
-        )
-        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
-
         # instance database connector if selected
         if (
                 self.data_type == DATA_TYPE.CSV_FILETYPE or
@@ -273,11 +265,11 @@ class HistoricalManagerDB:
         self._histdata_connector = [
             HistDataConnector(
                 ssl_verify=self.ssl_verify,
-                data_path=str(self._histdata_path)
+                data_path=str(self._histdata_path / 'histdata')
             ),
             DukascopyConnector(
                 ssl_verify=self.ssl_verify,
-                data_path=str(self._histdata_path)
+                data_path=str(self._histdata_path / 'dukascopy')
             )
         ]
 
@@ -519,12 +511,6 @@ class HistoricalManagerDB:
                         ticker,
                         year,
                         month_num,
-                        temp_filepath=str(self._temporary_data_path /
-                                          (f'{ticker}_' +
-                                           f'{year}_' +
-                                           f'{month}_' +
-                                           TEMP_CSV_FILE)
-                                          ),
                         engine=conn_engine
                     )
 
