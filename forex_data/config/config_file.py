@@ -109,7 +109,7 @@ def _get_config_filepath(
 def _apply_config(
         obj, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask,
         file_pattern='data_config.yaml'):
-    if 'config' in kwargs.keys():
+    if 'config' in kwargs.keys() and kwargs['config']:
 
         if kwargs['config']:
             config_path = Path(kwargs['config'])

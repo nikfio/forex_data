@@ -76,6 +76,7 @@ from .database import (
 )
 
 from .remoteconnector import (
+    RemoteConnector,
     HistDataConnector,
     DukascopyConnector
 )
@@ -306,6 +307,10 @@ class HistoricalManagerDB:
                 # failure is not sign of malfunction
                 # not to log
                 pass
+
+    def get_source_connectors(self) -> List[RemoteConnector]:
+
+        return self._histdata_connector
 
     def _get_ticker_list(self) -> List[str]:
 
@@ -1006,3 +1011,7 @@ class HistoricalManagerDB:
 
         # clear temporary files
         self._clear_temporary_data_folder()
+
+        # call connectors clear method
+        for conn in self.get_source_connectors():
+            conn.clear_temporary_folder()
