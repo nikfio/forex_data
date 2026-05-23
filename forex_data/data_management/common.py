@@ -143,6 +143,7 @@ __all__ = [
     'SQL_CONDITION_AGGREGATION_MODES',
     'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
     'HISTORICAL_DB_MIN_DATE',
+    'TWELVE_DATA_TIMEFRAMES',
 
     'validator_file_path',
     'validator_dir_path',

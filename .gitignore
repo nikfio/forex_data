@@ -5,7 +5,7 @@ issues/
 notes/
 *data_config.yaml
 *DS_Store*
-profiling/
+profiling-logs/
 *.code-workspace
 
 # Documentation guide files

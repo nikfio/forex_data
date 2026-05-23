@@ -2,6 +2,7 @@
 
 import sys
 from datetime import timedelta
+from pathlib import Path
 
 from loguru import logger
 
@@ -25,7 +26,7 @@ def main():
     # setup connector instance
     connector = RealTimeDBConnectorTwelveData(
         plan="free",
-        data_path=".//Users/nicolafiorato/.test_database"
+        data_path= Path.home() / ".test_database"
     )
 
     symbol = "EUR/USD"
