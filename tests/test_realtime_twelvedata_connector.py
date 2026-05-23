@@ -7,6 +7,7 @@ Created on Mon May 18 21:40:00 2026
 
 import sys
 import unittest
+from pathlib import Path
 from datetime import timedelta
 
 import polars as pl
@@ -24,7 +25,7 @@ while _data_path.exists():
     _data_path = Path.home() / f".test_database_{_counter}"
     _counter += 1
 
-_data_path = Path.home() / ".test_database"
+_data_path = Path.home() / ".test_database" / "Realtime"
 
 class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
     """
@@ -47,6 +48,9 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
             plan="free",
             data_path=_data_path
         )
+
+    def tearDown(self):
+        self.connector.clear_temporary_folder()
 
     def test_get_realtime_price(self):
         """
@@ -147,6 +151,14 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         df = result_lf.collect()
         logger.info(f"Received DataFrame:\n{df}")
         self.assertGreater(df.height, 0, "DataFrame should not be empty")
+
+        # Assert rows length is at least window/timeframe (24 rows for 1 day window with 1h timeframe)
+        expected_rows = int(interval_window / timedelta(hours=1))
+        self.assertGreaterEqual(
+            df.height,
+            expected_rows,
+            f"DataFrame should have at least {expected_rows} rows (window/timeframe)"
+        )
 
         expected_schema = list(POLARS_DTYPE_DICT.TIME_TF_DTYPE.keys())
         self.assertEqual(set(df.columns), set(expected_schema))

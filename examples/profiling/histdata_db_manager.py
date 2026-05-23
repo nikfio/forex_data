@@ -31,7 +31,7 @@ SORT_BY = 'cumulative'  # pstats sort key: 'cumulative', 'tottime', 'calls'
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
-PROFILE_DIR = BASE_DIR / 'profiling'
+PROFILE_DIR = BASE_DIR / 'profiling-logs'
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
 CPROFILE_BIN = PROFILE_DIR / 'histdata_db_manager_cprofile.prof'

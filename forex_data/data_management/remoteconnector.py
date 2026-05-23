@@ -50,6 +50,7 @@ from loguru import logger
 from .common import (
     PolarsDataFrame,
     PolarsLazyFrame,
+    DATE_FORMAT_SQL,
     TEMP_FOLDER,
     TEMP_CSV_FILE,
     SUPPORTED_DATA_FILES,
@@ -70,6 +71,7 @@ from .common import (
     TWELVE_DATA_PRO_MINUTE_RATE_LIMIT,
     DATA_PROVIDER_PLAN_LIST,
     TICK_TIMEFRAME,
+    TWELVE_DATA_TIMEFRAMES,
     read_csv,
     polars_datetime,
     any_date_to_datetime64,
@@ -134,6 +136,14 @@ class RemoteConnector:
 
     def clear_temporary_folder(self) -> None:
         shutil.rmtree(self._temporary_data_path, ignore_errors=True)
+        temp_root = self.data_path / TEMP_FOLDER
+        if temp_root.exists() and temp_root.is_dir():
+            try:
+                # If the directory is empty, remove it
+                if not any(temp_root.iterdir()):
+                    temp_root.rmdir()
+            except Exception:
+                pass
 
     def get_available_tickers(self) -> List[str]:
         """Get available tickers - must be implemented by subclasses."""
@@ -762,6 +772,8 @@ class DukascopyConnector(RemoteConnector):
 
         validate(self)
 
+        self.__attrs_post_init__(**kwargs)
+
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
         super().__attrs_post_init__()
@@ -1133,11 +1145,11 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         """Tracks requests internally and blocks execution if exceeding the rate limit."""
         now = time.time()
         # Evict timestamps older than 60 seconds
-        self._request_tiemestamps = [t for t in self._request_tiemestamps if now - t < 60]
+        self._request_timestamps = [t for t in self._request_timestamps if now - t < 60]
 
-        if len(self._request_tiemestamps) >= self._max_requests_per_minute:
+        if len(self._request_timestamps) >= self._max_requests_per_minute:
             # Calculate sleep required to let the oldest request clear the 60s window
-            sleep_time = 60 - (now - self._request_tiemestamps[0]) + 0.1
+            sleep_time = 60 - (now - self._request_timestamps[0]) + 0.1
             print(f"[Rate Limiter] Approaching {self.tier} tier threshold. Pausing for {sleep_time:.2f} seconds...")
             time.sleep(max(sleep_time, 0.1))
 
@@ -1197,9 +1209,9 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
 
         start_dt = any_date_to_datetime64(start_date)
         if start_dt.year < 2026:
-            logger.bind(target='twelvedata').warning(
+            logger.bind(target='twelvedata').error(
                 "For real time connectors start_date cannot be before January 2026")
-            return PolarsLazyFrame({})
+            raise ValueError("For real time connectors start_date cannot be before January 2026")
 
         params = {
             "symbol": symbol,
@@ -1216,7 +1228,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
                 f"Twelve Data response did not contain 'values': {data}")
             return PolarsLazyFrame({})
 
-        lf = PolarsDataFrame(data["values"]).lazy()
+        lf = PolarsLazyFrame(data["values"])
         tf_schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE
         return (
             lf.with_columns([
@@ -1254,15 +1266,22 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
                 f"Twelve Data response did not contain 'values': {data}")
             return PolarsLazyFrame({})
 
-        lf = PolarsDataFrame(data["values"]).lazy()
+        lf = PolarsLazyFrame(data["values"])
         tf_schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE
 
-        cutoff_dt = datetime.now() - interval_window
+        processed_lf = lf.with_columns([
+            pl.col("datetime").str.to_datetime("%Y-%m-%d %H:%M:%S").alias("timestamp"),
+        ])
+
+        # Set the cutoff to start from the most recent timestamp of the retrieved data
+        max_ts_df = processed_lf.select(pl.col("timestamp").max()).collect()
+        if max_ts_df.height > 0 and max_ts_df.item(0, 0) is not None:
+            cutoff_dt = max_ts_df.item(0, 0) - interval_window
+        else:
+            cutoff_dt = datetime.now() - interval_window
 
         return (
-            lf.with_columns([
-                pl.col("datetime").str.to_datetime("%Y-%m-%d %H:%M:%S").alias("timestamp"),
-            ])
+            processed_lf
             .select(list(tf_schema.keys()))
             .cast(tf_schema)
             .filter(pl.col("timestamp") >= cutoff_dt)
