@@ -1000,12 +1000,15 @@ class TestHistoricalManagerDB(unittest.TestCase):
         msg = f"No data downloaded for {ticker} in {current_year}"
         self.assertGreater(len(data), 0, msg=msg)
 
-    @unittest.skipUnless(os.environ.get("RUN_FALLBACK_TESTS") == "1", "Skipped by default. Run with RUN_FALLBACK_TESTS=1")
+    @unittest.skipUnless(
+        os.environ.get("RUN_FALLBACK_TESTS") == "1",
+        "Skipped by default. Run with RUN_FALLBACK_TESTS=1"
+    )
     def test_30_download_histdata_fails_fallback_to_dukascopy(self):
         """
         Test download of year 2004 for EURUSD
         it shall fail for histdata connector
-        meaning the fallback strategy will 
+        meaning the fallback strategy will
         use dukascopy to download the data
         Repeat the test for ticker GBPUSD year 2004
         """

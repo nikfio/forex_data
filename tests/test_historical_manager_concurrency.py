@@ -20,7 +20,7 @@ DATA_PATH: '{_data_path}'
 DATA_TYPE: 'parquet'
 ENGINE: 'polars_lazy'
 DB_FILES_YEAR_PARTITIONING: True
-SSL_VERIFY: True
+SSL_VERIFY: False
 '''
 
 

@@ -821,7 +821,8 @@ class DukascopyConnector(RemoteConnector):
             from tick_vault import reload_config
             reload_config(
                 base_directory=str(self._temporary_data_path),
-                worker_per_proxy=3
+                worker_per_proxy=3,
+                fetch_max_retry_attempts=3,
             )
         except ImportError:
             logger.bind(target='dukascopy').warning("tick_vault is not installed. Please install it to use DukascopyConnector.")
@@ -1030,6 +1031,37 @@ class DukascopyConnector(RemoteConnector):
         # Subtract 2 hours from current UTC time because Dukascopy CDN historical files
         # are uploaded with some latency (usually up to 1-2 hours).
         end = datetime.now(timezone.utc) - timedelta(hours=2)
+
+        # Roll back to Friday 21:00 UTC if the end time falls on a weekend.
+        # Weekday: 0=Monday, ..., 4=Friday, 5=Saturday, 6=Sunday.
+        # Market close: Friday 22:00 UTC. Market open: Sunday 22:00 UTC.
+        wd = end.weekday()
+        if (wd == 4 and end.hour >= 22) or (wd == 5) or (wd == 6 and end.hour < 22):
+            days_to_subtract = {4: 0, 5: 1, 6: 2}[wd]
+            end = end - timedelta(days=days_to_subtract)
+            end = end.replace(hour=21, minute=0, second=0, microsecond=0)
+
+            # In case the input end date is greater than the available range in the metadata DB,
+            # use the last available date in the DB if one exists.
+            try:
+                from tick_vault.metadata import MetadataDB
+                with MetadataDB() as db:
+                    db._ensure_table_exists(symbol_upper)
+                    table_name = db._get_table_name(symbol_upper)
+                    cursor = db.conn.execute(
+                        f"SELECT MAX(timestamp) FROM {table_name} WHERE has_data = 1"
+                    )
+                    row = cursor.fetchone()
+                    if row and row[0] is not None:
+                        last_available = datetime.fromtimestamp(row[0], tz=timezone.utc)
+                        last_available_end = last_available
+                        if end > last_available_end:
+                            end = last_available_end
+            except Exception as e:
+                logger.bind(target='dukascopy').debug(
+                    f"Could not check metadata database for last available range: {e}"
+                )
+
         start = end - interval_window
 
         # Run async download process
