@@ -27,6 +27,7 @@ while _data_path.exists():
 
 _data_path = Path.home() / ".test_database" / "Realtime"
 
+
 class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
     """
     Direct live tests for RealTimeDBConnectorTwelveData.
@@ -152,7 +153,8 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         logger.info(f"Received DataFrame:\n{df}")
         self.assertGreater(df.height, 0, "DataFrame should not be empty")
 
-        # Assert rows length is at least window/timeframe (24 rows for 1 day window with 1h timeframe)
+        # Assert rows length is at least window/timeframe
+        # (24 rows for 1 day window with 1h timeframe)
         expected_rows = int(interval_window / timedelta(hours=1))
         self.assertGreaterEqual(
             df.height,

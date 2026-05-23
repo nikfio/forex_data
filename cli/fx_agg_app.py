@@ -3,10 +3,8 @@
 Typer-based command-line interface for the Forex Data Aggregator.
 """
 
-import sys
 from typing import List
 import typer
-from loguru import logger
 
 from forex_data import HistoricalManagerDB
 
@@ -36,7 +34,10 @@ def generate_database(
         ["1D"],
         "--timeframe",
         "-t",
-        help="Timeframe interval(s) (e.g., 1m, 5m, 1h, 1D). Can be specified multiple times or comma-separated."
+        help=(
+            "Timeframe interval(s) (e.g., 1m, 5m, 1h, 1D). "
+            "Can be specified multiple times or comma-separated."
+        )
     ),
     config: str = typer.Option(
         "",
@@ -46,7 +47,9 @@ def generate_database(
     ),
 ):
     """
-    Generate and cache historical forex data in the database for the specified tickers and range.
+    Generate and cache historical forex data in the database.
+
+    Runs for the specified tickers and date range.
     """
     # Normalize the input tickers list (splitting by commas if needed)
     normalized_tickers = []
@@ -76,7 +79,11 @@ def generate_database(
     try:
         manager = HistoricalManagerDB(config=config)
     except Exception as e:
-        typer.secho(f"Failed to initialize HistoricalManagerDB: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"Failed to initialize HistoricalManagerDB: {e}",
+            fg=typer.colors.RED,
+            err=True
+        )
         raise typer.Exit(code=1)
 
     for ticker in normalized_tickers:
@@ -105,7 +112,8 @@ def generate_database(
 
                 row_count = len(df)
                 typer.secho(
-                    f"Successfully processed {ticker} ({tf}). Cached/retrieved {row_count} rows.",
+                    f"Successfully processed {ticker} ({tf}). "
+                    f"Cached/retrieved {row_count} rows.",
                     fg=typer.colors.GREEN
                 )
 

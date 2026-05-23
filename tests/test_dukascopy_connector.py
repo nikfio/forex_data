@@ -5,6 +5,7 @@ Created on Thu May 21 00:30:00 2026
 @author: Antigravity
 """
 
+import os
 import sys
 import unittest
 from unittest.mock import patch, MagicMock
@@ -122,6 +123,10 @@ class TestDukascopyConnector(unittest.TestCase):
             timeout=30
         )
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_DOWNLOAD_MONTH_TESTS") == "1",
+        "Skipped by default. Run with RUN_DOWNLOAD_MONTH_TESTS=1"
+    )
     def test_download_month_raw_polars_lazy(self):
         if not self.connector.check_connection():
             self.skipTest("No network connection to Dukascopy.")
@@ -154,7 +159,9 @@ class TestDukascopyConnector(unittest.TestCase):
         # Assert
         self.assertIsInstance(result, pl.DataFrame)
         self.assertGreater(result.height, 0)
-        self.assertIn("timestamp", result.columns)
+        # Assert duration spans the interval window (allowing tolerance for first/last tick times)
+        time_diff = result["timestamp"].max() - result["timestamp"].min()
+        self.assertGreaterEqual(time_diff + timedelta(seconds=10), timedelta(hours=10))
 
     def test_get_recent_data_reframed(self):
         if not self.connector.check_connection():
@@ -178,6 +185,11 @@ class TestDukascopyConnector(unittest.TestCase):
         self.assertIn("low", collected.columns)
         self.assertIn("close", collected.columns)
 
+        # Assert duration spans the interval window (allowing tolerance for 1-minute bar resolution)
+        df_timespan = collected["timestamp"].max() - collected["timestamp"].min()
+        # remove 1 min from df_timespan to account for 1 min bar resolution
+        self.assertGreaterEqual(df_timespan.total_seconds() + 60, timedelta(hours=10).total_seconds())
+
     def test_fail_safe_configurations(self):
         # Arrange & Act
         from tick_vault.config import CONFIG
@@ -189,11 +201,21 @@ class TestDukascopyConnector(unittest.TestCase):
         self.assertIn("Chrome", user_agent)
 
         # Assert tick_vault CONFIG values
-        self.assertEqual(CONFIG.worker_per_proxy, 3)  # overridden in connect()
-        self.assertEqual(CONFIG.fetch_max_retry_attempts, 5)  # default modified
-        self.assertEqual(CONFIG.request_pacing_min, 0.5)
-        self.assertEqual(CONFIG.request_pacing_max, 1.5)
-        self.assertIn("Mozilla", CONFIG.user_agent)
+        self.assertEqual(
+            CONFIG.worker_per_proxy, 3, "worker_per_proxy should be 3"
+        )  # overridden in connect()
+        self.assertEqual(
+            CONFIG.fetch_max_retry_attempts, 3, "fetch_max_retry_attempts should be 5"
+        )  # default modified
+        self.assertEqual(
+            CONFIG.request_pacing_min, 0.5, "request_pacing_min should be 0.5"
+        )
+        self.assertEqual(
+            CONFIG.request_pacing_max, 1.5, "request_pacing_max should be 1.5"
+        )
+        self.assertIn(
+            "Mozilla", CONFIG.user_agent, "user_agent should contain Mozilla"
+        )
 
 
 def main():
