@@ -809,7 +809,7 @@ class DukascopyConnector(RemoteConnector):
             from tick_vault import reload_config
             reload_config(
                 base_directory=str(self._temporary_data_path),
-                worker_per_proxy=1
+                worker_per_proxy=3
             )
         except ImportError:
             logger.bind(target='dukascopy').warning("tick_vault is not installed. Please install it to use DukascopyConnector.")
@@ -935,7 +935,7 @@ class DukascopyConnector(RemoteConnector):
         # Run async download process in the event loop
         logger.bind(target='dukascopy').info(f"Downloading {ticker_upper} for {year}-{month_num:02d}...")
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -951,8 +951,8 @@ class DukascopyConnector(RemoteConnector):
             empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
             return empty_df.lazy() if engine == 'polars_lazy' else empty_df
 
-        # Convert Pandas to Polars DataFrame
-        pl_df = pl.from_pandas(pandas_df)
+        # Convert to Polars LazyFrame
+        pl_df = pl.from_pandas(pandas_df).lazy()
 
         # Rename columns to match TIME_TICK_DTYPE
         pl_df = pl_df.rename({"time": "timestamp"})
@@ -972,7 +972,7 @@ class DukascopyConnector(RemoteConnector):
         # Filter out business days/hours using standard helper
         pl_df = business_days_data(pl_df)
 
-        return pl_df.lazy() if engine == 'polars_lazy' else pl_df
+        return pl_df if engine == 'polars_lazy' else pl_df.collect()
 
     def get_recent_data(
         self,
@@ -1023,7 +1023,7 @@ class DukascopyConnector(RemoteConnector):
         # Run async download process
         logger.bind(target='dukascopy').info(f"Downloading recent data for {symbol_upper} from {start} to {end}...")
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -1038,8 +1038,8 @@ class DukascopyConnector(RemoteConnector):
             empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
             return empty_df.lazy() if engine == 'polars_lazy' else empty_df
 
-        # Convert to Polars
-        pl_df = pl.from_pandas(pandas_df)
+        # Convert to Polars LazyFrame
+        pl_df = pl.from_pandas(pandas_df).lazy()
         pl_df = pl_df.rename({"time": "timestamp"})
         pl_df = pl_df.with_columns([
             (pl.col("ask_volume") + pl.col("bid_volume")).cast(pl.Float32).alias("vol"),
@@ -1051,10 +1051,10 @@ class DukascopyConnector(RemoteConnector):
 
         # Reframe data if timeframe is not TICK
         if timeframe.lower() != TICK_TIMEFRAME.lower():
-            # reframe_data is imported via .common * and expects PolarsDataFrame/LazyFrame and tf
+            # reframe_data
             pl_df = reframe_data(pl_df, timeframe)
 
-        return pl_df.lazy() if engine == 'polars_lazy' else pl_df
+        return pl_df if engine == 'polars_lazy' else pl_df.collect()
 
 
 # REAL-TIME DATABASE CONNECTOR CLASS
@@ -1073,8 +1073,8 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
                                   validator=validators.instance_of(int))
     _max_requests_per_minute: int = field(default=8,
                                           validator=validators.instance_of(int))
-    request_timestamps: List[float] = field(factory=list, init=False)
-    base_url: str = field(default="https://api.twelvedata.com", init=False)
+    _request_timestamps: List[float] = field(factory=list, init=False)
+    _base_url: str = field(default="https://api.twelvedata.com", init=False)
 
     @property
     def tier(self) -> str:
@@ -1133,21 +1133,21 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         """Tracks requests internally and blocks execution if exceeding the rate limit."""
         now = time.time()
         # Evict timestamps older than 60 seconds
-        self.request_timestamps = [t for t in self.request_timestamps if now - t < 60]
+        self._request_tiemestamps = [t for t in self._request_tiemestamps if now - t < 60]
 
-        if len(self.request_timestamps) >= self._max_requests_per_minute:
+        if len(self._request_tiemestamps) >= self._max_requests_per_minute:
             # Calculate sleep required to let the oldest request clear the 60s window
-            sleep_time = 60 - (now - self.request_timestamps[0]) + 0.1
+            sleep_time = 60 - (now - self._request_tiemestamps[0]) + 0.1
             print(f"[Rate Limiter] Approaching {self.tier} tier threshold. Pausing for {sleep_time:.2f} seconds...")
             time.sleep(max(sleep_time, 0.1))
 
-        self.request_timestamps.append(time.time())
+        self._request_timestamps.append(time.time())
 
     def _execute_request(self, endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handles HTTP mechanics, rate limiting, and standard headers."""
         self._enforce_rate_limit()
 
-        url = f"{self.base_url}/{endpoint}"
+        url = f"{self._base_url}/{endpoint}"
         params["apikey"] = self.api_key
 
         headers = {"Accept": "application/json"}
@@ -1186,6 +1186,15 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         Fetches historical data for a specific date range.
         Automatically checks boundaries for maximum output limits per call.
         """
+
+        # Sanity check - check if timeframe is supported by Twelve Data
+        if timeframe not in TWELVE_DATA_TIMEFRAMES:
+            logger.bind(target='twelvedata').warning(
+                f"Timeframe {timeframe} "
+                f"is not supported by Twelve Data. "
+                f"Supported: {', '.join(TWELVE_DATA_TIMEFRAMES)}")
+            return PolarsLazyFrame({})
+
         start_dt = any_date_to_datetime64(start_date)
         if start_dt.year < 2026:
             logger.bind(target='twelvedata').warning(
@@ -1223,6 +1232,15 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         Fetches recent data relative to the current time minus the interval_window.
         Example: Pass timedelta(days=90) to get the most recent rolling 3 months.
         """
+
+        # Sanity check - check if timeframe is supported by Twelve Data
+        if timeframe not in TWELVE_DATA_TIMEFRAMES:
+            logger.bind(target='twelvedata').warning(
+                f"Timeframe {timeframe} "
+                f"is not supported by Twelve Data. "
+                f"Supported: {', '.join(TWELVE_DATA_TIMEFRAMES)}")
+            return PolarsLazyFrame({})
+
         params = {
             "symbol": symbol,
             "interval": timeframe,

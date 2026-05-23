@@ -1785,3 +1785,19 @@ TWELVE_DATA_PRO_DAY_RATE_LIMIT = 5000  # api calls per day
 
 # TWELVE DATA LIMIT DATE
 TWELVE_DATA_LIMIT_DATE = datetime(2020, 1, 1)
+
+# TIMEFRAME e.g. interval admitted values
+TWELVE_DATA_TIMEFRAMES = [
+    "1min",
+    "5min",
+    "15min",
+    "30min",
+    "45min",
+    "1h",
+    "2h",
+    "4h",
+    "8h",
+    "1day",
+    "1week",
+    "1month"
+]

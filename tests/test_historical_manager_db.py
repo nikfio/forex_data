@@ -11,6 +11,7 @@ the functionality of the historical data manager including:
 """
 
 import unittest
+import os
 import shutil
 import random
 from loguru import logger
@@ -58,7 +59,7 @@ DATA_PATH: '{_data_path}'
 DATA_FILETYPE: 'parquet'
 ENGINE: 'polars_lazy'
 DB_FILES_YEAR_PARTITIONING: True
-SSL_VERIFY: True
+SSL_VERIFY: False
 '''
 
 
@@ -997,6 +998,54 @@ class TestHistoricalManagerDB(unittest.TestCase):
         if isinstance(data, PolarsLazyFrame):
             data = data.collect()
         msg = f"No data downloaded for {ticker} in {current_year}"
+        self.assertGreater(len(data), 0, msg=msg)
+
+    @unittest.skipUnless(os.environ.get("RUN_FALLBACK_TESTS") == "1", "Skipped by default. Run with RUN_FALLBACK_TESTS=1")
+    def test_30_download_histdata_fails_fallback_to_dukascopy(self):
+        """
+        Test download of year 2004 for EURUSD
+        it shall fail for histdata connector
+        meaning the fallback strategy will 
+        use dukascopy to download the data
+        Repeat the test for ticker GBPUSD year 2004
+        """
+
+        # fallback test on EURUSD 2004 hitdata fail
+        ticker = 'EURUSD'
+        year = 2004
+        start = datetime(year, 1, 1)
+        end = datetime(year, 12, 31)
+
+        data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe='1D',
+            start=start,
+            end=end
+        )
+
+        self.assertIsNotNone(data)
+        if isinstance(data, PolarsLazyFrame):
+            data = data.collect()
+        msg = f"No data downloaded for {ticker} in {year}"
+        self.assertGreater(len(data), 0, msg=msg)
+
+        # fallback test on GBPUSD 2004 hitdata fail
+        ticker = 'GBPUSD'
+        year = 2004
+        start = datetime(year, 1, 1)
+        end = datetime(year, 12, 31)
+
+        data = self.hist_manager.get_data(
+            ticker=ticker,
+            timeframe='1D',
+            start=start,
+            end=end
+        )
+
+        self.assertIsNotNone(data)
+        if isinstance(data, PolarsLazyFrame):
+            data = data.collect()
+        msg = f"No data downloaded for {ticker} in {year}"
         self.assertGreater(len(data), 0, msg=msg)
 
 

@@ -17,6 +17,14 @@ from forex_data import (
     POLARS_DTYPE_DICT
 )
 
+_base_path = Path.home() / ".test_database"
+_data_path = _base_path
+_counter = 1
+while _data_path.exists():
+    _data_path = Path.home() / f".test_database_{_counter}"
+    _counter += 1
+
+_data_path = Path.home() / ".test_database"
 
 class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
     """
@@ -37,7 +45,7 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         )
         self.connector = RealTimeDBConnectorTwelveData(
             plan="free",
-            data_path="./realtime_db"
+            data_path=_data_path
         )
 
     def test_get_realtime_price(self):
