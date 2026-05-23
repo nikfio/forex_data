@@ -35,6 +35,7 @@ pyinstrument = "^5.1.2"
 holidays = "^0.89"
 snakeviz = "^2.2.2"
 line-profiler = "^5.0.2"
+typer = "^0.25.1"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.3.2"

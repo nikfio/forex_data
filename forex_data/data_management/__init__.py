@@ -43,6 +43,7 @@ __all__ = [
     'get_class_attr_values',
     'get_class_attr_dict',
     'random_date_between',
+    'RemoteConnector',
     'RealTimeDBConnectorTwelveData',
     'HistDataConnector',
     'DukascopyConnector'
@@ -93,6 +94,7 @@ from .database import (
 )
 
 from .remoteconnector import (
+    RemoteConnector,
     RealTimeDBConnectorTwelveData,
     HistDataConnector,
     DukascopyConnector
