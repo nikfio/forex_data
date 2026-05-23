@@ -520,6 +520,8 @@ class HistoricalManagerDB:
                         elif self.engine == 'pyarrow':
                             month_data = month_data.to_arrow()
 
+                    is_empty_dataframe(month_data)
+
                     last_err = None
                     break
                 except TickerDataBadTypeException as e:

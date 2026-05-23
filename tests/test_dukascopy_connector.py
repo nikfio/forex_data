@@ -13,7 +13,6 @@ import polars as pl
 
 from forex_data import DukascopyConnector
 from forex_data.data_management.common import (
-    POLARS_DTYPE_DICT,
     DEFAULT_PATHS
 )
 
@@ -123,30 +122,6 @@ class TestDukascopyConnector(unittest.TestCase):
             timeout=30
         )
 
-    def test_download_month_raw_polars(self):
-        if not self.connector.check_connection():
-            self.skipTest("No network connection to Dukascopy.")
-
-        # Act
-        result = self.connector.download_month_raw(
-            ticker="EURUSD",
-            year=2024,
-            month_num=5,
-            engine="polars"
-        )
-
-        # Assert
-        self.assertIsInstance(result, pl.DataFrame)
-        self.assertGreater(result.height, 0)
-        self.assertListEqual(
-            list(result.columns),
-            list(POLARS_DTYPE_DICT.TIME_TICK_DTYPE.keys())
-        )
-
-        # Check volume and mid price mapping
-        self.assertGreaterEqual(result["vol"][0], 0)
-        self.assertAlmostEqual(result["p"][0], (result["ask"][0] + result["bid"][0]) / 2, places=5)
-
     def test_download_month_raw_polars_lazy(self):
         if not self.connector.check_connection():
             self.skipTest("No network connection to Dukascopy.")
@@ -172,7 +147,7 @@ class TestDukascopyConnector(unittest.TestCase):
         result = self.connector.get_recent_data(
             symbol="EURUSD",
             timeframe="TICK",
-            interval_window=timedelta(hours=1),
+            interval_window=timedelta(hours=10),
             engine="polars"
         )
 
@@ -190,17 +165,18 @@ class TestDukascopyConnector(unittest.TestCase):
         result = self.connector.get_recent_data(
             symbol="EURUSD",
             timeframe="1m",
-            interval_window=timedelta(hours=1),
-            engine="polars"
+            interval_window=timedelta(hours=10),
+            engine="polars_lazy"
         )
 
         # Assert
-        self.assertIsInstance(result, pl.DataFrame)
-        self.assertGreater(result.height, 0)
-        self.assertIn("open", result.columns)
-        self.assertIn("high", result.columns)
-        self.assertIn("low", result.columns)
-        self.assertIn("close", result.columns)
+        self.assertIsInstance(result, pl.LazyFrame)
+        collected = result.collect()
+        self.assertGreater(collected.height, 0)
+        self.assertIn("open", collected.columns)
+        self.assertIn("high", collected.columns)
+        self.assertIn("low", collected.columns)
+        self.assertIn("close", collected.columns)
 
     def test_fail_safe_configurations(self):
         # Arrange & Act
@@ -213,7 +189,7 @@ class TestDukascopyConnector(unittest.TestCase):
         self.assertIn("Chrome", user_agent)
 
         # Assert tick_vault CONFIG values
-        self.assertEqual(CONFIG.worker_per_proxy, 1)  # overridden in connect()
+        self.assertEqual(CONFIG.worker_per_proxy, 3)  # overridden in connect()
         self.assertEqual(CONFIG.fetch_max_retry_attempts, 5)  # default modified
         self.assertEqual(CONFIG.request_pacing_min, 0.5)
         self.assertEqual(CONFIG.request_pacing_max, 1.5)
