@@ -149,9 +149,11 @@ class HistoricalManagerDB:
             # call generated init
             self.__attrs_init__(**kwargs)  # type: ignore[attr-defined]
 
-        validate(self)
+        else:
 
-        self.__attrs_post_init__(**kwargs)
+            self.__attrs_post_init__(**kwargs)
+
+        validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 

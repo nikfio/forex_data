@@ -9,7 +9,7 @@ import os
 import sys
 import unittest
 from unittest.mock import patch, MagicMock
-from datetime import timedelta
+from datetime import datetime, timedelta
 import polars as pl
 
 from forex_data import DukascopyConnector
@@ -136,6 +136,29 @@ class TestDukascopyConnector(unittest.TestCase):
             ticker="EURUSD",
             year=2024,
             month_num=5,
+            engine="polars_lazy"
+        )
+
+        # Assert
+        self.assertIsInstance(result, pl.LazyFrame)
+        collected = result.collect()
+        self.assertGreater(collected.height, 0)
+
+    @unittest.skipUnless(
+        os.environ.get("RUN_DOWNLOAD_CURRENT_MONTH_TESTS") == "1",
+        "Skipped by default. Run with RUN_DOWNLOAD_CURRENT_MONTH_TESTS=1"
+    )
+    def test_download_current_month_raw_polars_lazy(self):
+        if not self.connector.check_connection():
+            self.skipTest("No network connection to Dukascopy.")
+
+        now = datetime.now()
+
+        # Act
+        result = self.connector.download_month_raw(
+            ticker="EURUSD",
+            year=now.year,
+            month_num=now.month,
             engine="polars_lazy"
         )
 
