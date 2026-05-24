@@ -27,7 +27,7 @@ def generate_database(
         help="Start date for data retrieval (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)."
     ),
     end_date: str = typer.Argument(
-        ...,
+        "now",
         help="End date for data retrieval (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)."
     ),
     timeframes: List[str] = typer.Option(
@@ -78,6 +78,9 @@ def generate_database(
 
     try:
         manager = HistoricalManagerDB(config=config)
+        # add requested timeframes 
+        # with this action we need just one tick download if needed
+        manager.add_timeframe(normalized_timeframes)
     except Exception as e:
         typer.secho(
             f"Failed to initialize HistoricalManagerDB: {e}",
@@ -87,47 +90,41 @@ def generate_database(
         raise typer.Exit(code=1)
 
     for ticker in normalized_tickers:
-        for tf in normalized_timeframes:
-            typer.secho(
-                f"Generating database for ticker: {ticker} | Timeframe: {tf} | "
-                f"Range: {start_date} to {end_date}",
-                fg=typer.colors.CYAN
+        typer.secho(
+            f"Generating database for ticker: {ticker} | Timeframes: {', '.join(normalized_timeframes)} | "
+            f"Range: {start_date} to {end_date}",
+            fg=typer.colors.CYAN
+        )
+
+        try:
+            # Query / download data. HistoricalManagerDB automatically downloads
+            # missing historical periods and caches them locally.
+            lazy_frame = manager.get_data(
+                ticker=ticker,
+                timeframe=normalized_timeframes[0],
+                start=start_date,
+                end=end_date
             )
 
-            try:
-                # Query / download data. HistoricalManagerDB automatically downloads
-                # missing historical periods and caches them locally.
-                lazy_frame = manager.get_data(
-                    ticker=ticker,
-                    timeframe=tf,
-                    start=start_date,
-                    end=end_date
-                )
+            # Collect lazy frame if applicable to get actual row count
+            if hasattr(lazy_frame, "collect"):
+                df = lazy_frame.collect()
+            else:
+                df = lazy_frame
 
-                # Collect lazy frame if applicable to get actual row count
-                if hasattr(lazy_frame, "collect"):
-                    df = lazy_frame.collect()
-                else:
-                    df = lazy_frame
+            row_count = len(df)
 
-                row_count = len(df)
-                typer.secho(
-                    f"Successfully processed {ticker} ({tf}). "
-                    f"Cached/retrieved {row_count} rows.",
-                    fg=typer.colors.GREEN
-                )
-
-            except Exception as e:
-                typer.secho(
-                    f"Error processing ticker {ticker} ({tf}): {e}",
-                    fg=typer.colors.RED,
-                    err=True
-                )
-                manager.close()
-                raise typer.Exit(code=1)
+        except Exception as e:
+            typer.secho(
+                f"Error processing ticker {ticker} ({tf}): {e}",
+                fg=typer.colors.RED,
+                err=True
+            )
+            manager.close()
+            raise typer.Exit(code=1)
 
     manager.close()
-    typer.secho("Database generation complete.", fg=typer.colors.GREEN, bold=True)
+    typer.secho("Database generation complete, tickers processed"f" : {', '.join(normalized_tickers)}, timeframes : {', '.join(normalized_timeframes)}", fg=typer.colors.GREEN, bold=True)
 
 
 if __name__ == "__main__":
