@@ -500,6 +500,9 @@ class HistoricalManagerDB:
 
             month_num = MONTHS.index(month) + 1
 
+            if year == datetime.now().year and month_num > datetime.now().month:
+                break
+
             month_data = None
             last_err = None
             for connector in self._histdata_connector:
@@ -683,7 +686,7 @@ class HistoricalManagerDB:
         else:
             self._tickers_years_dict.clear()
 
-    def add_timeframe(self, timeframe: str) -> None:
+    def add_timeframe(self, timeframe: str | List[str]) -> None:
         """
         Add and cache a new timeframe to the database.
 
@@ -869,8 +872,23 @@ class HistoricalManagerDB:
             self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
 
         # aggregate data to current instance if necessary
-        if not set(years_interval_req).issubset(
-                self._tickers_years_dict[ticker][timeframe]):
+        current_year = datetime.now().year
+        is_current_year_requested = current_year in years_interval_req
+
+        # here determine if to ask for new download
+        # if requested years are not already in localdb (tracked by tickers years dict)
+        # or if current year is requested
+        if (
+            not set(years_interval_req).issubset(
+                self._tickers_years_dict[ticker][timeframe]) or
+            is_current_year_requested
+        ):
+
+            # If the current year is requested, we force re-aggregation by removing it from the known timeframe list in memory
+            if is_current_year_requested:
+                for tf in list(self._tickers_years_dict[ticker].keys()):
+                    if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
+                        self._tickers_years_dict[ticker][tf].remove(current_year)
 
             year_tf_missing = list(
                 set(years_interval_req).difference(
@@ -879,6 +897,8 @@ class HistoricalManagerDB:
             year_tick_missing = list(set(years_interval_req).difference(
                 self._tickers_years_dict[ticker][TICK_TIMEFRAME]
             ))
+            if is_current_year_requested and current_year not in year_tick_missing:
+                year_tick_missing.append(current_year)
 
             lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
 
@@ -894,10 +914,17 @@ class HistoricalManagerDB:
                 if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
                     self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
 
+                if is_current_year_requested:
+                    for tf in list(self._tickers_years_dict[ticker].keys()):
+                        if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
+                            self._tickers_years_dict[ticker][tf].remove(current_year)
+
                 # Re-calculate missing years after re-reading
                 year_tick_missing = list(set(years_interval_req).difference(
                     self._tickers_years_dict[ticker][TICK_TIMEFRAME]
                 ))
+                if is_current_year_requested and current_year not in year_tick_missing:
+                    year_tick_missing.append(current_year)
 
                 # ONLY download years not already in the database
                 if year_tick_missing:
