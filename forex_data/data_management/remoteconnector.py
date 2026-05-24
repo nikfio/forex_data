@@ -104,6 +104,8 @@ class RemoteConnector:
         pass
 
     def __attrs_post_init__(self) -> None:
+        if self._temporary_data_path != Path('.'):
+            return
 
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()
@@ -135,7 +137,22 @@ class RemoteConnector:
         raise NotImplementedError("Subclasses must implement check_connection")
 
     def clear_temporary_folder(self) -> None:
-        shutil.rmtree(self._temporary_data_path, ignore_errors=True)
+        try:
+            import logging
+            tv_logger = logging.getLogger("tick_vault")
+            for handler in list(tv_logger.handlers):
+                if isinstance(handler, logging.FileHandler):
+                    handler.close()
+                    tv_logger.removeHandler(handler)
+        except Exception:
+            pass
+
+        try:
+            shutil.rmtree(self._temporary_data_path)
+        except Exception as e:
+            logger.bind(target='dukascopy').warning(
+                f"Failed to delete temporary directory {self._temporary_data_path}: {e}"
+            )
         temp_root = self.data_path / TEMP_FOLDER
         if temp_root.exists() and temp_root.is_dir():
             try:
@@ -225,9 +242,11 @@ class HistDataConnector(RemoteConnector):
             # call generated init
             self.__attrs_init__(**kwargs)  # type: ignore[attr-defined]
 
-        validate(self)
+        else:
 
-        self.__attrs_post_init__(**kwargs)
+            self.__attrs_post_init__(**kwargs)
+
+        validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
@@ -770,9 +789,11 @@ class DukascopyConnector(RemoteConnector):
             # call generated init
             self.__attrs_init__(**kwargs)  # type: ignore[attr-defined]
 
-        validate(self)
+        else:
 
-        self.__attrs_post_init__(**kwargs)
+            self.__attrs_post_init__(**kwargs)
+
+        validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
@@ -1140,9 +1161,11 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
             # call generated init
             self.__attrs_init__(**kwargs)  # type: ignore[attr-defined]
 
-        validate(self)
+        else:
 
-        self.__attrs_post_init__(**kwargs)
+            self.__attrs_post_init__(**kwargs)
+
+        validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
 
