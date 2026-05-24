@@ -120,7 +120,8 @@ def read_tick_data(
         last_time = last_chunk.time
 
         logger.debug(
-            f"Available data range for {symbol}: {first_time.isoformat()} to {last_time.isoformat()}"
+            f"Available data range for {symbol}: "
+            f"{first_time.isoformat()} to {last_time.isoformat()}"
         )
 
         # Process start parameter
@@ -139,17 +140,22 @@ def read_tick_data(
             if strict:
                 # In strict mode, verify start is within available range
                 if start < first_time:
-                    raise ValueError(
-                        f"Requested start time {start.isoformat()} is before the first available "
-                        f"data at {first_time.isoformat()}. Use strict=False to clip to available range."
+                    msg = (
+                        f"Requested start time {start.isoformat()} "
+                        f"is before the first available data at "
+                        f"{first_time.isoformat()}. "
+                        "Use strict=False to clip to available range."
                     )
+                    raise ValueError(msg)
                 logger.debug(f"Start validated in strict mode: {start.isoformat()}")
             else:
                 # In non-strict mode, clip start to available range
                 if start < first_time:
                     logger.warning(
-                        f"Requested start time {start.isoformat()} is before first available data "
-                        f"at {first_time.isoformat()}. Clipping to first available."
+                        f"Requested start time {start.isoformat()} "
+                        f"is before first available data "
+                        f"at {first_time.isoformat()}. "
+                        "Clipping to first available."
                     )
                     start = first_time
                 else:
@@ -174,10 +180,13 @@ def read_tick_data(
 
                 last_time_exclusive = last_time + timedelta(hours=1)
                 if end > last_time_exclusive:
-                    raise ValueError(
-                        f"Requested end time {end.isoformat()} is after the last available "
-                        f"data at {last_time.isoformat()}. Use strict=False to clip to available range."
+                    msg = (
+                        f"Requested end time {end.isoformat()} "
+                        f"is after the last available data at "
+                        f"{last_time.isoformat()}. "
+                        "Use strict=False to clip to available range."
                     )
+                    raise ValueError(msg)
                 logger.debug(f"End validated in strict mode: {end.isoformat()}")
             else:
                 # In non-strict mode, clip end to available range
@@ -185,8 +194,10 @@ def read_tick_data(
                 last_time_exclusive = last_time + timedelta(hours=1)
                 if end > last_time_exclusive:
                     logger.warning(
-                        f"Requested end time {end.isoformat()} is after last available data "
-                        f"at {last_time.isoformat()}. Clipping to last available + 1 hour."
+                        f"Requested end time {end.isoformat()} "
+                        f"is after last available data at "
+                        f"{last_time.isoformat()}. "
+                        "Clipping to last available + 1 hour."
                     )
                     end = last_time_exclusive
                 else:
@@ -218,7 +229,10 @@ def read_tick_data(
         total=len(chunks),
         desc=f"Reading {symbol}",
         unit="chunk",
-        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+        bar_format=(
+            "{l_bar}{bar}| {n_fmt}/{total_fmt} "
+            "[{elapsed}<{remaining}, {rate_fmt}]"
+        ),
         colour="green",
         disable=not show_progress,
     ) as pbar:
@@ -236,7 +250,8 @@ def read_tick_data(
             except Exception as e:
                 pbar.close()
                 logger.error(
-                    f"Failed to decode chunk {chunk.symbol} at {chunk.time.isoformat()}: {e}"
+                    f"Failed to decode chunk {chunk.symbol} "
+                    f"at {chunk.time.isoformat()}: {e}"
                 )
                 raise
 

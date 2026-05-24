@@ -68,8 +68,11 @@ class TickChunk(BaseModel, frozen=True):
 
         if time.minute != 0 or time.second != 0 or time.microsecond != 0:
             raise ValueError(
-                f"Datetime must be rounded to the hour (minute=0, second=0, microsecond=0). "
-                f"Got: {time} (minute={time.minute}, second={time.second}, microsecond={time.microsecond})"
+                "Datetime must be rounded to the hour "
+                "(minute=0, second=0, microsecond=0). "
+                f"Got: {time} (minute={time.minute}, "
+                f"second={time.second}, "
+                f"microsecond={time.microsecond})"
             )
 
         # Normalize to UTC
@@ -191,7 +194,8 @@ class TickChunk(BaseModel, frozen=True):
         if not file_path.exists():
             raise FileNotFoundError(
                 f"File not found: {file_path}. "
-                f"Chunk for {self.symbol} at {self.time.isoformat()} has not been downloaded."
+                f"Chunk for {self.symbol} at {self.time.isoformat()} "
+                "has not been downloaded."
             )
 
         return file_path.read_bytes()

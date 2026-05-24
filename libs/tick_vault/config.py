@@ -15,7 +15,8 @@ class Config(BaseSettings):
             Default: ./tick_vault_data
 
         fetch_max_retry_attempts: Maximum number of fast retry attempts for failed
-            HTTP requests before entering cooldown. Does not include the initial attempt.
+            HTTP requests before entering cooldown. Does not include the
+            initial attempt.
             Recommended: 2-3 for typical network conditions.
             Default: 2
 
@@ -102,14 +103,20 @@ class Config(BaseSettings):
         default=240.0,
         ge=0,
         le=600.0,
-        description="Cooldown delay in seconds before retrying after fast retries exhausted (0-600)",
+        description=(
+            "Cooldown delay in seconds before retrying after fast "
+            "retries exhausted (0-600)"
+        ),
     )
 
     fetch_cooldown_retries: int = Field(
         default=3,
         ge=0,
         le=5,
-        description="Number of cooldown retry cycles after fast retries exhausted (0-5)",
+        description=(
+            "Number of cooldown retry cycles after fast "
+            "retries exhausted (0-5)"
+        ),
     )
 
     worker_per_proxy: int = Field(
@@ -186,8 +193,10 @@ class Config(BaseSettings):
         """
         if self.metadata_update_batch_timeout >= self.worker_queue_timeout:
             raise ValueError(
-                f"metadata_update_batch_timeout ({self.metadata_update_batch_timeout}s) "
-                f"must be less than worker_queue_timeout ({self.worker_queue_timeout}s) "
+                "metadata_update_batch_timeout "
+                f"({self.metadata_update_batch_timeout}s) "
+                "must be less than worker_queue_timeout "
+                f"({self.worker_queue_timeout}s) "
                 "to prevent false timeout detections"
             )
         return self

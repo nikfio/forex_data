@@ -53,7 +53,8 @@ def setup_logger() -> logging.Logger:
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%H:%M:%S"
     )
     file_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
+        "%(asctime)s - %(name)s - %(levelname)s - "
+        "%(funcName)s:%(lineno)d - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
@@ -81,7 +82,8 @@ def update_log_file() -> None:
     file_handler = LazyFileHandler(log_file)
     file_handler.setLevel(logging.DEBUG)
     file_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
+        "%(asctime)s - %(name)s - %(levelname)s - "
+        "%(funcName)s:%(lineno)d - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     file_handler.setFormatter(file_format)

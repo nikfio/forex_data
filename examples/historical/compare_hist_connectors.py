@@ -25,12 +25,12 @@ from forex_data.data_management.common import DEFAULT_PATHS
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 SYMBOL = "EURUSD"
-YEAR   = 2024
-MONTH  = 7          # July
+YEAR = 2024
+MONTH = 7          # July
 
 # Shared temp / data directory so both connectors write into different sub-dirs
 BASE_DIR = Path.home() / ".test_database"
-HISTDATA_DATA_PATH  = BASE_DIR / DEFAULT_PATHS.HIST_DATA_FOLDER / "histdata"
+HISTDATA_DATA_PATH = BASE_DIR / DEFAULT_PATHS.HIST_DATA_FOLDER / "histdata"
 DUKASCOPY_DATA_PATH = BASE_DIR / DEFAULT_PATHS.HIST_DATA_FOLDER / "dukascopy"
 
 # Engine used for both downloads
@@ -65,18 +65,22 @@ def _compare_stats(df_hist: pl.DataFrame, df_duka: pl.DataFrame) -> None:
         if col not in df_hist.columns or col not in df_duka.columns:
             continue
         for stat_name, hist_val, duka_val in [
-            ("mean", df_hist[col].mean(),   df_duka[col].mean()),
-            ("std",  df_hist[col].std(),    df_duka[col].std()),
-            ("min",  df_hist[col].min(),    df_duka[col].min()),
-            ("max",  df_hist[col].max(),    df_duka[col].max()),
+            ("mean", df_hist[col].mean(), df_duka[col].mean()),
+            ("std", df_hist[col].std(), df_duka[col].std()),
+            ("min", df_hist[col].min(), df_duka[col].min()),
+            ("max", df_hist[col].max(), df_duka[col].max()),
         ]:
-            delta = (duka_val - hist_val) if (hist_val is not None and duka_val is not None) else None
+            delta = (
+                (duka_val - hist_val)
+                if (hist_val is not None and duka_val is not None)
+                else None
+            )
             stats_rows.append({
                 "column": col,
-                "stat":   stat_name,
-                "histdata":   round(hist_val, 6) if hist_val is not None else None,
-                "dukascopy":  round(duka_val, 6) if duka_val is not None else None,
-                "delta":      round(delta, 6)    if delta is not None else None,
+                "stat": stat_name,
+                "histdata": round(hist_val, 6) if hist_val is not None else None,
+                "dukascopy": round(duka_val, 6) if duka_val is not None else None,
+                "delta": round(delta, 6) if delta is not None else None,
             })
 
     cmp = pl.DataFrame(stats_rows)
@@ -86,7 +90,11 @@ def _compare_stats(df_hist: pl.DataFrame, df_duka: pl.DataFrame) -> None:
     print(cmp)
 
 
-def _timestamp_comparison(df_hist: pl.DataFrame, df_duka: pl.DataFrame, joined: pl.DataFrame) -> None:
+def _timestamp_comparison(
+    df_hist: pl.DataFrame,
+    df_duka: pl.DataFrame,
+    joined: pl.DataFrame
+) -> None:
     """
     1. Hour-of-day tick distribution for each connector.
     2. Average / median / max absolute timestamp delta on exact-matched ticks.
@@ -107,7 +115,8 @@ def _timestamp_comparison(df_hist: pl.DataFrame, df_duka: pl.DataFrame, joined: 
     hist_hours = hour_counts(df_hist, "histdata_ticks")
     duka_hours = hour_counts(df_duka, "dukascopy_ticks")
 
-    hour_cmp = hist_hours.join(duka_hours, on="hour", how="full", coalesce=True).sort("hour")
+    hour_cmp = hist_hours.join(duka_hours, on="hour",
+                               how="full", coalesce=True).sort("hour")
     print("\n  Hour-of-day tick distribution (UTC):")
     print(hour_cmp)
 
@@ -135,9 +144,9 @@ def _timestamp_comparison(df_hist: pl.DataFrame, df_duka: pl.DataFrame, joined: 
          .alias("abs_delta_ms"))  # milliseconds (timestamp unit is ms)
     )
 
-    mean_ms   = nearest["abs_delta_ms"].mean()
+    mean_ms = nearest["abs_delta_ms"].mean()
     median_ms = nearest["abs_delta_ms"].median()
-    max_ms    = nearest["abs_delta_ms"].max()
+    max_ms = nearest["abs_delta_ms"].max()
 
     print("\n  Nearest-neighbour timestamp delta (HistData → Dukascopy):")
     print(f"    Mean   : {mean_ms:>10.3f} ms  ({mean_ms / 1000:>8.4f} s)")
@@ -148,7 +157,8 @@ def _timestamp_comparison(df_hist: pl.DataFrame, df_duka: pl.DataFrame, joined: 
     quantiles = [0.25, 0.50, 0.75, 0.90, 0.95, 0.99]
     print("\n  Delta quantiles (ms):")
     for q in quantiles:
-        print(f"    p{int(q*100):>2d}  : {nearest['abs_delta_ms'].quantile(q):>10.3f} ms")
+        val = nearest['abs_delta_ms'].quantile(q)
+        print(f"    p{int(q * 100):>2d}  : {val:>10.3f} ms")
 
 
 def _check_timezone_offset(
@@ -209,7 +219,7 @@ def _check_timezone_offset(
               f" median delta ≥ 30 min")
         print(f"  Estimated shift: {sign}{shift_hours}h"
               f" (median delta = {overall_median_ms / 1000:.1f}s)")
-        print(f"  → One dataset is likely in a different timezone.\n")
+        print("  → One dataset is likely in a different timezone.\n")
     else:
         print(f"\n  ✓ No timezone offset detected"
               f" ({large_offset_hours.len()}/{total_hours} hours"
@@ -230,7 +240,7 @@ def _overlap_comparison(df_hist: pl.DataFrame, df_duka: pl.DataFrame) -> None:
     ask/bid/p deltas.
     """
     ts_start = max(df_hist["timestamp"].min(), df_duka["timestamp"].min())
-    ts_end   = min(df_hist["timestamp"].max(), df_duka["timestamp"].max())
+    ts_end = min(df_hist["timestamp"].max(), df_duka["timestamp"].max())
 
     hist_overlap = df_hist.filter(
         (pl.col("timestamp") >= ts_start) & (pl.col("timestamp") <= ts_end)
@@ -255,22 +265,21 @@ def _overlap_comparison(df_hist: pl.DataFrame, df_duka: pl.DataFrame) -> None:
     ).with_columns([
         (pl.col("ask_duka") - pl.col("ask")).alias("Δask"),
         (pl.col("bid_duka") - pl.col("bid")).alias("Δbid"),
-        (pl.col("p_duka")   - pl.col("p")).alias("Δp"),
+        (pl.col("p_duka") - pl.col("p")).alias("Δp"),
     ])
 
     print(f"\n  Exact-timestamp matches : {joined.height:,}")
     if joined.height > 0:
         print("\n  Sample of matched rows (first 10):")
         print(joined.select(["timestamp", "ask", "ask_duka", "Δask",
-                              "bid", "bid_duka", "Δbid",
-                              "p",   "p_duka",   "Δp"]).head(10))
+                             "bid", "bid_duka", "Δbid",
+                             "p", "p_duka", "Δp"]).head(10))
 
         print("\n  Delta statistics across matched ticks:")
         print(joined.select(["Δask", "Δbid", "Δp"]).describe())
 
     _compare_stats(hist_overlap, duka_overlap)
     _timestamp_comparison(hist_overlap, duka_overlap, joined)
-
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -308,7 +317,10 @@ def main() -> None:
         )
         elapsed_hist = time.perf_counter() - t0
         df_hist = _collect(raw_hist).sort("timestamp")
-        logger.info(f"HistDataConnector finished in {elapsed_hist:.2f}s — {df_hist.height:,} ticks")
+        logger.info(
+            f"HistDataConnector finished in {elapsed_hist:.2f}s — "
+            f"{df_hist.height:,} ticks"
+        )
         hist_connector.clear_temporary_folder()
 
     # ── DukascopyConnector ────────────────────────────────────────────────────
@@ -332,7 +344,10 @@ def main() -> None:
         )
         elapsed_duka = time.perf_counter() - t0
         df_duka = _collect(raw_duka).sort("timestamp")
-        logger.info(f"DukascopyConnector finished in {elapsed_duka:.2f}s — {df_duka.height:,} ticks")
+        logger.info(
+            f"DukascopyConnector finished in {elapsed_duka:.2f}s — "
+            f"{df_duka.height:,} ticks"
+        )
         duka_connector.clear_temporary_folder()
 
     # ── Report ────────────────────────────────────────────────────────────────
@@ -346,8 +361,10 @@ def main() -> None:
         print(f"\n{'═' * 60}")
         print("  Download timing")
         print(f"{'═' * 60}")
-        print(f"  HistDataConnector  : {elapsed_hist:.2f} s  ({df_hist.height:,} ticks)")
-        print(f"  DukascopyConnector : {elapsed_duka:.2f} s  ({df_duka.height:,} ticks)")
+        print(
+            f"  HistDataConnector  : {elapsed_hist:.2f} s  ({df_hist.height:,} ticks)")
+        print(
+            f"  DukascopyConnector : {elapsed_duka:.2f} s  ({df_duka.height:,} ticks)")
 
         _overlap_comparison(df_hist, df_duka)
 

@@ -26,7 +26,7 @@ def main():
     # setup connector instance
     connector = RealTimeDBConnectorTwelveData(
         plan="free",
-        data_path= Path.home() / ".test_database"
+        data_path=Path.home() / ".test_database"
     )
 
     symbol = "EUR/USD"
