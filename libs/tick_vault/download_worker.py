@@ -33,7 +33,8 @@ async def download_worker(
         output_queue: Queue for reporting results
 
     Raises:
-        ForbiddenError: If access is blocked/forbidden (propagated from fetch_with_retry)
+        ForbiddenError: If access is blocked/forbidden (propagated from
+            fetch_with_retry)
         RuntimeError: If max retries exceeded or unexpected errors occur
             (propagated from fetch_with_retry)
         FileExistsError: If attempting to save a chunk that already exists on disk
@@ -78,7 +79,8 @@ async def download_worker(
                 # Data exists - save to disk
                 chunk.save(content)
                 logger.debug(
-                    f"Downloaded and saved chunk: {chunk.symbol} {chunk.time.isoformat()}"
+                    f"Downloaded and saved chunk: {chunk.symbol} "
+                    f"{chunk.time.isoformat()}"
                 )
             else:
                 logger.debug(

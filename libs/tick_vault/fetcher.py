@@ -124,7 +124,8 @@ async def _fetch(client: AsyncClient, url: str) -> bytes | None:
         # Client errors (other 4xx) - unexpected, needs investigation
         elif 400 <= response.status_code < 500:
             raise RuntimeError(
-                f"Unexpected client error (status {response.status_code}) for URL: {url}"
+                f"Unexpected client error (status {response.status_code}) "
+                f"for URL: {url}"
             )
 
         # Any other unexpected status code
@@ -244,7 +245,8 @@ async def fetch_with_retry(client: AsyncClient, url: str) -> bytes | None:
                 if attempt == CONFIG.fetch_max_retry_attempts:
                     break  # Exhausted fast retries, try cooldown
 
-                # Exponential backoff, but if it is a 503 error, make the minimum delay 30 seconds
+                # Exponential backoff, but if it is a 503 error,
+                # make the minimum delay 30 seconds
                 is_503 = "503" in str(e)
                 base_delay = 30.0 if is_503 else CONFIG.fetch_base_retry_delay
                 delay = base_delay * (2**attempt)
@@ -263,4 +265,3 @@ async def fetch_with_retry(client: AsyncClient, url: str) -> bytes | None:
         f"All retries exhausted ({CONFIG.fetch_max_retry_attempts} fast + "
         f"{CONFIG.fetch_cooldown_retries} cooldown) for URL: {url}"
     ) from last_error
-

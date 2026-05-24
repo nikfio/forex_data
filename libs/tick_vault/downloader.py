@@ -37,13 +37,16 @@ async def download_range(
         RuntimeError: If max retries exceeded or unexpected errors occur
         ValueError: If database operations fail
 
-    Example:
-        >>> await download_range(
-        ...     symbol='XAUUSD',
-        ...     start=datetime(2024, 1, 1),
-        ...     end=datetime(2024, 2, 1),
-        ...     proxies=['http://127.0.0.1:8080', 'http://127.0.0.1:9090', 'http://proxy2:8080'],
-        ... )
+        Example:
+            >>> await download_range(
+            ...     symbol='XAUUSD',
+            ...     start=datetime(2024, 1, 1),
+            ...     end=datetime(2024, 2, 1),
+            ...     proxies=[
+            ...         'http://127.0.0.1:8080',
+            ...         'http://127.0.0.1:9090',
+            ...     ],
+            ... )
     """
     logger.info(f"Starting download for {symbol} from {start.date()} to {end.date()}")
 
@@ -60,7 +63,8 @@ async def download_range(
     # If nothing to download, exit early
     if not chunks_to_download:
         logger.info(
-            f"All data for {symbol} from {start.date()} to {end.date()} already downloaded"
+            f"All data for {symbol} from {start.date()} to "
+            f"{end.date()} already downloaded"
         )
         return
 
@@ -113,7 +117,10 @@ async def download_range(
         total=total_chunks,
         desc=f"Downloading {symbol}",
         unit="chunk",
-        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+        bar_format=(
+            "{l_bar}{bar}| {n_fmt}/{total_fmt} "
+            "[{elapsed}<{remaining}, {rate_fmt}]"
+        ),
         colour="green",
     )
 

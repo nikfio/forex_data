@@ -78,10 +78,13 @@ async def metadata_worker(
                 # Check if we should exit (parent process may have crashed)
                 # If the queue has been empty for the main timeout period, exit
                 try:
+                    timeout = (
+                        CONFIG.worker_queue_timeout
+                        - CONFIG.metadata_update_batch_timeout
+                    )
                     chunk = await asyncio.wait_for(
                         result_queue.get(),
-                        timeout=CONFIG.worker_queue_timeout
-                        - CONFIG.metadata_update_batch_timeout,
+                        timeout=timeout,
                     )
 
                     if chunk is None:
@@ -93,6 +96,8 @@ async def metadata_worker(
                 except TimeoutError:
                     logger.warning("Metadata worker timeout - assuming parent crashed")
                     # Long timeout - assume parent crashed, exit
-                    raise  # To ensure other processes stop, maybe download workers are stuck
+                    # To ensure other processes stop, maybe download workers
+                    # are stuck.
+                    raise
 
     logger.debug("Metadata worker shutting down")

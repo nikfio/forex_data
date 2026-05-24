@@ -14,8 +14,10 @@ def generate_hourly_datetimes(start: datetime, end: datetime) -> list[datetime]:
     issues and ensures consistency with financial market data conventions.
 
     Args:
-        start: The start datetime of the range (will be normalized to UTC and rounded down)
-        end: The end datetime of the range (will be normalized to UTC and rounded down, excluded)
+        start: The start datetime of the range (will be normalized to
+            UTC and rounded down)
+        end: The end datetime of the range (will be normalized to UTC
+            and rounded down, excluded)
 
     Returns:
         list[datetime]: A list of timezone-aware UTC datetime objects, one for each

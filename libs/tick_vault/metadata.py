@@ -129,10 +129,11 @@ class MetadataDB:
             ]
 
             # Bulk insert with single commit
-            self.conn.executemany(
-                f"INSERT OR REPLACE INTO {table_name} (timestamp, has_data) VALUES (?, ?)",
-                data,
+            query = (
+                f"INSERT OR REPLACE INTO {table_name} "
+                "(timestamp, has_data) VALUES (?, ?)"
             )
+            self.conn.executemany(query, data)
             self.conn.commit()
 
     def find_not_attempted_chunks(
@@ -187,7 +188,8 @@ class MetadataDB:
         ]
 
         logger.debug(
-            f"Found {len(not_attempted)} not-attempted chunks for {symbol} from {start:%Y-%m-%d %H:00} to {end:%Y-%m-%d %H:00}"
+            f"Found {len(not_attempted)} not-attempted chunks for {symbol} "
+            f"from {start:%Y-%m-%d %H:00} to {end:%Y-%m-%d %H:00}"
         )
 
         return not_attempted
@@ -271,7 +273,8 @@ class MetadataDB:
 
     def check_for_gaps(self, symbol: str, start: datetime, end: datetime) -> None:
         """
-        Verify data continuity by checking for gaps in downloaded data within a time range.
+        Verify data continuity by checking for gaps in downloaded data
+        within a time range.
 
         Checks that all hours between start and end exist in the database with no gaps.
         This should be called before reading data to ensure consistency.
@@ -324,10 +327,12 @@ class MetadataDB:
 
         if actual_count == 0:
             logger.warning(
-                f"No data found for symbol {symbol} in range {start_hour.date()} to {end_hour.date()}"
+                f"No data found for symbol {symbol} in range "
+                f"{start_hour.date()} to {end_hour.date()}"
             )
             raise ValueError(
-                f"No data found for symbol {symbol} in range {start_hour.date()} to {end_hour.date()}"
+                f"No data found for symbol {symbol} in range "
+                f"{start_hour.date()} to {end_hour.date()}"
             )
 
         # Generate all expected hours in the range
@@ -355,19 +360,22 @@ class MetadataDB:
             ]
 
             logger.error(
-                f"Data gaps detected for {symbol} in range {start_hour.date()} to {end_hour.date()}: "
+                f"Data gaps detected for {symbol} in range "
+                f"{start_hour.date()} to {end_hour.date()}: "
                 f"{len(missing_timestamps)} missing hours"
             )
 
+            missing_suffix = " ..." if len(missing_dates) > 10 else ""
             raise RuntimeError(
-                f"Data gaps found for symbol {symbol} in range {start_hour.date()} to {end_hour.date()}. "
+                f"Data gaps found for symbol {symbol} in range "
+                f"{start_hour.date()} to {end_hour.date()}. "
                 f"Expected {expected_count} entries but found {actual_count}. "
-                f"Missing timestamps: {missing_dates[:10]}"
-                + (" ..." if len(missing_dates) > 10 else "")
+                f"Missing timestamps: {missing_dates[:10]}{missing_suffix}"
             )
 
         logger.debug(
-            f"No gaps found for {symbol} in range {start_hour.date()} to {end_hour.date()} "
+            f"No gaps found for {symbol} in range "
+            f"{start_hour.date()} to {end_hour.date()} "
             f"({expected_count} hours verified)"
         )
 
