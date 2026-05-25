@@ -36,6 +36,9 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
     """
 
     def setUp(self):
+        import os
+        if not os.environ.get("TWELVE_DATA_API_KEY"):
+            self.skipTest("TWELVE_DATA_API_KEY environment variable not set")
         logger.remove()
         logger.add(
             sys.stdout,
