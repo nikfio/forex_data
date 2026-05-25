@@ -78,7 +78,7 @@ def generate_database(
 
     try:
         manager = HistoricalManagerDB(config=config)
-        # add requested timeframes 
+        # add requested timeframes
         # with this action we need just one tick download if needed
         manager.add_timeframe(normalized_timeframes)
     except Exception as e:
@@ -91,7 +91,8 @@ def generate_database(
 
     for ticker in normalized_tickers:
         typer.secho(
-            f"Generating database for ticker: {ticker} | Timeframes: {', '.join(normalized_timeframes)} | "
+            f"Generating database for ticker: {ticker} | "
+            f"Timeframes: {', '.join(normalized_timeframes)} | "
             f"Range: {start_date} to {end_date}",
             fg=typer.colors.CYAN
         )
@@ -113,10 +114,17 @@ def generate_database(
                 df = lazy_frame
 
             row_count = len(df)
+            typer.secho(
+                f"Successfully processed {ticker} "
+                f"({normalized_timeframes[0]}). "
+                f"Cached/retrieved {row_count} rows.",
+                fg=typer.colors.GREEN
+            )
 
         except Exception as e:
             typer.secho(
-                f"Error processing ticker {ticker} ({tf}): {e}",
+                f"Error processing ticker {ticker} "
+                f"({normalized_timeframes[0]}): {e}",
                 fg=typer.colors.RED,
                 err=True
             )
@@ -124,7 +132,13 @@ def generate_database(
             raise typer.Exit(code=1)
 
     manager.close()
-    typer.secho("Database generation complete, tickers processed"f" : {', '.join(normalized_tickers)}, timeframes : {', '.join(normalized_timeframes)}", fg=typer.colors.GREEN, bold=True)
+    typer.secho(
+        f"Database generation complete, tickers processed: "
+        f"{', '.join(normalized_tickers)}, timeframes: "
+        f"{', '.join(normalized_timeframes)}",
+        fg=typer.colors.GREEN,
+        bold=True
+    )
 
 
 if __name__ == "__main__":
