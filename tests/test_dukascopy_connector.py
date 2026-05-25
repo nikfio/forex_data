@@ -167,6 +167,10 @@ class TestDukascopyConnector(unittest.TestCase):
         collected = result.collect()
         self.assertGreater(collected.height, 0)
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_DOWNLOAD_CURRENT_MONTH_TESTS") == "1",
+        "Skipped by default. Run with RUN_DOWNLOAD_CURRENT_MONTH_TESTS=1"
+    )
     def test_get_recent_data_tick(self):
         if not self.connector.check_connection():
             self.skipTest("No network connection to Dukascopy.")
@@ -186,6 +190,10 @@ class TestDukascopyConnector(unittest.TestCase):
         time_diff = result["timestamp"].max() - result["timestamp"].min()
         self.assertGreaterEqual(time_diff + timedelta(seconds=10), timedelta(hours=10))
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_DOWNLOAD_CURRENT_MONTH_TESTS") == "1",
+        "Skipped by default. Run with RUN_DOWNLOAD_CURRENT_MONTH_TESTS=1"
+    )
     def test_get_recent_data_reframed(self):
         if not self.connector.check_connection():
             self.skipTest("No network connection to Dukascopy.")
