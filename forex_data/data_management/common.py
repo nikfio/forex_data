@@ -143,6 +143,10 @@ __all__ = [
     'SQL_CONDITION_AGGREGATION_MODES',
     'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
     'HISTORICAL_DB_MIN_DATE',
+    'SUPPORTED_HISTORICAL_DATA_PROVIDERS',
+    'HISTDATA_PROVIDER',
+    'DUKASCOPY_PROVIDER',
+    'SUPPORTED_REALTIME_DATA_PROVIDERS',
     'TWELVE_DATA_TIMEFRAMES',
 
     'validator_file_path',
@@ -270,9 +274,8 @@ YEAR_FIELD_PATTERN_STR = '^Y([0-9]{4,})$'
 POLARS_DURATION_PATTERN_STR = '^[0-9]+(ns|us|ms|s|m|h|d|w|mo|q|y|i)$'
 PYARROW_DURATION_PATTERN_STR = '^[0-9]+(ns|us|ms|s|m|h|d|w|mo|q|y|i)$'
 
+
 # GENERAL UTILITIES
-
-
 def get_class_attr_keys(var):
 
     defined_keys = []
@@ -483,8 +486,6 @@ SUPPORTED_SQL_CONDITION_AGGREGATION_MODES = Literal[
 # auxiliary functions
 
 # get elements from db key
-
-
 def get_db_key_elements(key):
 
     res = fullmatch(DATA_KEY_TEMPLATE_STR, key)
@@ -521,7 +522,6 @@ def infer_date_from_format_dt(s, date_format='ISO8601', unit=None, utc=False):
 # link to official pandas doc
 # https://pandas.pydata.org/docs/user_guide/timeseries.html#dateoffset-objects
 # add compatibility to polars frequency string
-
 def check_timeframe_str(tf: str | Timedelta | DateOffset,
                         engine: Literal['pandas',
                                         'polars',
@@ -777,13 +777,13 @@ def random_date_between(start_date, end_date):
     random_seconds = random.randint(0, int(delta.total_seconds()))
     return start_date + timedelta(seconds=random_seconds)
 
+
 # BASE OPERATIONS WITH DATAFRAME
 # depending on dataframe engine support
 # for supported engines see var SUPPORTED_DATA_ENGINES
 
+
 # DATA ENGINES TYPES DICTIONARY
-
-
 class DTYPE_DICT:
 
     TICK_DTYPE = {'ask': 'float32',
@@ -1763,10 +1763,25 @@ def update_ticker_years_dict(
 
 
 '''
+HISTORICAL DATA PROVIDERS
+'''
+
+HISTDATA_PROVIDER = 'Histdata'
+DUKASCOPY_PROVIDER = 'Dukascopy'
+
+SUPPORTED_HISTORICAL_DATA_PROVIDERS = [
+    HISTDATA_PROVIDER,
+    DUKASCOPY_PROVIDER
+]
+
+
+'''
 REALTIME DATA PROVIDERS
 '''
 
 # TWELVE DATA
+TWELVEDATA_PROVIDER = 'TwelveData'
+
 PAIR_TWELVE_DATA_FORMAT = PAIR_GENERIC_FORMAT
 PAIR_TWELVE_DATA_PATTERN = '^' + SINGLE_CURRENCY_PATTERN_STR + \
     SINGLE_CURRENCY_PATTERN_STR + '$'
@@ -1801,4 +1816,8 @@ TWELVE_DATA_TIMEFRAMES = [
     "1day",
     "1week",
     "1month"
+]
+
+SUPPORTED_REALTIME_DATA_PROVIDERS = [
+    TWELVEDATA_PROVIDER
 ]
