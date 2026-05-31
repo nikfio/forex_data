@@ -1191,7 +1191,7 @@ class HistoricalManagerDB:
 
         return self._db_connector.read_data_window(
             market='forex',
-            date=date,
+            date=any_date_to_datetime64(date),
             ticker=ticker,
             timeframe=timeframe,
             periods=periods,
