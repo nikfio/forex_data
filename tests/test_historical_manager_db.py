@@ -47,12 +47,16 @@ __all__ = ['TestHistoricalManagerDB']
 
 from pathlib import Path
 
-_base_path = Path.home() / ".test_database"
-_data_path = _base_path
-_counter = 1
-while _data_path.exists():
-    _data_path = Path.home() / f".test_database_{_counter}"
-    _counter += 1
+_env_data_path = os.getenv("TEST_DATA_PATH")
+if _env_data_path:
+    _data_path = Path(_env_data_path)
+else:
+    _base_path = Path.home() / ".test_database"
+    _data_path = _base_path
+    _counter = 1
+    while _data_path.exists():
+        _data_path = Path.home() / f".test_database_{_counter}"
+        _counter += 1
 
 test_config_yaml = f'''
 DATA_PATH: '{_data_path}'
@@ -84,7 +88,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             except Exception:
                 pass
 
-        if _data_path.exists():
+        if not _env_data_path and _data_path.exists():
             shutil.rmtree(_data_path)
 
     def test_01_initialization_with_config(self):
@@ -979,56 +983,88 @@ class TestHistoricalManagerDB(unittest.TestCase):
         msg = f"No data downloaded for {ticker} in {current_year}"
         self.assertGreater(len(data), 0, msg=msg)
 
-    @unittest.skipUnless(
-        os.environ.get("RUN_FALLBACK_TESTS") == "1",
-        "Skipped by default. Run with RUN_FALLBACK_TESTS=1"
-    )
-    def test_30_download_histdata_fails_fallback_to_dukascopy(self):
+    def test_30_download_histdata_computerror_fallback_correction(self):
         """
-        Test download of year 2004 for EURUSD
-        it shall fail for histdata connector
-        meaning the fallback strategy will
-        use dukascopy to download the data
-        Repeat the test for ticker GBPUSD year 2004
+        Test download of year 2004 for EURUSD and GBPUSD.
+        In 2004, histdata.com CSVs contain trailing whitespaces on floats,
+        which triggers a ComputeError.
+        The connector should catch it and use the correction formula fallback
+        to strip whitespace, succeeding without falling back to Dukascopy.
         """
+        from unittest.mock import patch
 
-        # fallback test on EURUSD 2004 hitdata fail
+        with patch(
+            'forex_data.data_management.historicaldata'
+            '.DukascopyConnector.download_month_raw'
+        ) as mock_duka:
+            # fallback test on EURUSD 2004 histdata fail
+            ticker = 'EURUSD'
+            year = 2004
+            start = datetime(year, 1, 1)
+            end = datetime(year, 12, 31)
+
+            data = self.hist_manager.get_data(
+                ticker=ticker,
+                timeframe='1D',
+                start=start,
+                end=end
+            )
+
+            self.assertIsNotNone(data)
+            if isinstance(data, PolarsLazyFrame):
+                data = data.collect()
+            msg = f"No data downloaded for {ticker} in {year}"
+            self.assertGreater(len(data), 0, msg=msg)
+
+            # fallback test on GBPUSD 2004 histdata fail
+            ticker = 'GBPUSD'
+            year = 2004
+            start = datetime(year, 1, 1)
+            end = datetime(year, 12, 31)
+
+            data = self.hist_manager.get_data(
+                ticker=ticker,
+                timeframe='1D',
+                start=start,
+                end=end
+            )
+
+            self.assertIsNotNone(data)
+            if isinstance(data, PolarsLazyFrame):
+                data = data.collect()
+            msg = f"No data downloaded for {ticker} in {year}"
+            self.assertGreater(len(data), 0, msg=msg)
+
+            # Verify that Dukascopy was NEVER called, because
+            # HistData successfully corrected the data
+            mock_duka.assert_not_called()
+
+    def test_31_read_data_window(self):
+        """
+        Test read_data with window parameter
+        """
         ticker = 'EURUSD'
-        year = 2004
-        start = datetime(year, 1, 1)
-        end = datetime(year, 12, 31)
+        timeframe = '4h'
+        periods = 48
+        end = datetime(2023, 4, 30)
 
-        data = self.hist_manager.get_data(
+        data = self.hist_manager.get_data_window(
+            date=end,
             ticker=ticker,
-            timeframe='1D',
-            start=start,
-            end=end
+            timeframe=timeframe,
+            periods=periods,
+            direction='backward'
         )
-
         self.assertIsNotNone(data)
+
+        # Collect if lazy frame
         if isinstance(data, PolarsLazyFrame):
             data = data.collect()
-        msg = f"No data downloaded for {ticker} in {year}"
-        self.assertGreater(len(data), 0, msg=msg)
 
-        # fallback test on GBPUSD 2004 hitdata fail
-        ticker = 'GBPUSD'
-        year = 2004
-        start = datetime(year, 1, 1)
-        end = datetime(year, 12, 31)
-
-        data = self.hist_manager.get_data(
-            ticker=ticker,
-            timeframe='1D',
-            start=start,
-            end=end
-        )
-
-        self.assertIsNotNone(data)
-        if isinstance(data, PolarsLazyFrame):
-            data = data.collect()
-        msg = f"No data downloaded for {ticker} in {year}"
-        self.assertGreater(len(data), 0, msg=msg)
+        # assert data shape[0] (rows)
+        # is equal to periods
+        expected_rows = periods
+        self.assertEqual(data.shape[0], expected_rows)
 
 
 if __name__ == '__main__':

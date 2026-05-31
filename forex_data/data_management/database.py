@@ -39,7 +39,7 @@ from polars import (
 import json
 from datetime import datetime, timedelta
 from pathlib import Path as PathType
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast, Literal
 from numpy import array
 from re import (
     fullmatch,
@@ -1321,3 +1321,160 @@ class LocalDBYearConnector(DatabaseConnector):
             dataframe = dataframe.cast(POLARS_DTYPE_DICT.TIME_TF_DTYPE)
 
         return dataframe
+
+    def read_data_window(self,
+                         market: str,
+                         ticker: str,
+                         timeframe: str,
+                         date: datetime | str | Timestamp | PolarsDatetime,
+                         periods: int,
+                         direction : Literal['backward', 'forward'],
+                         comparison_column_name: List[str] | str | None = None,
+                         check_level: List[int | float] | int | float | None = None,
+                         comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
+                         comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
+                         ) -> PolarsLazyFrame:
+        """
+        Read window of data specified by input requirements:
+        the data window has timespan in order to return a dataframe
+        with rows size equal to periods.
+        Query the local db to calculate the start date of the window
+        if direction is forward, or end date if backward.
+
+
+        Args:
+            market (str): Market name (e.g., 'forex').
+            ticker (str): Trading pair (e.g., 'XAUUSD').
+            timeframe (str): Timeframe (e.g., 'TICK').
+            date (datetime | str | Timestamp | PolarsDatetime): Start or end date for the window.
+            periods (int): Number of timeframe units to look back or forward.
+            direction (str): Direction to look back ('backward' or 'forward').
+            comparison_column_name (List[str] | str | None): List of column names
+                to compare.
+                If None, no comparison is performed.
+            check_level (List[int | float] | int | float | None): List of values
+                to compare against.
+                If None, no comparison is performed.
+            comparison_operator (List[SUPPORTED_SQL_COMPARISON_OPERATORS] |
+                SUPPORTED_SQL_COMPARISON_OPERATORS | None): List of comparison
+                operators to use for comparison.
+                If None, no comparison is performed.
+            comparison_aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES
+                | None): Aggregation mode to use for comparison.
+                If None, no comparison is performed.
+
+        Returns:
+            PolarsDataFrame: DataFrame with data for the window.
+        """
+
+        # based on timeframe and window size (units of timeframe)
+        # estimate how many years the query should cover
+        if direction == 'backward':
+            end_date = date
+            start_date = estimate_start_date_to_business_days(
+                end_date,
+                timeframe,
+                periods,
+                holidays=FOREX_HOLIDAYS
+            )
+
+            # consider (start_date.year - 1) with -1 as margin
+            # e.g. if start_date is 2000-01-01, we need to include 1999 files
+            years_list = range(start_date.year - 1, end_date.year + 1)
+
+        elif direction == 'forward':
+            start_date = date
+            end_date = estimate_end_date_to_business_days(
+                start_date,
+                timeframe,
+                periods,
+                holidays=FOREX_HOLIDAYS
+            )
+
+            # consider end_date.year + 2 with +1 as margin
+            # e.g. if end_date is 2022-12-31, we need to include 2023 files
+            years_list = range(start_date.year, end_date.year + 2)
+
+        # get a hook (lazyframe) to the local db files needed
+        dataframes_list = []
+        for y in years_list:
+            filename = self._get_filename(market, ticker, timeframe, y)
+            filepath = (self.data_path / market / ticker / timeframe / filename)
+
+            if filepath.exists():
+                file_lock_path = str(filepath) + '.lock'
+                with FileLock(file_lock_path):
+                    if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                        df_year = read_csv(self.engine, filepath)
+                    elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                        df_year = read_parquet(self.engine, filepath)
+                    dataframes_list.append(df_year)
+
+        if not dataframes_list:
+            logger.bind(target='localdb').critical(
+                f'No files found for {market} {ticker} {timeframe} for years {years_list}')
+            raise FileNotFoundError(
+                f"No files found for {market} {ticker} {timeframe} for years {years_list}")
+
+        if not dataframes_list:
+            logger.bind(target='localdb').critical(f'No files found for {market} {ticker} {timeframe} between {start} and {end}')
+            raise FileNotFoundError(f"No files found for {market} {ticker} {timeframe} between {start} and {end}")
+
+        # aggregated lazyframe to query from
+        dataframe = concat(dataframes_list)
+
+        # produce a SQL query to local database to count the number of entries (rows)
+        # from start date or end date
+        # the count stops when it reaches 'window' number of rows
+        # the query shall return the first and last datetime entries
+        # in ascending order of timestamp
+        if direction == 'backward':
+            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+                        FROM (
+                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_date}'
+                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} DESC
+                            LIMIT {periods}
+                        ) AS sub
+                        '''
+        elif direction == 'forward':
+            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+                        FROM (
+                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_date}'
+                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} ASC
+                            LIMIT {periods}
+                        ) AS sub
+                        '''
+
+        try:
+
+            window_dates = dataframe.sql(query)
+            if isinstance(window_dates, PolarsLazyFrame):
+                window_dates = window_dates.collect()
+
+        except Exception as e:
+            logger.bind(target='localdb').error(
+                f'executing query {query} failed: {e}')
+
+            return PolarsLazyFrame([])
+
+        else:
+
+            # get the corrected dates
+            start_date_from_db = window_dates.item(0, 0)
+            end_date_from_db = window_dates.item(0, 1)
+
+        return self.read_data(
+            market,
+            ticker,
+            timeframe,
+            start_date_from_db,
+            end_date_from_db,
+            comparison_column_name,
+            check_level,
+            comparison_operator,
+            comparison_aggregation_mode,
+        )
