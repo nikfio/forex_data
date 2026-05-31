@@ -154,7 +154,7 @@ class Config(BaseSettings):
     )
 
     worker_queue_timeout: float = Field(
-        default=300.0,
+        default=1800.0,
         gt=0,
         description="Timeout in seconds for worker queue operations",
     )

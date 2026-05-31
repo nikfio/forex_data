@@ -20,16 +20,19 @@ from typing import (
     Any,
     List,
     Literal,
-    Dict
+    Dict,
+    Tuple
 )
 
 import requests
 import random
+from math import ceil
 from bs4 import BeautifulSoup
 
 from datetime import (
     timedelta,
-    datetime
+    datetime,
+    date
 )
 
 from pathlib import Path
@@ -78,8 +81,8 @@ from pyarrow.parquet import (
 
 # POLARS
 from polars import (
-    Float32 as polars_float32,
-    Datetime as polars_datetime,
+    Float32 as PolarsFloat32,
+    Datetime as PolarsDatetime,
     read_csv as polars_read_csv,
     concat as polars_concat,
     col,
@@ -89,7 +92,8 @@ from polars import (
     DataFrame as PolarsDataFrame,
     LazyFrame as PolarsLazyFrame,
     scan_csv as polars_scan_csv,
-    scan_parquet as polars_scan_parquet
+    scan_parquet as polars_scan_parquet,
+    business_day_count
 )
 
 from dateutil.rrule import (
@@ -148,6 +152,7 @@ __all__ = [
     'DUKASCOPY_PROVIDER',
     'SUPPORTED_REALTIME_DATA_PROVIDERS',
     'TWELVE_DATA_TIMEFRAMES',
+    'FOREX_HOLIDAYS',
 
     'validator_file_path',
     'validator_dir_path',
@@ -162,7 +167,6 @@ __all__ = [
     'get_dataframe_element',
     'astype',
     'read_csv',
-    'polars_datetime',
     'sort_dataframe',
     'concat_data',
     'list_remove_duplicates',
@@ -185,9 +189,19 @@ __all__ = [
     'get_class_attr_keys',
     'get_class_attr_values',
     'get_class_attr_dict',
+    'get_forex_holidays',
+    'adjust_end_date_to_business_days',
+    'adjust_start_date_to_business_days',
+    'estimate_start_date_to_business_days',
+    'estimate_end_date_to_business_days',
+    'Timestamp',
+    'PolarsDatetime',
+    'PolarsFloat32',
+    'PolarsDataFrame',
+    'PolarsLazyFrame',
 ]
 
-# =============================================================================
+
 # CUSTOM EXCEPTIONS
 # =============================================================================
 
@@ -830,24 +844,24 @@ class PYARROW_DTYPE_DICT:
 
 class POLARS_DTYPE_DICT:
 
-    TICK_DTYPE = {'ask': polars_float32,
-                  'bid': polars_float32,
-                  'vol': polars_float32,
-                  'p': polars_float32}
-    TF_DTYPE = {'open': polars_float32,
-                'high': polars_float32,
-                'low': polars_float32,
-                'close': polars_float32}
-    TIME_TICK_DTYPE = {'timestamp': polars_datetime('ms'),
-                       'ask': polars_float32,
-                       'bid': polars_float32,
-                       'vol': polars_float32,
-                       'p': polars_float32}
-    TIME_TF_DTYPE = {'timestamp': polars_datetime('ms'),
-                     'open': polars_float32,
-                     'high': polars_float32,
-                     'low': polars_float32,
-                     'close': polars_float32}
+    TICK_DTYPE = {'ask': PolarsFloat32,
+                  'bid': PolarsFloat32,
+                  'vol': PolarsFloat32,
+                  'p': PolarsFloat32}
+    TF_DTYPE = {'open': PolarsFloat32,
+                'high': PolarsFloat32,
+                'low': PolarsFloat32,
+                'close': PolarsFloat32}
+    TIME_TICK_DTYPE = {'timestamp': PolarsDatetime('ms'),
+                       'ask': PolarsFloat32,
+                       'bid': PolarsFloat32,
+                       'vol': PolarsFloat32,
+                       'p': PolarsFloat32}
+    TIME_TF_DTYPE = {'timestamp': PolarsDatetime('ms'),
+                     'open': PolarsFloat32,
+                     'high': PolarsFloat32,
+                     'low': PolarsFloat32,
+                     'close': PolarsFloat32}
 
 # DATA ENGINES FUNCTIONS
 
@@ -1689,6 +1703,21 @@ US_HOLIDAYS = country_holidays('US', years=YEARS)
 US_holiday_dates = [holiday_date for holiday_date in US_HOLIDAYS.keys()]
 
 
+def get_forex_holidays(years: range):
+    """
+    Generates standard Global Forex closure dates (Dec 25 & Jan 1)
+    for a range of years.
+    """
+    closure_dates = []
+    for year in years:
+        closure_dates.append(date(year, 1, 1))    # New Year's Day
+        closure_dates.append(date(year, 12, 25))  # Christmas Day
+    return sorted(closure_dates)
+
+
+FOREX_HOLIDAYS = get_forex_holidays(range(2000, datetime.now().year + 1))
+
+
 def business_days_data(dataframe: PolarsLazyFrame |
                        PolarsDataFrame) -> PolarsDataFrame | PolarsLazyFrame:
     '''
@@ -1704,6 +1733,352 @@ def business_days_data(dataframe: PolarsLazyFrame |
         (col('timestamp').dt.weekday() < 6) &  # Keep Monday(1) through Friday(5)
         (~col('timestamp').dt.date().is_in(US_holiday_dates))  # Exclude holidays
     )
+
+
+WEEKDAYS_ITERABLE = (True, True, True, True, True, False, False)
+
+
+def add_business_days(
+    date: date | Timestamp | datetime,
+    business_days_to_add: int,
+    holidays: list,
+    direction: str = 'backward'
+) -> datetime:
+    """
+    Add business days forward or backward from a given start date using Polars.
+    """
+
+    # convert date inputs in datetime obj
+    if (
+        isinstance(date, str)
+        or
+        isinstance(date, Timestamp)
+    ):
+        date = any_date_to_datetime64(date)
+
+    if isinstance(date, datetime):
+        date = date.date()
+
+    if isinstance(date, PolarsDatetime):
+        date = date.to_pandas().date()
+
+    if direction not in ('backward', 'forward'):
+        raise ValueError(
+            f"direction must be 'backward' or 'forward', got '{direction}'"
+        )
+
+    # Determine sign based on direction
+    sign = -1 if direction == 'backward' else 1
+
+    # add business days using polars method
+    df = PolarsDataFrame({
+        "start": [date]
+    })
+
+    result = df.with_columns(
+        new_start=col("start").dt.add_business_days(
+            sign * business_days_to_add,
+            week_mask=WEEKDAYS_ITERABLE,
+            holidays=holidays,
+            roll=direction
+        )
+    )
+
+    # get the new start value
+    new_date = result.select(col("new_start").first()).item()
+
+    # if direction is backward, get the floor value
+    if direction == 'backward':
+        new_date = datetime.combine(new_date, datetime.min.time())
+    # if direction is forward, get the ceil value
+    else:
+        new_date = datetime.combine(new_date, datetime.max.time())
+
+    return new_date
+
+
+def adjust_start_date_to_business_days(
+    end: datetime | str | Timestamp | PolarsDatetime,
+    timeframe: str | timedelta,
+    periods: int,
+    holidays: list,
+    start: datetime | str | Timestamp | PolarsDatetime | None = None,
+) -> Tuple[int, datetime]:
+    """
+    Calculate if timeframe con fit exactly periods times in the timespan
+    between start and end dates.
+    If not, recursively calculates a new start by advancing backwards
+    with business days. End date remains always unmodified.
+    """
+    # Convert inputs to datetime objects
+    if isinstance(start, (str, Timestamp)):
+        start = any_date_to_datetime64(start)
+    elif isinstance(start, PolarsDatetime):
+        start = datetime.fromtimestamp(start.timestamp())
+
+    if isinstance(end, (str, Timestamp)):
+        end = any_date_to_datetime64(end)
+    elif isinstance(end, PolarsDatetime):
+        end = datetime.fromtimestamp(end.timestamp())
+
+    # Convert timeframe to timedelta if it's a string
+    if isinstance(timeframe, str):
+        timeframe_td = Timedelta(timeframe).to_pytimedelta()
+    else:
+        timeframe_td = timeframe
+
+    # Calculate total duration needed (timeframe * periods)
+    total_duration_needed = timeframe_td * periods
+
+    # if start is None, calculate it from end date
+    if start is None:
+        start = end - total_duration_needed
+
+    # Recursive helper function to add business days backwards
+    def add_business_days_backwards(
+        current_start: datetime | date,
+        current_end: datetime | date
+    ) -> datetime | date:
+        """
+        Recursively adjust start date backwards.
+        """
+        # convert to date if datetime
+        if isinstance(current_start, datetime):
+            current_start = current_start.date()
+        if isinstance(current_end, datetime):
+            current_end = current_end.date()
+
+        # count business days between current_start and current_end
+        business_days = PolarsDataFrame({
+            "start": [current_start],
+            "end": [current_end]
+        }).select(
+            business_day_count(
+                "start", "end",
+                week_mask=WEEKDAYS_ITERABLE,
+                holidays=holidays
+            )
+        ).item()
+
+        # business days to timedelta
+        business_days_td = timedelta(days=business_days)
+
+        if business_days_td < total_duration_needed:
+            # calculate how many business days to add backwards from start
+            business_days_to_add = ceil(
+                (total_duration_needed - business_days_td).days
+            )
+
+            if business_days_to_add == 0:
+                business_days_to_add = 1
+
+            # add business days using the helper function
+            new_start = add_business_days(
+                current_start,
+                business_days_to_add,
+                holidays,
+                direction='backward'
+            )
+
+            return add_business_days_backwards(new_start, current_end)
+        else:
+            # have enough business days
+            return current_start
+
+    # Call the recursive function
+    new_start = add_business_days_backwards(start, end)
+
+    final_start = (
+        new_start.date() if isinstance(new_start, datetime) else new_start
+    )
+    final_end = end.date() if isinstance(end, datetime) else end
+
+    # Calculate how many complete timeframe periods fit in the business timespan
+    df_final = PolarsDataFrame({
+        "start": [final_start],
+        "end": [final_end]
+    })
+
+    final_business_days = df_final.select(
+        business_day_count(
+            "start", "end",
+            week_mask=WEEKDAYS_ITERABLE,
+            holidays=holidays
+        )
+    ).item()
+
+    final_business_days_td = timedelta(days=final_business_days)
+
+    if timeframe_td.total_seconds() > 0:
+        count = int(final_business_days_td // timeframe_td)
+    else:
+        count = 0
+
+    # convert back to datetime if needed
+    if isinstance(new_start, date):
+        new_start = datetime.combine(new_start, datetime.min.time())
+
+    return count, new_start
+
+
+def adjust_end_date_to_business_days(
+    start: datetime | str | Timestamp | PolarsDatetime,
+    timeframe: str | timedelta,
+    periods: int,
+    holidays: list,
+    end: datetime | str | Timestamp | PolarsDatetime | None = None
+) -> Tuple[int, datetime]:
+    """
+    Calculate if timeframe can fit exactly periods times in the timespan
+    between start and end dates.
+    If not, recursively calculates a new end by advancing forwards
+    with business days. Start date remains always unmodified.
+    """
+    # Convert inputs to datetime objects
+    if isinstance(start, (str, Timestamp)):
+        start = any_date_to_datetime64(start)
+    elif isinstance(start, PolarsDatetime):
+        start = datetime.fromtimestamp(start.timestamp())
+
+    if isinstance(end, (str, Timestamp)):
+        end = any_date_to_datetime64(end)
+    elif isinstance(end, PolarsDatetime):
+        end = datetime.fromtimestamp(end.timestamp())
+
+    # Convert timeframe to timedelta if it's a string
+    if isinstance(timeframe, str):
+        timeframe_td = Timedelta(timeframe).to_pytimedelta()
+    else:
+        timeframe_td = timeframe
+
+    # Calculate total duration needed (timeframe * periods)
+    total_duration_needed = timeframe_td * periods
+
+    # if end is None, calculate it from start date
+    if end is None:
+        end = start + total_duration_needed
+
+    # Recursive helper function to add business days forwards
+    def add_business_days_forwards(
+        current_start: datetime | date,
+        current_end: datetime | date
+    ) -> datetime | date:
+        """
+        Recursively adjust end date forwards.
+        """
+        # convert to date if datetime
+        if isinstance(current_start, datetime):
+            current_start = current_start.date()
+        if isinstance(current_end, datetime):
+            current_end = current_end.date()
+
+        # count business days between current_start and current_end
+        business_days = PolarsDataFrame({
+            "start": [current_start],
+            "end": [current_end]
+        }).select(
+            business_day_count(
+                "start", "end",
+                week_mask=WEEKDAYS_ITERABLE,
+                holidays=holidays
+            )
+        ).item()
+
+        # business days to timedelta
+        business_days_td = timedelta(days=business_days)
+
+        if business_days_td < total_duration_needed:
+            # calculate how many business days to add forwards from end
+            business_days_to_add = ceil(
+                (total_duration_needed - business_days_td).days
+            )
+
+            if business_days_to_add == 0:
+                business_days_to_add = 1
+
+            # add business days using the helper function
+            new_end = add_business_days(
+                current_end,
+                business_days_to_add,
+                holidays,
+                direction='forward'
+            )
+
+            return add_business_days_forwards(current_start, new_end)
+        else:
+            # have enough business days
+            return current_end
+
+    # Call the recursive function
+    new_end = add_business_days_forwards(start, end)
+
+    final_start = start.date() if isinstance(start, datetime) else start
+    final_end = (
+        new_end.date() if isinstance(new_end, datetime) else new_end
+    )
+
+    # Calculate how many complete timeframe periods fit in the business timespan
+    df_final = PolarsDataFrame({
+        "start": [final_start],
+        "end": [final_end]
+    })
+
+    final_business_days = df_final.select(
+        business_day_count(
+            "start", "end",
+            week_mask=WEEKDAYS_ITERABLE,
+            holidays=holidays
+        )
+    ).item()
+
+    final_business_days_td = timedelta(days=final_business_days)
+
+    if timeframe_td.total_seconds() > 0:
+        count = int(final_business_days_td // timeframe_td)
+    else:
+        count = 0
+
+    # convert back to datetime if needed
+    if isinstance(new_end, date):
+        new_end = datetime.combine(new_end, datetime.max.time())
+
+    return count, new_end
+
+
+def estimate_start_date_to_business_days(
+    end_date: datetime | str | Timestamp | PolarsDatetime,
+    timeframe: str | timedelta,
+    window_size: int,
+    holidays: list = []
+) -> datetime:
+    """
+    Estimate start date needed to cover a window size of timeframe periods.
+    """
+    _, start_date = adjust_start_date_to_business_days(
+        end=end_date,
+        timeframe=timeframe,
+        periods=window_size,
+        holidays=holidays
+    )
+    return start_date
+
+
+def estimate_end_date_to_business_days(
+    start_date: datetime | str | Timestamp | PolarsDatetime,
+    timeframe: str | timedelta,
+    window_size: int,
+    holidays: list = []
+) -> datetime:
+    """
+    Estimate end date needed to cover a window size of timeframe periods.
+    """
+    _, end_date = adjust_end_date_to_business_days(
+        start=start_date,
+        timeframe=timeframe,
+        periods=window_size,
+        holidays=holidays
+    )
+    return end_date
 
 
 def update_ticker_years_dict(

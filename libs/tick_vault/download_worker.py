@@ -72,8 +72,16 @@ async def download_worker(
                 break
 
             # Fetch data with automatic retry logic
-            # Any ForbiddenError or RuntimeError will be raised immediately
-            content = await fetch_with_retry(client, chunk.url)
+            # Any ForbiddenError will be raised immediately to stop download.
+            # RuntimeError (exhausted retries/timeouts) is caught to proceed.
+            try:
+                content = await fetch_with_retry(client, chunk.url)
+            except RuntimeError as e:
+                logger.error(
+                    f"Failed to download chunk {chunk.symbol} {chunk.time.isoformat()} "
+                    f"after all retries: {e}. Treating as no-data and proceeding."
+                )
+                content = None
 
             if content is not None:
                 # Data exists - save to disk

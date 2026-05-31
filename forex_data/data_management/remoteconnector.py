@@ -50,6 +50,7 @@ from loguru import logger
 from .common import (
     PolarsDataFrame,
     PolarsLazyFrame,
+    PolarsFloat32,
     DATE_FORMAT_SQL,
     TEMP_FOLDER,
     TEMP_CSV_FILE,
@@ -73,7 +74,7 @@ from .common import (
     TICK_TIMEFRAME,
     TWELVE_DATA_TIMEFRAMES,
     read_csv,
-    polars_datetime,
+    PolarsDatetime,
     any_date_to_datetime64,
     business_days_data,
     reframe_data,
@@ -147,12 +148,13 @@ class RemoteConnector:
         except Exception:
             pass
 
-        try:
-            shutil.rmtree(self._temporary_data_path)
-        except Exception as e:
-            logger.bind(target='dukascopy').warning(
-                f"Failed to delete temporary directory {self._temporary_data_path}: {e}"
-            )
+        if self._temporary_data_path.exists():
+            try:
+                shutil.rmtree(self._temporary_data_path)
+            except Exception as e:
+                logger.bind(target='dukascopy').warning(
+                    f"Failed to delete temporary directory {self._temporary_data_path}: {e}"
+                )
         temp_root = self.data_path / TEMP_FOLDER
         if temp_root.exists() and temp_root.is_dir():
             try:
@@ -515,6 +517,7 @@ class HistDataConnector(RemoteConnector):
             String as polars_string,
             col
         )
+        from polars.exceptions import ComputeError
 
         if engine == 'pandas':
 
@@ -649,29 +652,57 @@ class HistDataConnector(RemoteConnector):
             buf.download(temp_filepath)
 
             # from histdata raw files column 'p' is not present
-            raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-            raw_file_dtypes.pop('p')
-            raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
+            try:
+                # Fast path: try reading directly as Float32
+                raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
+                raw_file_dtypes.pop('p')
+                raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
 
-            # read file
-            # set schema for columns but avoid timestamp columns
-            df = read_csv(
-                'polars',
-                temp_filepath,
-                separator=',',
-                has_header=False,
-                new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                schema=raw_file_dtypes,
-                use_pyarrow=True
-            )
-
-            # convert timestamp column to datetime data type
-            df = df.with_columns(
-                col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
-                    polars_datetime('ms'),
-                    format=DATE_FORMAT_HISTDATA_CSV
+                df = read_csv(
+                    'polars',
+                    temp_filepath,
+                    separator=',',
+                    has_header=False,
+                    new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
+                    schema=raw_file_dtypes,
+                    use_pyarrow=True
                 )
-            )
+                df = df.with_columns(
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        PolarsDatetime('ms'),
+                        format=DATE_FORMAT_HISTDATA_CSV
+                    )
+                )
+
+            except ComputeError:
+                # Safe path: fallback to parsing all as String, stripping whitespace, and casting
+                df = read_csv(
+                    'polars',
+                    temp_filepath,
+                    separator=',',
+                    has_header=False,
+                    schema={
+                        'column_1': polars_string,
+                        'column_2': polars_string,
+                        'column_3': polars_string,
+                        'column_4': polars_string
+                    }
+                )
+                df = df.rename({
+                    'column_1': 'timestamp',
+                    'column_2': 'ask',
+                    'column_3': 'bid',
+                    'column_4': 'vol'
+                })
+                df = df.with_columns([
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        PolarsDatetime('ms'),
+                        format=DATE_FORMAT_HISTDATA_CSV
+                    ),
+                    col('ask').str.strip_chars().cast(PolarsFloat32),
+                    col('bid').str.strip_chars().cast(PolarsFloat32),
+                    col('vol').str.strip_chars().cast(PolarsFloat32)
+                ])
 
             # calculate 'p'
             df = df.with_columns(
@@ -713,28 +744,60 @@ class HistDataConnector(RemoteConnector):
             buf.download(temp_filepath)
 
             # from histdata raw files column 'p' is not present
-            raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-            raw_file_dtypes.pop('p')
-            raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
+            try:
+                # Fast path: try reading directly as Float32
+                raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
+                raw_file_dtypes.pop('p')
+                raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
 
-            # read file
-            # set schema for columns but avoid timestamp columns
-            df = read_csv(
-                'polars_lazy',
-                temp_filepath,
-                separator=',',
-                has_header=False,
-                new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                schema=raw_file_dtypes
-            )
-
-            # convert timestamp column to datetime data type
-            df = df.with_columns(
-                col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
-                    polars_datetime('ms'),
-                    format=DATE_FORMAT_HISTDATA_CSV
+                df = read_csv(
+                    'polars_lazy',
+                    temp_filepath,
+                    separator=',',
+                    has_header=False,
+                    new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
+                    schema=raw_file_dtypes
                 )
-            )
+                df = df.with_columns(
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        PolarsDatetime('ms'),
+                        format=DATE_FORMAT_HISTDATA_CSV
+                    )
+                )
+                # Eagerly collect to force schema/parsing validation on all rows.
+                # If there are parsing errors anywhere in the file, this will raise ComputeError.
+                # Then convert it back to a LazyFrame so it matches the expected return type.
+                df = df.collect().lazy()
+
+            except ComputeError:
+                # Safe path: fallback to parsing all as String, stripping whitespace, and casting
+                df = read_csv(
+                    'polars_lazy',
+                    temp_filepath,
+                    separator=',',
+                    has_header=False,
+                    schema={
+                        'column_1': polars_string,
+                        'column_2': polars_string,
+                        'column_3': polars_string,
+                        'column_4': polars_string
+                    }
+                )
+                df = df.rename({
+                    'column_1': 'timestamp',
+                    'column_2': 'ask',
+                    'column_3': 'bid',
+                    'column_4': 'vol'
+                })
+                df = df.with_columns([
+                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                        PolarsDatetime('ms'),
+                        format=DATE_FORMAT_HISTDATA_CSV
+                    ),
+                    col('ask').str.strip_chars().cast(PolarsFloat32),
+                    col('bid').str.strip_chars().cast(PolarsFloat32),
+                    col('vol').str.strip_chars().cast(PolarsFloat32)
+                ])
 
             # calculate 'p'
             df = df.with_columns(

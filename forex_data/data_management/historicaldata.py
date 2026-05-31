@@ -1,7 +1,7 @@
 
 from loguru import logger
-from typing import Any, Dict, List, Optional, Union
-from datetime import datetime
+from typing import Any, Dict, List, Optional, Union, Literal
+from datetime import datetime, date
 from uuid import uuid4
 from filelock import FileLock
 from textwrap import dedent
@@ -506,6 +506,13 @@ class HistoricalManagerDB:
             month_data = None
             last_err = None
             for connector in self._histdata_connector:
+                if (
+                    isinstance(connector, HistDataConnector) and
+                    year == datetime.now().year and
+                    month_num == datetime.now().month
+                ):
+                    continue
+
                 try:
                     if ticker.upper() not in connector.get_available_tickers():
                         continue
@@ -962,6 +969,237 @@ class HistoricalManagerDB:
             check_level=check_level,
             comparison_operator=comparison_operator,
             comparison_aggregation_mode=aggregation_mode
+        )
+
+    def get_data_window(
+        self,
+        ticker: str,
+        date: date,
+        timeframe: str,
+        periods: int,
+        direction: Literal['backward', 'forward'],
+        comparison_column_name: List[str] | str | None = None,
+        check_level: List[int | float] | int | float | None = None,
+        comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
+        comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None,
+    ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
+
+        """
+        Retrieve OHLC historical window data for the specified ticker.
+        The unit resoluton of the window is set equal to the timeframe.
+        Unit resolution is the timespan between two candles (rows) in
+        normal conditions: during weekends the rule does not apply.
+        The window total number of candles (rows) is specified by timeframe * periods.
+
+        Fetches historical forex data from the database, automatically downloading
+        and aggregating data if not already available. Supports multiple timeframes
+
+        Args:
+            ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD', 'NZDUSD').
+                Case-insensitive.
+            date (str | datetime): date for data retrieval. Accepts:
+                - ISO format: 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+                - datetime object
+            timeframe (str): Candle timeframe for data aggregation. Supported frames:
+                1s (1 second)
+                1m (1 minute)
+                1h (1 hour)
+                1d (1 calendar day)
+                1w (1 calendar week)
+                1mo (1 calendar month)
+                1q (1 calendar quarter)
+                1y (1 calendar year)
+                periods (int): Number of timeframe units to look back or forward.
+            direction (Literal['backward', 'forward']): Direction to look back
+                ('backward' or 'forward').
+            comparison_column_name (List[str] | str | None): List of column names
+                to compare.
+                If None, no comparison is performed.
+            check_level (List[int | float] | int | float | None): List of values
+                to compare against.
+                If None, no comparison is performed.
+            comparison_operator (List[SUPPORTED_SQL_COMPARISON_OPERATORS] |
+                SUPPORTED_SQL_COMPARISON_OPERATORS | None): List of comparison
+                operators to use for comparison.
+                If None, no comparison is performed.
+            comparison_aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES
+                | None): Aggregation mode to use for comparison.
+                If None, no comparison is performed.
+
+        Returns:
+            Union[PolarsDataFrame, PolarsLazyFrame]: DataFrame with the historical
+                data.
+
+        Raises:
+            TickerNotFoundError: If the ticker is not found.
+            TickerDataNotFoundError: If the ticker data is not found.
+            TickerDataBadTypeException: If the ticker data is not of the expected
+                type.
+            TickerDataInvalidException: If the ticker data is invalid.
+
+        Examples:
+            >>> get_data_window(
+            ...     ticker='EURUSD',
+            ...     date='2022-01-01',
+            ...     timeframe='1m',
+            ...     window=10,
+            ...     direction='backward'
+            ... )
+        """
+
+        # check ticker exists in available tickers
+        # from histdata database
+        if (
+            ticker.upper() not in self._histdata_tickers_list and
+            ticker.lower() not in self._get_ticker_list()
+        ):
+            logger.bind(target='histmanager').error(
+                f'ticker {ticker.upper()} not found in database')
+            raise TickerNotFoundError(f'ticker {ticker} not found in database')
+
+        # force ticker parameter to lower case
+        ticker = ticker.lower()
+
+        # force timeframe parameter to lower case
+        timeframe = timeframe.lower()
+
+        if not check_timeframe_str(timeframe, engine=self.engine):
+
+            logger.bind(target='histmanager').error(
+                f'timeframe request {timeframe} invalid')
+            raise ValueError(f'timeframe request {timeframe} invalid')
+
+        if direction == 'backward':
+            end = any_date_to_datetime64(date)
+            start = estimate_start_date_to_business_days(end, timeframe, periods, FOREX_HOLIDAYS)
+        else:
+            start = any_date_to_datetime64(date)
+            end = estimate_end_date_to_business_days(start, timeframe, periods, FOREX_HOLIDAYS)
+
+        # sanity checks on query dates specific to historical data
+        if end < start:
+
+            logger.bind(target='histmanager').error(
+                'date interval not coherent, '
+                'end must be older than start')
+            return self._dataframe_type([])
+
+        if start < HISTORICAL_DB_MIN_DATE:
+
+            logger.bind(target='histmanager').error(
+                f'start date {start} is older than the minimum '
+                f'date in database {HISTORICAL_DB_MIN_DATE}')
+            return self._dataframe_type([])
+
+        if start > datetime.now():
+
+            logger.bind(target='histmanager').error(
+                f'start date {start} is newer than the maximum '
+                f'date in database {datetime.now()}')
+            raise ValueError(f'start date {start} is newer now date')
+
+        # get years including interval requested
+        years_interval_req = list(range(start.year, end.year + 1, 1))
+
+        # Initialize ticker/timeframe in dict if not present
+        if ticker not in self._tickers_years_dict:
+            self._tickers_years_dict[ticker] = {}
+        if timeframe not in self._tickers_years_dict[ticker]:
+            self._tickers_years_dict[ticker][timeframe] = []
+        if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+
+        # aggregate data to current instance if necessary
+        current_year = datetime.now().year
+        is_current_year_requested = current_year in years_interval_req
+
+        # here determine if to ask for new download
+        # if requested years are not already in localdb (tracked by tickers years dict)
+        # or if current year is requested
+        if (
+            not set(years_interval_req).issubset(
+                self._tickers_years_dict[ticker][timeframe]) or
+            is_current_year_requested
+        ):
+
+            # If the current year is requested, we force re-aggregation by removing it from the known timeframe list in memory
+            if is_current_year_requested:
+                for tf in list(self._tickers_years_dict[ticker].keys()):
+                    if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
+                        self._tickers_years_dict[ticker][tf].remove(current_year)
+
+            year_tf_missing = list(
+                set(years_interval_req).difference(
+                    self._tickers_years_dict[ticker][timeframe]))
+
+            year_tick_missing = list(set(years_interval_req).difference(
+                self._tickers_years_dict[ticker][TICK_TIMEFRAME]
+            ))
+            if is_current_year_requested and current_year not in year_tick_missing:
+                year_tick_missing.append(current_year)
+
+            lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
+
+            with FileLock(lock_file):
+                # Re-read the JSON file to fetch the latest state from disk
+                self._tickers_years_dict = self._db_connector.create_tickers_years_dict()
+
+                # Initialize ticker/timeframe in dict if not present after rebuild
+                if ticker not in self._tickers_years_dict:
+                    self._tickers_years_dict[ticker] = {}
+                if timeframe not in self._tickers_years_dict[ticker]:
+                    self._tickers_years_dict[ticker][timeframe] = []
+                if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
+                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+
+                if is_current_year_requested:
+                    for tf in list(self._tickers_years_dict[ticker].keys()):
+                        if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
+                            self._tickers_years_dict[ticker][tf].remove(current_year)
+
+                # Re-calculate missing years after re-reading
+                year_tick_missing = list(set(years_interval_req).difference(
+                    self._tickers_years_dict[ticker][TICK_TIMEFRAME]
+                ))
+                if is_current_year_requested and current_year not in year_tick_missing:
+                    year_tick_missing.append(current_year)
+
+                # ONLY download years not already in the database
+                if year_tick_missing:
+                    self._download(
+                        ticker,
+                        year_tick_missing
+                    )
+                else:
+                    logger.bind(
+                        target='histmanager').info(
+                        f"Skipped downloading {ticker} {years_interval_req} as it was managed by another process.")
+
+                # add timeframe and update db INSIDE the lock so that
+                # a concurrent process can't read a parquet that is still
+                # being written by this process
+                self.add_timeframe(timeframe)
+                self._update_db(ticker)
+
+                if not set(years_interval_req).issubset(
+                        self._tickers_years_dict[ticker][timeframe]):
+
+                    logger.bind(target='histmanager').critical(
+                        f'processing year data completion for '
+                        f'{years_interval_req} not ok')
+                    raise ValueError
+
+        return self._db_connector.read_data_window(
+            market='forex',
+            date=date,
+            ticker=ticker,
+            timeframe=timeframe,
+            periods=periods,
+            direction=direction,
+            comparison_column_name=comparison_column_name,
+            check_level=check_level,
+            comparison_operator=comparison_operator,
+            comparison_aggregation_mode=comparison_aggregation_mode
         )
 
     def plot(
