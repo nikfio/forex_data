@@ -54,6 +54,7 @@ from pandas import (
     isnull,
     bdate_range,
     to_datetime,
+    to_timedelta,
     Timedelta,
     read_parquet as pandas_read_parquet,
     read_csv as pandas_read_csv
@@ -156,6 +157,7 @@ __all__ = [
 
     'validator_file_path',
     'validator_dir_path',
+    'validate_timedelta_str',
     'get_attrs_names',
     'check_timeframe_str',
     'any_date_to_datetime64',
@@ -1585,6 +1587,20 @@ def validator_list_ge(min_value):
             logger.error(f'Values in {attribute}: {fails} '
                          f'are not greater than {min_value}')
             raise ValueError
+
+
+def validate_timedelta_str(instance, attribute, value):
+    try:
+        res = to_timedelta(value)
+        if not isinstance(res, Timedelta):
+            raise TypeError(
+                f"'{attribute.name}' must be a valid timedelta representation, got {type(res).__name__}"
+            )
+    except Exception as e:
+        raise ValueError(
+            f"'{attribute.name}' must be a valid timedelta representation, error: {e}"
+        ) from e
+
 
 # ATTRIBUTES
 

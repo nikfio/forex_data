@@ -1063,18 +1063,48 @@ class TestHistoricalManagerDB(unittest.TestCase):
         """
         Test read_last_timestamp function
         """
-        ticker = 'EURUSD'
+        tickers = self.hist_manager._get_ticker_list()
+        self.assertGreater(len(tickers), 0)
+        ticker = tickers[0]
+
         # Test with timeframe=None (should auto-select smallest timeframe available)
         ts = self.hist_manager._db_connector.read_last_timestamp('forex', ticker)
         self.assertIsInstance(ts, datetime)
+
+        # Get available timeframes for this ticker
+        timeframes = self.hist_manager._db_connector.get_ticker_timeframes_list(ticker)
+        self.assertGreater(len(timeframes), 0)
+        timeframe = timeframes[0]
 
         # Test with explicit timeframe
         ts_explicit = self.hist_manager._db_connector.read_last_timestamp(
             'forex',
             ticker,
-            timeframe='4h'
+            timeframe=timeframe
         )
         self.assertIsInstance(ts_explicit, datetime)
+
+        # Apply to a ticker that does not exist and assert is None
+        invalid_ticker = 'INVALID_TICKER_XYZ'
+        ts_invalid = self.hist_manager._db_connector.read_last_timestamp(
+            'forex',
+            invalid_ticker
+        )
+        self.assertIsNone(ts_invalid)
+
+    def test_33_max_discrepancy_validation(self):
+        """Test that max_discrepancy_with_now is correctly validated on init."""
+        # 1. Valid string representing a timedelta should succeed
+        manager = HistoricalManagerDB(max_discrepancy_with_now='2D')
+        self.assertEqual(manager.max_discrepancy_with_now, '2D')
+
+        # 2. Non-string should raise TypeError
+        with self.assertRaises(TypeError):
+            HistoricalManagerDB(max_discrepancy_with_now=123)
+
+        # 3. Invalid timedelta string should raise ValueError
+        with self.assertRaises(ValueError):
+            HistoricalManagerDB(max_discrepancy_with_now='invalid_td')
 
 
 if __name__ == '__main__':

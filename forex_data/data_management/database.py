@@ -1689,6 +1689,11 @@ class LocalDBYearConnector(DatabaseConnector):
                 specified market, ticker and timeframe (or smallest available
                 timeframe if timeframe is not set)
         """
+
+        # if tickers is not in database return None
+        if ticker not in self.get_tickers_list():
+            return None
+
         if timeframe is None:
             # get timeframes available
             timeframes_available = self.get_ticker_timeframes_list(ticker)
