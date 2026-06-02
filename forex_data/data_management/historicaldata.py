@@ -16,7 +16,8 @@ from attrs import (
 # PANDAS
 from pandas import (
     DataFrame as pandas_dataframe,
-    to_datetime
+    to_datetime,
+    to_timedelta
 )
 
 # PYARROW
@@ -106,6 +107,8 @@ class HistoricalManagerDB:
                              validator=validators.instance_of(bool))
     connector_id: str = field(default='',
                               validator=validators.optional(validators.instance_of(str)))
+    max_discrepancy_with_now: str = field(default='1d',
+                                          validator=validators.instance_of(str))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -880,7 +883,29 @@ class HistoricalManagerDB:
 
         # aggregate data to current instance if necessary
         current_year = datetime.now().year
-        is_current_year_requested = current_year in years_interval_req
+
+        # determine if to include and update of current year data
+        # if not is on a weekend day (Saturday or Sunday)
+        # set now as previous Friday at 17:00
+        if datetime.now().weekday() in [5, 6]:
+            now_ref = datetime.now() - timedelta(days=datetime.now().weekday() + 1)
+            now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
+        else:
+            now_ref = datetime.now()
+
+        is_current_year_requested = (
+            current_year in years_interval_req
+            and
+            (
+                (
+                    now_ref
+                    -
+                    self._db_connector.read_last_timestamp('forex', ticker)
+                ).total_seconds()
+                >
+                to_timedelta(self.max_discrepancy_with_now).total_seconds()
+            )
+        )
 
         # here determine if to ask for new download
         # if requested years are not already in localdb (tracked by tickers years dict)
@@ -891,7 +916,8 @@ class HistoricalManagerDB:
             is_current_year_requested
         ):
 
-            # If the current year is requested, we force re-aggregation by removing it from the known timeframe list in memory
+            # If the current year is requested, we force re-aggregation
+            # by removing it from the known timeframe list in memory
             if is_current_year_requested:
                 for tf in list(self._tickers_years_dict[ticker].keys()):
                     if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:

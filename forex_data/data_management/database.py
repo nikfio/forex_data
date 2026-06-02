@@ -17,7 +17,6 @@ Created on Sun Feb 23 00:02:36 2025
         OSS versions for windows required
 '''
 
-import polars as pl
 import time
 import requests
 from requests import Session
@@ -36,6 +35,8 @@ from polars import (
     LazyFrame as PolarsLazyFrame,
     concat
 )
+
+from pandas import to_timedelta
 import json
 from datetime import datetime, timedelta
 from pathlib import Path as PathType
@@ -123,6 +124,28 @@ class DatabaseConnector:
                        years: int | List[int]) -> PolarsLazyFrame:
         """Read data for specific year(s) - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_data_year")
+
+    def read_data_window(self,
+                         market: str,
+                         ticker: str,
+                         timeframe: str,
+                         date: datetime | str | Timestamp | PolarsDatetime,
+                         periods: int,
+                         direction : Literal['backward', 'forward'],
+                         comparison_column_name: List[str] | str | None = None,
+                         check_level: List[int | float] | int | float | None = None,
+                         comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
+                         comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
+                         ) -> PolarsLazyFrame:
+        """Read window of data - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement read_data_window")
+
+    def read_last_timestamp(self,
+                            market: str,
+                            ticker: str,
+                            timeframe: str = None) -> datetime:
+        """Read last timestamp from database - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement read_last_timestamp")
 
     def _list_local_data(self) -> List[PathType]:
 
@@ -942,6 +965,172 @@ class LocalDBConnector(DatabaseConnector):
 
         return dataframe
 
+    def read_data_window(self,
+                         market: str,
+                         ticker: str,
+                         timeframe: str,
+                         date: datetime | str | Timestamp | PolarsDatetime,
+                         periods: int,
+                         direction : Literal['backward', 'forward'],
+                         comparison_column_name: List[str] | str | None = None,
+                         check_level: List[int | float] | int | float | None = None,
+                         comparison_operator: List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None = None,
+                         comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
+                         ) -> PolarsLazyFrame:
+        """
+        Read window of data specified by input requirements:
+        the data window has timespan in order to return a dataframe
+        with rows size equal to periods.
+        Query the local db to calculate the start date of the window
+        if direction is forward, or end date if backward.
+        """
+        if direction == 'backward':
+            end_date = date
+            start_date = estimate_start_date_to_business_days(
+                end_date,
+                timeframe,
+                periods,
+                holidays=FOREX_HOLIDAYS
+            )
+        elif direction == 'forward':
+            start_date = date
+            end_date = estimate_end_date_to_business_days(
+                start_date,
+                timeframe,
+                periods,
+                holidays=FOREX_HOLIDAYS
+            )
+
+        filename = self._get_filename(market, ticker, timeframe)
+        filepath = (self.data_path / market / ticker / filename)
+
+        if not (filepath.exists() and filepath.is_file()):
+            logger.bind(target='localdb').critical(f'file {filepath} not found')
+            raise FileNotFoundError(f"file {filepath} not found")
+
+        # Per-file lock ensures we don't read while write_data is writing.
+        file_lock_path = str(filepath) + '.lock'
+        with FileLock(file_lock_path):
+            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                dataframe = read_csv(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                dataframe = read_parquet(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+
+        if direction == 'backward':
+            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+                        FROM (
+                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_date}'
+                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} DESC
+                            LIMIT {periods}
+                        ) AS sub
+                        '''
+        elif direction == 'forward':
+            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+                        FROM (
+                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_date}'
+                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} ASC
+                            LIMIT {periods}
+                        ) AS sub
+                        '''
+
+        try:
+            window_dates = dataframe.sql(query)
+            if isinstance(window_dates, PolarsLazyFrame):
+                window_dates = window_dates.collect()
+        except Exception as e:
+            logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
+            return PolarsLazyFrame([])
+        else:
+            start_date_from_db = window_dates.item(0, 0)
+            end_date_from_db = window_dates.item(0, 1)
+
+        return self.read_data(
+            market,
+            ticker,
+            timeframe,
+            start_date_from_db,
+            end_date_from_db,
+            comparison_column_name,
+            check_level,
+            comparison_operator,
+            comparison_aggregation_mode,
+        )
+
+    def read_last_timestamp(
+        self,
+        market: str,
+        ticker: str,
+        timeframe: str = None
+    ) -> datetime:
+        """
+        Read last timestamp from database.
+        If timeframe is not set (None), retrieve the smallest timeframe
+        available in local database
+
+        Args:
+            market (str): Market name
+            ticker (str): Ticker symbol
+            timeframe (str, optional): Timeframe of the data
+
+        Returns:
+            datetime: Last timestamp in the local database for the
+                specified market, ticker and timeframe (or smallest available
+                timeframe if timeframe is not set)
+        """
+        if timeframe is None:
+            # get timeframes available
+            timeframes_available = self.get_ticker_timeframes_list(ticker)
+            if not timeframes_available:
+                logger.bind(target='localdb').critical(
+                    f'No timeframes available for {market} {ticker}')
+                raise ValueError(f"No timeframes available for {market} {ticker}")
+
+            # get smallest timeframe
+            timeframe = timeframes_available[0]
+
+        filename = self._get_filename(market, ticker, timeframe)
+        filepath = (self.data_path / market / ticker / filename)
+
+        if not (filepath.exists() and filepath.is_file()):
+            logger.bind(target='localdb').critical(f'file {filepath} not found')
+            raise FileNotFoundError(f"file {filepath} not found")
+
+        # Per-file lock ensures we don't read while write_data is writing.
+        file_lock_path = str(filepath) + '.lock'
+        with FileLock(file_lock_path):
+            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                dataframe = read_csv(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                dataframe = read_parquet(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+
+        query = f'''SELECT MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+                    FROM self
+                    '''
+
+        try:
+            window_dates = dataframe.sql(query)
+            if isinstance(window_dates, PolarsLazyFrame):
+                window_dates = window_dates.collect()
+        except Exception as e:
+            logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
+            raise
+        else:
+            end_date_from_db = window_dates.item(0, 0)
+
+        return end_date_from_db
+
 
 @define(kw_only=True, slots=True)
 class LocalDBYearConnector(DatabaseConnector):
@@ -1478,3 +1667,88 @@ class LocalDBYearConnector(DatabaseConnector):
             comparison_operator,
             comparison_aggregation_mode,
         )
+
+    def read_last_timestamp(
+        self,
+        market: str,
+        ticker: str,
+        timeframe: str = None
+    ) -> datetime:
+        """
+        Read last timestamp from database.
+        If timeframe is not set (None), retrieve the smallest timeframe
+        available in local database
+
+        Args:
+            market (str): Market name
+            ticker (str): Ticker symbol
+            timeframe (str, optional): Timeframe of the data
+
+        Returns:
+            datetime: Last timestamp in the local database for the
+                specified market, ticker and timeframe (or smallest available
+                timeframe if timeframe is not set)
+        """
+        if timeframe is None:
+            # get timeframes available
+            timeframes_available = self.get_ticker_timeframes_list(ticker)
+            if not timeframes_available:
+                logger.bind(target='localdb').critical(
+                    f'No timeframes available for {market} {ticker}')
+                raise ValueError(f"No timeframes available for {market} {ticker}")
+
+            # if 'tick' is available, get 'tick' as minimum timeframe
+            if 'tick' in timeframes_available:
+                timeframe = 'tick'
+            else:
+                # sort timeframes from smallest to largest
+                timeframes_available = sorted(
+                    timeframes_available,
+                    key=lambda s: to_timedelta(s).total_seconds(),
+                    reverse=False
+                )
+                # get smallest timeframe
+                timeframe = timeframes_available[0]
+
+        # Get list of years available for this ticker and timeframe
+        years_list = self._get_ticker_years_list_from_db(ticker, timeframe)
+        if not years_list:
+            logger.bind(target='localdb').critical(
+                f'No data found for {market} {ticker} {timeframe}')
+            raise FileNotFoundError(f"No data found for {market} {ticker} {timeframe}")
+        latest_year = max(years_list)
+
+        filename = self._get_filename(market, ticker, timeframe, latest_year)
+        filepath = (self.data_path / market / ticker / timeframe / filename)
+
+        if not (filepath.exists() and filepath.is_file()):
+            logger.bind(target='localdb').critical(f'file {filepath} not found')
+            raise FileNotFoundError(f"file {filepath} not found")
+
+        # Per-file lock ensures we don't read while write_data is writing.
+        file_lock_path = str(filepath) + '.lock'
+        with FileLock(file_lock_path):
+            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                dataframe = read_csv(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                dataframe = read_parquet(self.engine, filepath)
+                if hasattr(dataframe, 'collect'):
+                    dataframe = dataframe.collect().lazy()
+
+        query = f'''SELECT MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+                    FROM self
+                    '''
+
+        try:
+            window_dates = dataframe.sql(query)
+            if isinstance(window_dates, PolarsLazyFrame):
+                window_dates = window_dates.collect()
+        except Exception as e:
+            logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
+            raise
+        else:
+            end_date_from_db = window_dates.item(0, 0)
+
+        return end_date_from_db

@@ -108,11 +108,6 @@ Future Releases
 Planned for v0.2.0
 ------------------
 
-Database Integration
-^^^^^^^^^^^^^^^^^^^^
-
-* Cache data in AWS S3 storage and other major cloud providers persistent storage service
-
 Enhanced Features
 ^^^^^^^^^^^^^^^^^
 
@@ -130,6 +125,7 @@ Performance
 Planned for v0.3.0
 ------------------
 
+* Cache data in AWS S3 storage and other major cloud providers persistent storage service
 * Robust connection between Historical and Real-time data managers if applicable
 * Data types outside raw price data available for query (e.g. volume, fundamentals information and others))
 
