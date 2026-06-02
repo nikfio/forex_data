@@ -7,12 +7,12 @@ All notable changes to the forex_data project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-Version 0.1.8 (Current)
+Version 0.2.0 (Current)
 =======================
 
-*Release Date: 04/04/2026*
+*Release Date: 02/06/2026*
 
-Tested with Python 3.12 and 3.13.
+Tested with Python 3.12.13.
 Largely tested with default data parameters: engine 'polars-lazy' and file format 'parquet'.
 
 Added
@@ -29,6 +29,9 @@ Core Features
   * Automatic timeframe aggregation
   * Smart data caching for improved performance
   * Get data function with conditional options
+  * Determine if current year data needs updated from remote source, based on a threshold
+  * Improved robustness of the local database management
+  * Added cli utility to generate any database from scratch
 
 * **Real-time Data Management**: 
 
@@ -105,23 +108,6 @@ Known Issues
 Future Releases
 ===============
 
-Planned for v0.2.0
-------------------
-
-Enhanced Features
-^^^^^^^^^^^^^^^^^
-
-* Real-time data provider caching as in Historical manager
-
-Performance
-^^^^^^^^^^^
-
-* Data engine and format files, all options testing 
-* Performance comparisons (Polars vs PyArrow vs Pandas)
-* Caching optimizations:
-
-  * db files organization by year, a file contains one year data
-
 Planned for v0.3.0
 ------------------
 
@@ -132,7 +118,7 @@ Planned for v0.3.0
 Planned for v0.4.0
 ------------------
 
-* Add Stock Market, Future, Commodities and Option data support
+* Add data support for other markets (Stock Market, Future, Commodities and so on...)
 
 How to Upgrade
 ==============
