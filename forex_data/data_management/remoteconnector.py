@@ -70,7 +70,7 @@ from .common import (
     TWELVE_DATA_CHUNK_SIZE,
     TWELVE_DATA_FREE_TIER_MINUTE_RATE_LIMIT,
     TWELVE_DATA_PRO_MINUTE_RATE_LIMIT,
-    DATA_PROVIDER_PLAN_LIST,
+    TWELVEDATA_PROVIDER_PLAN_LIST,
     TICK_TIMEFRAME,
     TWELVE_DATA_TIMEFRAMES,
     read_csv,
@@ -1195,12 +1195,23 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
     """
 
     api_key: str = field(default='', validator=validators.instance_of(str))
-    plan: str = field(default='', validator=validators.in_(DATA_PROVIDER_PLAN_LIST))
+    plan: str = field(
+        default='',
+        validator=validators.and_(
+            validators.instance_of(str),
+            validators.in_(TWELVEDATA_PROVIDER_PLAN_LIST)
+        ),
+        converter=str.lower
+    )
 
-    _max_output_size: int = field(default=TWELVE_DATA_CHUNK_SIZE,
-                                  validator=validators.instance_of(int))
-    _max_requests_per_minute: int = field(default=8,
-                                          validator=validators.instance_of(int))
+    _chunk_size: int = field(
+        default=TWELVE_DATA_CHUNK_SIZE,
+        validator=validators.instance_of(int)
+    )
+    _max_requests_per_minute: int = field(
+        default=8,
+        validator=validators.instance_of(int)
+    )
     _request_timestamps: List[float] = field(factory=list, init=False)
     _base_url: str = field(default="https://api.twelvedata.com", init=False)
 
@@ -1245,7 +1256,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
             raise ValueError("API key is required for RealTimeDBConnectorTwelveData")
 
         # set default twelve data chunk size
-        self._max_output_size = TWELVE_DATA_CHUNK_SIZE
+        self._chunk_size = TWELVE_DATA_CHUNK_SIZE
 
         # Configure rate limits and safety margins based on tier
         if self.tier == "free":
@@ -1258,6 +1269,16 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
                    rotation="5 MB",
                    filter=lambda record: ('twelvedata' == record['extra'].get('target') and
                                           bool(record["extra"].get('target'))))
+
+    @property
+    def chunk_size(self) -> int:
+        """Max number of data points per request."""
+        return self._max_output_size
+
+    @property
+    def max_requests_per_minute(self) -> int:
+        """Max number of requests per minute."""
+        return self._max_requests_per_minute
 
     def _enforce_rate_limit(self) -> None:
         """Tracks requests internally and blocks execution if exceeding the rate limit."""
@@ -1336,7 +1357,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
             "interval": timeframe,
             "start_date": start_date,
             "end_date": end_date,
-            "outputsize": self._max_output_size
+            "outputsize": self._chunk_size
         }
 
         data = self._execute_request("time_series", params)
@@ -1348,6 +1369,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
 
         lf = PolarsLazyFrame(data["values"])
         tf_schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE
+        # return data ordered by timestamp in ascending order
         return (
             lf.with_columns([
                 pl.col("datetime").str.to_datetime("%Y-%m-%d %H:%M:%S").alias("timestamp"),
@@ -1374,7 +1396,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         params = {
             "symbol": symbol,
             "interval": timeframe,
-            "outputsize": self._max_output_size,
+            "outputsize": self._chunk_size,
         }
 
         data = self._execute_request("time_series", params)
@@ -1398,6 +1420,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         else:
             cutoff_dt = datetime.now() - interval_window
 
+        # return data ordered by timestamp in ascending order
         return (
             processed_lf
             .select(list(tf_schema.keys()))

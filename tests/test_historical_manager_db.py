@@ -958,16 +958,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
             supported = ['eurusd']
         ticker = random.choice(supported)
 
-        # Pick random end_date in current year
-        start_of_year = datetime(current_year, 1, 1)
-        end_limit = datetime.now() - timedelta(days=2)
-        if end_limit < start_of_year:
-            end_limit = datetime.now()
-
-        end_date = random_date_between(start_of_year, end_limit)
+        # request end date = now
+        end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
-        if start_date < start_of_year:
-            start_date = start_of_year
 
         logger.debug(f"Test 29: Downloading {ticker} from {start_date} to {end_date}")
         data = self.hist_manager.get_data(
@@ -1065,6 +1058,23 @@ class TestHistoricalManagerDB(unittest.TestCase):
         # is equal to periods
         expected_rows = periods
         self.assertEqual(data.shape[0], expected_rows)
+
+    def test_32_read_last_timestamp(self):
+        """
+        Test read_last_timestamp function
+        """
+        ticker = 'EURUSD'
+        # Test with timeframe=None (should auto-select smallest timeframe available)
+        ts = self.hist_manager._db_connector.read_last_timestamp('forex', ticker)
+        self.assertIsInstance(ts, datetime)
+
+        # Test with explicit timeframe
+        ts_explicit = self.hist_manager._db_connector.read_last_timestamp(
+            'forex',
+            ticker,
+            timeframe='4h'
+        )
+        self.assertIsInstance(ts_explicit, datetime)
 
 
 if __name__ == '__main__':
