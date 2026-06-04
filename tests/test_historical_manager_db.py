@@ -39,8 +39,7 @@ from forex_data import (
     POLARS_DTYPE_DICT,
     business_days_data,
     US_holiday_dates,
-    random_date_between,
-    HISTORICAL_DB_MIN_DATE
+    random_date_between
 )
 
 __all__ = ['TestHistoricalManagerDB']
