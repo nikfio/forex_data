@@ -449,10 +449,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         # 4. Re-download data for a random 4-month timespan
         # Pick dates within completed past years to avoid triggering
         # slow/flaky current-year downloads
-        past_year_limit = datetime(datetime.now().year - 1, 12, 31)
         start_date = random_date_between(
-            HISTORICAL_DB_MIN_DATE,
-            past_year_limit - timedelta(days=4 * 30)
+            datetime(2008, 12, 31),
+            datetime(2014, 12, 31)
         )
         end_date = start_date + timedelta(days=4 * 30)
 
