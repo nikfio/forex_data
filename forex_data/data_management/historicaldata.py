@@ -829,7 +829,8 @@ class HistoricalManagerDB:
         # check ticker exists in available tickers
         # from histdata database
         if (
-                ticker.upper() not in self._histdata_tickers_list and
+            ticker.upper() not in self._histdata_tickers_list
+            and
             ticker.lower() not in self._get_ticker_list()
         ):
             logger.bind(target='histmanager').error(
@@ -888,32 +889,31 @@ class HistoricalManagerDB:
 
         # determine if current year data new download
         # has to be requested
-        is_current_year_requested = False
         current_year = datetime.now().year
+        is_current_year_requested = False
 
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
 
-        if not ticker_available_last_timestamp:
+        if current_year in years_interval_req:
 
-            # ticker is not in DD
-            # request for current year forced to True
-            is_current_year_requested = True
+            if not ticker_available_last_timestamp:
 
-        elif end >= ticker_available_last_timestamp:
+                # ticker is not in DD
+                # request for current year forced to True
+                is_current_year_requested = True
 
-            # determine if to include and update of current year data
-            # if not is on a weekend day (Saturday or Sunday)
-            # set now as previous Friday at 17:00
-            if datetime.now().weekday() in [5, 6]:
-                now_ref = datetime.now() - timedelta(days=datetime.now().weekday() + 1)
-                now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
-            else:
-                now_ref = datetime.now()
+            elif end >= ticker_available_last_timestamp:
 
-            is_current_year_requested = (
-                current_year in years_interval_req
-                and
-                (
+                # determine if to include and update of current year data
+                # if not is on a weekend day (Saturday or Sunday)
+                # set now as previous Friday at 17:00
+                if datetime.now().weekday() in [5, 6]:
+                    now_ref = datetime.now() - timedelta(days=datetime.now().weekday() + 1)
+                    now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
+                else:
+                    now_ref = datetime.now()
+
+                is_current_year_requested = (
                     (
                         now_ref
                         -
@@ -922,13 +922,12 @@ class HistoricalManagerDB:
                     >
                     to_timedelta(self.max_discrepancy_with_now).total_seconds()
                 )
-            )
 
-        else:
+            else:
 
-            # db already cover request for current year
-            # end date is less recent than available timestamp
-            is_current_year_requested = False
+                # db already cover request for current year
+                # end date is less recent than available timestamp
+                is_current_year_requested = False
 
         # here determine if to ask for new download
         # if requested years are not already in localdb (tracked by tickers years dict)
@@ -1165,27 +1164,26 @@ class HistoricalManagerDB:
 
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
 
-        if not ticker_available_last_timestamp:
+        if current_year in years_interval_req:
 
-            # ticker is not in DD
-            # request for current year forced to True
-            is_current_year_requested = True
+            if not ticker_available_last_timestamp:
 
-        elif end >= ticker_available_last_timestamp:
+                # ticker is not in DD
+                # request for current year forced to True
+                is_current_year_requested = True
 
-            # determine if to include and update of current year data
-            # if not is on a weekend day (Saturday or Sunday)
-            # set now as previous Friday at 17:00
-            if datetime.now().weekday() in [5, 6]:
-                now_ref = datetime.now() - timedelta(days=datetime.now().weekday() + 1)
-                now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
-            else:
-                now_ref = datetime.now()
+            elif end >= ticker_available_last_timestamp:
 
-            is_current_year_requested = (
-                current_year in years_interval_req
-                and
-                (
+                # determine if to include and update of current year data
+                # if not is on a weekend day (Saturday or Sunday)
+                # set now as previous Friday at 17:00
+                if datetime.now().weekday() in [5, 6]:
+                    now_ref = datetime.now() - timedelta(days=datetime.now().weekday() + 1)
+                    now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
+                else:
+                    now_ref = datetime.now()
+
+                is_current_year_requested = (
                     (
                         now_ref
                         -
@@ -1194,13 +1192,12 @@ class HistoricalManagerDB:
                     >
                     to_timedelta(self.max_discrepancy_with_now).total_seconds()
                 )
-            )
 
-        else:
+            else:
 
-            # db already cover request for current year
-            # end date is less recent than available timestamp
-            is_current_year_requested = False
+                # db already cover request for current year
+                # end date is less recent than available timestamp
+                is_current_year_requested = False
 
         # here determine if to ask for new download
         # if requested years are not already in localdb (tracked by tickers years dict)
