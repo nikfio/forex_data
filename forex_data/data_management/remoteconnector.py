@@ -664,7 +664,7 @@ class HistDataConnector(RemoteConnector):
                     separator=',',
                     has_header=False,
                     new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                    schema=raw_file_dtypes,
+                    schema_overrides=raw_file_dtypes,
                     use_pyarrow=True
                 )
                 df = df.with_columns(
@@ -674,7 +674,11 @@ class HistDataConnector(RemoteConnector):
                     )
                 )
 
-            except ComputeError:
+            except Exception as e:
+
+                logger.bind(target='histdata').warning(f'Occurred Exception: {type(e).__name__} - {e}.'
+                                                       'Trying remove trailing spaces method')
+
                 # Safe path: fallback to parsing all as String, stripping whitespace, and casting
                 df = read_csv(
                     'polars',
@@ -756,7 +760,7 @@ class HistDataConnector(RemoteConnector):
                     separator=',',
                     has_header=False,
                     new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                    schema=raw_file_dtypes
+                    schema_overrides=raw_file_dtypes
                 )
                 df = df.with_columns(
                     col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
@@ -769,7 +773,10 @@ class HistDataConnector(RemoteConnector):
                 # Then convert it back to a LazyFrame so it matches the expected return type.
                 df = df.collect().lazy()
 
-            except ComputeError:
+            except Exception as e:
+                logger.bind(target='histdata').warning(f'Occurred Exception: {type(e).__name__}\n'
+                                                       f' {e}. \n'
+                                                       'Trying remove trailing spaces method')
                 # Safe path: fallback to parsing all as String, stripping whitespace, and casting
                 df = read_csv(
                     'polars_lazy',
@@ -798,6 +805,7 @@ class HistDataConnector(RemoteConnector):
                     col('bid').str.strip_chars().cast(PolarsFloat32),
                     col('vol').str.strip_chars().cast(PolarsFloat32)
                 ])
+                df = df.collect().lazy()
 
             # calculate 'p'
             df = df.with_columns(
@@ -805,7 +813,13 @@ class HistDataConnector(RemoteConnector):
             )
 
             # final cast to standard dtypes
-            df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            df = df.select([
+                col('timestamp').cast(PolarsDatetime('ms')),
+                col('ask').cast(PolarsFloat32),
+                col('bid').cast(PolarsFloat32),
+                col('vol').cast(PolarsFloat32),
+                col('p').cast(PolarsFloat32)
+            ])
 
             # clean duplicated timestamps rows, keep first by default
             df = df.unique(subset=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
