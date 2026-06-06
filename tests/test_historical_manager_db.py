@@ -431,9 +431,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 start=start,
                 end=end
             )
-        except TickerDataBadTypeException:
+        except (TickerDataBadTypeException, ConnectionError, OSError):
             # if the data is not available from source
-            # skip the test
+            # or remote server dropped the connection, skip the test
             self.skipTest(f"Data for {ticker} not available from source")
 
         # Verify it's in the ticker list
@@ -464,9 +464,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 start=start_date,
                 end=end_date
             )
-        except TickerDataBadTypeException:
+        except (TickerDataBadTypeException, ConnectionError, OSError):
             # if the data is not available from source
-            # skip the test
+            # or remote server dropped the connection, skip the test
             self.skipTest(f"Data for {ticker} not available from source")
 
         # 5. Verify data is successfully re-downloaded
