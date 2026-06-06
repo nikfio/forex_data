@@ -263,7 +263,7 @@ HISTORICAL_DB_MIN_DATE = datetime(2000, 1, 1)
 DATE_NO_HOUR_FORMAT = '%Y-%m-%d'
 DATE_FORMAT_ISO8601 = 'ISO8601'
 DATE_FORMAT_SQL = '%Y-%m-%d %H:%M:%S.%f'
-DATE_FORMAT_HISTDATA_CSV = '%Y%m%d %H%M%S%f'
+DATE_FORMAT_HISTDATA_CSV = '%Y%m%d %H%M%S%3f'
 
 # DATA_KEY_TEMPLATE_STR           = '{ticker}.Y{year}.{tf}'
 # DATA_KEY_TEMPLATE_PATTERN       =  '^[A-Za-z]+.Y[0-9]+.[A-Za-z0-9]+'
