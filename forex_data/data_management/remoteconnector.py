@@ -1419,11 +1419,26 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
 
         lf = PolarsLazyFrame(data["values"])
         tf_schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE
+
+        # Convert timestamp to America/New_York to filter weekends with DST
+        # Market closes Friday 17:00 NY time and opens Sunday 17:00 NY time
+        ny_time = (
+            pl.col("timestamp")
+            .dt.replace_time_zone("UTC")
+            .dt.convert_time_zone("America/New_York")
+        )
+        is_weekend = (
+            (ny_time.dt.weekday() == 6)
+            | ((ny_time.dt.weekday() == 5) & (ny_time.dt.hour() >= 17))
+            | ((ny_time.dt.weekday() == 7) & (ny_time.dt.hour() < 17))
+        )
+
         # return data ordered by timestamp in ascending order
         return (
             lf.with_columns([
                 pl.col("datetime").str.to_datetime("%Y-%m-%d %H:%M:%S").alias("timestamp"),
             ])
+            .filter(~is_weekend)
             .select(list(tf_schema.keys()))
             .cast(tf_schema)
             .sort("timestamp")
@@ -1443,12 +1458,37 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
                 f"Supported: {', '.join(TWELVE_DATA_TIMEFRAMES)}")
             return PolarsLazyFrame({})
 
+        # Check if now is weekend in New York timezone
+        import zoneinfo
+        ny_tz = zoneinfo.ZoneInfo("America/New_York")
+        now_ny = datetime.now(ny_tz)
+        wkday = now_ny.weekday()  # Mon=0, ..., Sun=6
+        is_wknd = (
+            (wkday == 5)
+            or (wkday == 4 and now_ny.hour >= 17)
+            or (wkday == 6 and now_ny.hour < 17)
+        )
+
         params = {
             "symbol": symbol,
             "interval": timeframe,
             "outputsize": self._chunk_size,
             "timezone": "UTC"
         }
+
+        if is_wknd:
+            # Set end_date to last active time (most recent Friday at 17:00 NY time)
+            # wkday - 4 subtracts 0 days for Friday, 1 for Saturday, 2 for Sunday
+            last_active_ny = (
+                now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
+                - timedelta(days=wkday - 4)
+            )
+            # Convert to UTC as strings
+            last_active_utc = last_active_ny.astimezone(zoneinfo.ZoneInfo("UTC"))
+            start_dt = last_active_utc - interval_window
+
+            params["end_date"] = last_active_utc.strftime("%Y-%m-%d %H:%M:%S")
+            params["start_date"] = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
         data = self._execute_request("time_series", params)
 
@@ -1463,6 +1503,22 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         processed_lf = lf.with_columns([
             pl.col("datetime").str.to_datetime("%Y-%m-%d %H:%M:%S").alias("timestamp"),
         ])
+
+        # Convert timestamp to America/New_York to filter weekends with DST
+        # Market closes Friday 17:00 NY time and opens Sunday 17:00 NY time
+        ny_time = (
+            pl.col("timestamp")
+            .dt.replace_time_zone("UTC")
+            .dt.convert_time_zone("America/New_York")
+        )
+        is_weekend = (
+            (ny_time.dt.weekday() == 6)
+            | ((ny_time.dt.weekday() == 5) & (ny_time.dt.hour() >= 17))
+            | ((ny_time.dt.weekday() == 7) & (ny_time.dt.hour() < 17))
+        )
+
+        # Filter out weekend data first
+        processed_lf = processed_lf.filter(~is_weekend)
 
         # Set the cutoff to start from the most recent timestamp of the retrieved data
         max_ts_df = processed_lf.select(pl.col("timestamp").max()).collect()
