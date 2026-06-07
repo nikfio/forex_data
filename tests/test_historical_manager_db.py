@@ -1104,6 +1104,96 @@ class TestHistoricalManagerDB(unittest.TestCase):
         with self.assertRaises(ValueError):
             HistoricalManagerDB(max_discrepancy_with_now='invalid_td')
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_DOWNLOAD_MONTH_TESTS") == "1",
+        "Skipped by default. Run with RUN_DOWNLOAD_MONTH_TESTS=1"
+    )
+    def test_34_histdata_dukascopy_timezone_alignment(self):
+        """
+        Verify that HistData and Dukascopy connectors align on UTC (offset +0h)
+        after timezone correction is implemented.
+        """
+        import polars as pl
+        from forex_data.data_management import HistDataConnector, DukascopyConnector
+
+        # Test on 2 days of EURUSD July 2024
+        ticker = 'EURUSD'
+        year = 2024
+        month = 7
+
+        base_path = _data_path
+        hist_conn = HistDataConnector(
+            data_path=base_path / 'historical_test' / 'histdata',
+            ssl_verify=False
+        )
+        duka_conn = DukascopyConnector(
+            data_path=base_path / 'historical_test' / 'dukascopy',
+            ssl_verify=True
+        )
+
+        try:
+            # Download raw data
+            raw_hist = hist_conn.download_month_raw(
+                ticker=ticker, year=year, month_num=month, engine="polars_lazy"
+            )
+            df_hist = raw_hist.collect().sort("timestamp")
+
+            raw_duka = duka_conn.download_month_raw(
+                ticker=ticker, year=year, month_num=month, engine="polars_lazy"
+            )
+            df_duka = raw_duka.collect().sort("timestamp")
+        finally:
+            hist_conn.clear_temporary_folder()
+            duka_conn.clear_temporary_folder()
+
+        # We only need a subset for matching
+        ts_start = max(df_hist["timestamp"].min(), df_duka["timestamp"].min())
+        ts_end = ts_start + timedelta(days=2)
+
+        df_hist_sub = df_hist.filter(
+            (col("timestamp") >= ts_start)
+            & (col("timestamp") <= ts_end)
+        )
+        df_duka_sub = df_duka.filter(
+            (col("timestamp") >= ts_start - timedelta(hours=12))
+            & (col("timestamp") <= ts_end + timedelta(hours=12))
+        )
+
+        # Test offsets around +0h (-1h, +0h, +1h) to verify +0h has the
+        # minimum price delta
+        offsets = [-1, 0, 1]
+        results = {}
+
+        for h in offsets:
+            df_hist_shifted = df_hist_sub.with_columns(
+                (col("timestamp") + pl.duration(hours=h)).alias("timestamp_shifted")
+            ).sort("timestamp_shifted")
+
+            df_duka_select = df_duka_sub.select(["timestamp", "p"]).rename(
+                {"timestamp": "ts_duka", "p": "p_duka"}
+            )
+            joined = df_hist_shifted.join_asof(
+                df_duka_select,
+                left_on="timestamp_shifted",
+                right_on="ts_duka",
+                strategy="nearest",
+                tolerance="5s"
+            ).filter(col("p_duka").is_not_null())
+
+            if len(joined) > 100:
+                price_diff = (joined["p_duka"] - joined["p"]).abs()
+                results[h] = price_diff.median()
+
+        # Assert that +0h has the minimum median price delta
+        self.assertIn(0, results)
+        best_offset = min(results, key=results.get)
+        self.assertEqual(
+            best_offset,
+            0,
+            f"Expected best offset to be 0h (UTC aligned), but got "
+            f"{best_offset}h. Median deltas: {results}"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
