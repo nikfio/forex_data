@@ -1208,6 +1208,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
     Class to read real-time data from the database using TwelveData API.
     """
 
+    # interface parameters
     api_key: str = field(default='', validator=validators.instance_of(str))
     plan: str = field(
         default='',
@@ -1218,6 +1219,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         converter=str.lower
     )
 
+    # internal parameters
     _chunk_size: int = field(
         default=TWELVE_DATA_CHUNK_SIZE,
         validator=validators.instance_of(int)
@@ -1287,7 +1289,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
     @property
     def chunk_size(self) -> int:
         """Max number of data points per request."""
-        return self._max_output_size
+        return self._chunk_size
 
     @property
     def max_requests_per_minute(self) -> int:
