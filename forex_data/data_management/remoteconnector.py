@@ -27,6 +27,7 @@ from io import BytesIO
 from zipfile import ZipFile, ZipExtFile, BadZipFile
 from textwrap import dedent
 from bs4 import BeautifulSoup
+import pandas as pd
 import polars as pl
 from attrs import define, field, validators, validate
 from typing import Any, Dict, List, Union
@@ -42,7 +43,8 @@ from pyarrow import (
     compute as pc,
     schema,
     Table,
-    duration
+    duration,
+    timestamp as pyarrow_timestamp
 )
 
 from loguru import logger
@@ -524,7 +526,7 @@ class HistDataConnector(RemoteConnector):
             # pandas with python engine can read a runtime opened
             # zip file
 
-            # funtions is specific for format of files downloaded
+            # function is specific for format of files downloaded
             # parse file passed as input
 
             df = read_csv(
@@ -537,6 +539,15 @@ class HistDataConnector(RemoteConnector):
                 date_format=DATE_FORMAT_HISTDATA_CSV,
                 engine='c'
             )
+
+            # Localize and convert timezone from America/New_York (EST/EDT) to UTC
+            df['timestamp'] = (
+                pd.to_datetime(df['timestamp'])
+                .dt.tz_localize('America/New_York', ambiguous='NaT', nonexistent='NaT')
+                .dt.tz_convert('UTC')
+                .dt.tz_localize(None)
+            )
+            df = df.dropna(subset=['timestamp'])
 
             # calculate 'p'
             df['p'] = (df['ask'] + df['bid']) / 2
@@ -609,6 +620,11 @@ class HistDataConnector(RemoteConnector):
                                         15,
                                         99).cast(pyarrow_int64()).cast(duration("ms"))
             timecol = pc.add(ts2, d)
+
+            # Localize and convert timezone from America/New_York (EST/EDT) to UTC
+            timecol_aware = pc.assume_timezone(timecol, 'America/New_York', ambiguous='earliest', nonexistent='earliest')
+            timecol_utc = pc.cast(timecol_aware, pyarrow_timestamp('ms', tz='UTC'))
+            timecol = pc.cast(timecol_utc, pyarrow_timestamp('ms', tz=None))
 
             # calculate 'p'
             p_value = pc.divide(
@@ -708,6 +724,14 @@ class HistDataConnector(RemoteConnector):
                     col('vol').str.strip_chars().cast(PolarsFloat32)
                 ])
 
+            # Localize and convert timezone from America/New_York (EST/EDT) to UTC
+            df = df.with_columns(
+                col(BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                .dt.replace_time_zone('America/New_York', ambiguous='earliest', non_existent='null')
+                .dt.convert_time_zone('UTC')
+                .dt.replace_time_zone(None)
+            ).filter(col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_not_null())
+
             # calculate 'p'
             df = df.with_columns(
                 ((col('ask') + col('bid')) / 2).alias('p')
@@ -806,6 +830,14 @@ class HistDataConnector(RemoteConnector):
                     col('vol').str.strip_chars().cast(PolarsFloat32)
                 ])
                 df = df.collect().lazy()
+
+            # Localize and convert timezone from America/New_York (EST/EDT) to UTC
+            df = df.with_columns(
+                col(BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                .dt.replace_time_zone('America/New_York', ambiguous='earliest', non_existent='null')
+                .dt.convert_time_zone('UTC')
+                .dt.replace_time_zone(None)
+            ).filter(col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_not_null())
 
             # calculate 'p'
             df = df.with_columns(
@@ -1344,7 +1376,8 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         record = {
             "timestamp": datetime.now(),
             "ticker": symbol,
-            "price": float(data["price"])
+            "price": float(data["price"]),
+            "timezone": "UTC"
         }
         return PolarsDataFrame([record]).lazy()
 
@@ -1373,7 +1406,8 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
             "interval": timeframe,
             "start_date": start_date,
             "end_date": end_date,
-            "outputsize": self._chunk_size
+            "outputsize": self._chunk_size,
+            "timezone": "UTC"
         }
 
         data = self._execute_request("time_series", params)
@@ -1413,6 +1447,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
             "symbol": symbol,
             "interval": timeframe,
             "outputsize": self._chunk_size,
+            "timezone": "UTC"
         }
 
         data = self._execute_request("time_series", params)
