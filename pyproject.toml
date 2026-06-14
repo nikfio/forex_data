@@ -12,7 +12,7 @@ packages = [
 
 
 [tool.poetry.dependencies]
-python = "~3.12"
+python = ">=3.12,<3.14"
 pyaml = "^21.10.1"
 pandas = ">=2.0.0"
 matplotlib = ">=3.9.2"
@@ -54,3 +54,6 @@ sphinx-autodoc-typehints = "^3.6.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["libs"]
