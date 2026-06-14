@@ -157,8 +157,31 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         self.assertGreater(df.height, 0, "DataFrame should not be empty")
 
         # Assert rows length is at least window/timeframe
-        # (24 rows for 1 day window with 1h timeframe)
-        expected_rows = int(interval_window / timedelta(hours=1))
+        # taking into account weekend closures.
+        import zoneinfo
+        from datetime import datetime as dt_class
+
+        utc_tz = zoneinfo.ZoneInfo("UTC")
+        ny_tz = zoneinfo.ZoneInfo("America/New_York")
+
+        max_ts = df["timestamp"].max()
+        max_ts_utc = max_ts.replace(tzinfo=utc_tz)
+        start_ts_utc = max_ts_utc - interval_window
+
+        expected_rows = 0
+        current = max_ts_utc
+        while current > start_ts_utc:
+            current_ny = current.astimezone(ny_tz)
+            wkday = current_ny.weekday()  # Mon=0, ..., Sun=6
+            is_wknd = (
+                (wkday == 5)  # Saturday
+                or (wkday == 4 and current_ny.hour >= 17)  # Friday >= 17:00 NY time
+                or (wkday == 6 and current_ny.hour < 17)  # Sunday < 17:00 NY time
+            )
+            if not is_wknd:
+                expected_rows += 1
+            current -= timedelta(hours=1)
+
         self.assertGreaterEqual(
             df.height,
             expected_rows,
