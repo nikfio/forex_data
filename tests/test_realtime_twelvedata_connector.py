@@ -5,10 +5,16 @@ Created on Mon May 18 21:40:00 2026
 @author: Antigravity
 """
 
+import os
 import sys
 import unittest
+import zoneinfo
+from datetime import (
+    datetime,
+    timedelta
+)
 from pathlib import Path
-from datetime import timedelta
+from unittest.mock import patch
 
 import polars as pl
 from loguru import logger
@@ -36,7 +42,6 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
     """
 
     def setUp(self):
-        import os
         if not os.environ.get("TWELVE_DATA_API_KEY"):
             self.skipTest("TWELVE_DATA_API_KEY environment variable not set")
         logger.remove()
@@ -156,11 +161,6 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         logger.info(f"Received DataFrame:\n{df}")
         self.assertGreater(df.height, 0, "DataFrame should not be empty")
 
-        # Assert rows length is at least window/timeframe
-        # taking into account weekend closures.
-        import zoneinfo
-        from datetime import datetime as dt_class
-
         utc_tz = zoneinfo.ZoneInfo("UTC")
         ny_tz = zoneinfo.ZoneInfo("America/New_York")
 
@@ -196,8 +196,6 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         Tests that get_data and get_recent_data correctly filter out weekend data.
         Does not require a live API key as we mock the HTTP request response.
         """
-        from unittest.mock import patch
-
         # Mock data representing various UTC times:
         # We need mock data in June (Summer, DST active in NY: NY is UTC-4)
         # And mock data in December (Winter, DST inactive in NY: NY is UTC-5)
@@ -293,15 +291,11 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         the request parameters are correctly shifted to target the last active
         market period (Friday close).
         """
-        import zoneinfo
-        from datetime import datetime as real_datetime
-        from unittest.mock import patch
-
         # Mock current time as Saturday June 6, 2026 12:00:00 NY time (weekend)
         ny_tz = zoneinfo.ZoneInfo("America/New_York")
-        mock_now = real_datetime(2026, 6, 6, 12, 0, 0, tzinfo=ny_tz)
+        mock_now = datetime(2026, 6, 6, 12, 0, 0, tzinfo=ny_tz)
 
-        class MockDatetime(real_datetime):
+        class MockDatetime(datetime):
             @classmethod
             def now(cls, tz=None):
                 if tz is not None:
