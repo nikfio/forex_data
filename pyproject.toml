@@ -12,7 +12,7 @@ packages = [
 
 
 [tool.poetry.dependencies]
-python = ">=3.12,<3.14"
+python = ">=3.13,<3.14"
 pyaml = "^21.10.1"
 pandas = ">=2.0.0"
 matplotlib = ">=3.9.2"
@@ -27,7 +27,7 @@ pytest = "^8.1.1"
 loguru = "^0.7.2"
 numpy  = ">=1.22,<3.0.0"
 debugpy = "^1.8.5"
-iteration-utilities = "^0.12.1"
+iteration-utilities = "^0.13.0"
 bs4 = "^0.0.2"
 flake8 = "^7.1.1"
 mypy = "^1.14.1"
