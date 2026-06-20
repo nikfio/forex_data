@@ -1,7 +1,7 @@
 
 from loguru import logger
 from typing import Any, Dict, List, Optional, Union, Literal
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from uuid import uuid4
 from filelock import FileLock
 from textwrap import dedent
@@ -276,11 +276,15 @@ class HistoricalManagerDB:
         self._histdata_connector = [
             HistDataConnector(
                 ssl_verify=self.ssl_verify,
-                data_path=str(self._histdata_path / 'histdata')
+                data_path=str(self._histdata_path / 'histdata'),
+                engine=self.engine,
+                data_type=self.data_type,
             ),
             DukascopyConnector(
                 ssl_verify=self.ssl_verify,
-                data_path=str(self._histdata_path / 'dukascopy')
+                data_path=str(self._histdata_path / 'dukascopy'),
+                engine=self.engine,
+                data_type=self.data_type,
             )
         ]
 
@@ -850,6 +854,10 @@ class HistoricalManagerDB:
             raise ValueError(f'timeframe request {timeframe} invalid')
 
         else:
+            if start == 'now':
+                raise ValueError("start date cannot be 'now'")
+            if end == 'now':
+                end = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
             start = any_date_to_datetime64(start)
             end = any_date_to_datetime64(end)
@@ -1116,6 +1124,11 @@ class HistoricalManagerDB:
             logger.bind(target='histmanager').error(
                 f'timeframe request {timeframe} invalid')
             raise ValueError(f'timeframe request {timeframe} invalid')
+
+        if date == 'now':
+            if direction == 'forward':
+                raise ValueError("start date cannot be 'now'")
+            date = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
         if direction == 'backward':
             end = any_date_to_datetime64(date)
