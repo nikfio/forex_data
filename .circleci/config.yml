@@ -49,7 +49,7 @@ run_profiling:
     echo "Profiling completed. Reports saved to test-results/profiling/"
   
 jobs:
-  py312:
+  py313:
     <<: *defaults
     docker:
       - image: cimg/python:3.13.13

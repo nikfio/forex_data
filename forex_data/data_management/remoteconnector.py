@@ -92,6 +92,7 @@ from ..config import _apply_config
 @define(kw_only=True, slots=True)
 class RemoteConnector:
 
+    # interface parameters
     data_path: Union[str, Path] = field(default='', validator=validators.or_(
         validators.instance_of(str), validators.instance_of(Path)))
     data_type: str = field(default='parquet',
@@ -99,6 +100,7 @@ class RemoteConnector:
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
 
+    # internal parameters
     _tickers_years_info_filepath = field(default=Path('.'))
     _temporary_data_path = field(default=Path('.'))
 
@@ -226,7 +228,10 @@ class HistDataConnector(RemoteConnector):
     connector interface.
     """
 
+    # interface parameters
     ssl_verify: bool = field(default=True, validator=validators.instance_of(bool))
+
+    # internal parameters
     _session: Session = field(factory=Session)
     _tickers_cache: List[str] = field(factory=list,
                                       validator=validators.instance_of(list))
@@ -878,7 +883,10 @@ class DukascopyConnector(RemoteConnector):
     behind a single RemoteConnector-derived interface.
     """
 
+    # interface parameters
     ssl_verify: bool = field(default=True, validator=validators.instance_of(bool))
+
+    # internal parameters
     _session: Session = field(factory=Session)
     _tickers_cache: List[str] = field(factory=list,
                                       validator=validators.instance_of(list))
@@ -1293,7 +1301,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
 
         super().__attrs_post_init__()
 
-        # set up log sink for dukascopy connector
+        # set up log sink for twelvedata connector
         log_path = Path(self.data_path) / 'log' / 'twelvedata.log'
 
         # apy key if not defined get it from env variable TWELVEDATA_API_KEY
