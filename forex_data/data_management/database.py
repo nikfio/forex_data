@@ -77,6 +77,7 @@ class DatabaseConnector:
 
     _tickers_years_info_filepath = field(default=Path('.'))
     _local_files_cache: Any = field(default=None, init=False)
+    _last_timestamp_cache: Any = field(default=None, init=False)
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -84,6 +85,7 @@ class DatabaseConnector:
 
     def __attrs_post_init__(self) -> None:
 
+        self._last_timestamp_cache = {}
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()
         if (
@@ -1103,6 +1105,10 @@ class LocalDBConnector(DatabaseConnector):
             # get smallest timeframe
             timeframe = timeframes_available[0]
 
+        cache_key = (market.lower(), ticker.lower(), timeframe.lower())
+        if self._last_timestamp_cache is not None and cache_key in self._last_timestamp_cache:
+            return self._last_timestamp_cache[cache_key]
+
         filename = self._get_filename(market, ticker, timeframe)
         filepath = (self.data_path / market / ticker / filename)
 
@@ -1136,6 +1142,8 @@ class LocalDBConnector(DatabaseConnector):
         else:
             end_date_from_db = window_dates.item(0, 0)
 
+        if self._last_timestamp_cache is not None:
+            self._last_timestamp_cache[cache_key] = end_date_from_db
         return end_date_from_db
 
 
@@ -1723,6 +1731,10 @@ class LocalDBYearConnector(DatabaseConnector):
                 # get smallest timeframe
                 timeframe = timeframes_available[0]
 
+        cache_key = (market.lower(), ticker.lower(), timeframe.lower())
+        if self._last_timestamp_cache is not None and cache_key in self._last_timestamp_cache:
+            return self._last_timestamp_cache[cache_key]
+
         # Get list of years available for this ticker and timeframe
         years_list = self._get_ticker_years_list_from_db(ticker, timeframe)
         if not years_list:
@@ -1764,4 +1776,6 @@ class LocalDBYearConnector(DatabaseConnector):
         else:
             end_date_from_db = window_dates.item(0, 0)
 
+        if self._last_timestamp_cache is not None:
+            self._last_timestamp_cache[cache_key] = end_date_from_db
         return end_date_from_db
