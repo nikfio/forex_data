@@ -105,6 +105,8 @@ class HistoricalManagerDB:
                                              validator=validators.instance_of(bool))
     ssl_verify: bool = field(default=True,
                              validator=validators.instance_of(bool))
+    polars_gpu_engine: bool = field(default=False,
+                                    validator=validators.instance_of(bool))
     connector_id: str = field(default='',
                               validator=validators.optional(validators.instance_of(str)))
     max_discrepancy_with_now: str = field(
@@ -254,7 +256,8 @@ class HistoricalManagerDB:
                 self._db_connector = connector_type(
                     data_path=str(self._histdata_path / f'LocalDB_{self.connector_id}'),
                     data_type=self.data_type,
-                    engine=self.engine
+                    engine=self.engine,
+                    polars_gpu_engine=self.polars_gpu_engine
                 )
 
             else:
@@ -263,7 +266,8 @@ class HistoricalManagerDB:
                 self._db_connector = connector_type(
                     data_path=str(self._histdata_path / 'LocalDB'),
                     data_type=self.data_type,
-                    engine=self.engine
+                    engine=self.engine,
+                    polars_gpu_engine=self.polars_gpu_engine
                 )
 
         else:

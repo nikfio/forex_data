@@ -154,6 +154,7 @@ __all__ = [
     'TWELVE_DATA_LIMIT_DATE',
     'TWELVE_DATA_TIMEFRAMES',
     'SUPPORTED_REALTIME_DATA_PROVIDERS',
+    'collect_lazyframe',
 
     'validator_file_path',
     'validator_dir_path',
@@ -2181,3 +2182,13 @@ TWELVE_DATA_TIMEFRAMES = [
 SUPPORTED_REALTIME_DATA_PROVIDERS = [
     TWELVEDATA_PROVIDER
 ]
+
+
+def collect_lazyframe(dataframe: PolarsLazyFrame, use_gpu: bool = False) -> PolarsDataFrame:
+    if use_gpu:
+        try:
+            return dataframe.collect(engine="gpu")
+        except Exception as e:
+            logger.bind(target='env').warning(f"Polars GPU engine collect failed, falling back to CPU: {e}")
+            return dataframe.collect()
+    return dataframe.collect()

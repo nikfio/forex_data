@@ -72,6 +72,8 @@ class DatabaseConnector:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
+    polars_gpu_engine: bool = field(default=False,
+                                    validator=validators.instance_of(bool))
 
     _tickers_years_info_filepath = field(default=Path('.'))
 
@@ -656,7 +658,7 @@ class LocalDBConnector(DatabaseConnector):
 
             else:
 
-                ticker_years_list = [int(row[0]) for row in read.collect().iter_rows()]
+                ticker_years_list = [int(row[0]) for row in collect_lazyframe(read, self.polars_gpu_engine).iter_rows()]
 
         return ticker_years_list
 
@@ -832,14 +834,14 @@ class LocalDBConnector(DatabaseConnector):
                     dataframe = read_csv(self.engine, filepath)
                     # Eagerly materialise inside the lock (see comment above)
                     if hasattr(dataframe, 'collect'):
-                        dataframe = dataframe.collect().lazy()
+                        dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
                 elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
 
                     dataframe = read_parquet(self.engine, filepath)
                     # Eagerly materialise inside the lock (see comment above)
                     if hasattr(dataframe, 'collect'):
-                        dataframe = dataframe.collect().lazy()
+                        dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
             try:
 
@@ -936,11 +938,11 @@ class LocalDBConnector(DatabaseConnector):
             if self.data_type == DATA_TYPE.CSV_FILETYPE:
                 dataframe = read_csv(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
             elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
                 dataframe = read_parquet(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
         # Apply year filter via SQL
         year_filter_str = ", ".join([str(y) for y in years_list])
@@ -1014,11 +1016,11 @@ class LocalDBConnector(DatabaseConnector):
             if self.data_type == DATA_TYPE.CSV_FILETYPE:
                 dataframe = read_csv(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
             elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
                 dataframe = read_parquet(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
         if direction == 'backward':
             query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
@@ -1044,7 +1046,7 @@ class LocalDBConnector(DatabaseConnector):
         try:
             window_dates = dataframe.sql(query)
             if isinstance(window_dates, PolarsLazyFrame):
-                window_dates = window_dates.collect()
+                window_dates = collect_lazyframe(window_dates, self.polars_gpu_engine)
         except Exception as e:
             logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
             return PolarsLazyFrame([])
@@ -1109,11 +1111,11 @@ class LocalDBConnector(DatabaseConnector):
             if self.data_type == DATA_TYPE.CSV_FILETYPE:
                 dataframe = read_csv(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
             elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
                 dataframe = read_parquet(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
         query = f'''SELECT MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
                     FROM self
@@ -1122,7 +1124,7 @@ class LocalDBConnector(DatabaseConnector):
         try:
             window_dates = dataframe.sql(query)
             if isinstance(window_dates, PolarsLazyFrame):
-                window_dates = window_dates.collect()
+                window_dates = collect_lazyframe(window_dates, self.polars_gpu_engine)
         except Exception as e:
             logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
             raise
@@ -1642,7 +1644,7 @@ class LocalDBYearConnector(DatabaseConnector):
 
             window_dates = dataframe.sql(query)
             if isinstance(window_dates, PolarsLazyFrame):
-                window_dates = window_dates.collect()
+                window_dates = collect_lazyframe(window_dates, self.polars_gpu_engine)
 
         except Exception as e:
             logger.bind(target='localdb').error(
@@ -1736,11 +1738,11 @@ class LocalDBYearConnector(DatabaseConnector):
             if self.data_type == DATA_TYPE.CSV_FILETYPE:
                 dataframe = read_csv(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
             elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
                 dataframe = read_parquet(self.engine, filepath)
                 if hasattr(dataframe, 'collect'):
-                    dataframe = dataframe.collect().lazy()
+                    dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
         query = f'''SELECT MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
                     FROM self
@@ -1749,7 +1751,7 @@ class LocalDBYearConnector(DatabaseConnector):
         try:
             window_dates = dataframe.sql(query)
             if isinstance(window_dates, PolarsLazyFrame):
-                window_dates = window_dates.collect()
+                window_dates = collect_lazyframe(window_dates, self.polars_gpu_engine)
         except Exception as e:
             logger.bind(target='localdb').error(f'executing query {query} failed: {e}')
             raise

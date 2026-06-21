@@ -84,6 +84,7 @@ from .common import (
     TickerDataNotFoundError,
     TickerDataBadTypeException,
     get_attrs_names,
+    collect_lazyframe,
 )
 
 from ..config import _apply_config
@@ -99,6 +100,8 @@ class RemoteConnector:
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
+    polars_gpu_engine: bool = field(default=False,
+                                    validator=validators.instance_of(bool))
 
     # internal parameters
     _tickers_years_info_filepath = field(default=Path('.'))
@@ -800,7 +803,7 @@ class HistDataConnector(RemoteConnector):
                 # Eagerly collect to force schema/parsing validation on all rows.
                 # If there are parsing errors anywhere in the file, this will raise ComputeError.
                 # Then convert it back to a LazyFrame so it matches the expected return type.
-                df = df.collect().lazy()
+                df = collect_lazyframe(df, self.polars_gpu_engine).lazy()
 
             except Exception as e:
                 logger.bind(target='histdata').warning(f'Occurred Exception: {type(e).__name__}\n'
@@ -834,7 +837,7 @@ class HistDataConnector(RemoteConnector):
                     col('bid').str.strip_chars().cast(PolarsFloat32),
                     col('vol').str.strip_chars().cast(PolarsFloat32)
                 ])
-                df = df.collect().lazy()
+                df = collect_lazyframe(df, self.polars_gpu_engine).lazy()
 
             # Localize and convert timezone from America/New_York (EST/EDT) to UTC
             df = df.with_columns(
@@ -1123,7 +1126,7 @@ class DukascopyConnector(RemoteConnector):
         # Filter out business days/hours using standard helper
         pl_df = business_days_data(pl_df)
 
-        return pl_df if engine == 'polars_lazy' else pl_df.collect()
+        return pl_df if engine == 'polars_lazy' else collect_lazyframe(pl_df, self.polars_gpu_engine)
 
     def get_recent_data(
         self,
@@ -1236,7 +1239,7 @@ class DukascopyConnector(RemoteConnector):
             # reframe_data
             pl_df = reframe_data(pl_df, timeframe)
 
-        return pl_df if engine == 'polars_lazy' else pl_df.collect()
+        return pl_df if engine == 'polars_lazy' else collect_lazyframe(pl_df, self.polars_gpu_engine)
 
 
 # REAL-TIME DATABASE CONNECTOR CLASS
@@ -1529,7 +1532,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         processed_lf = processed_lf.filter(~is_weekend)
 
         # Set the cutoff to start from the most recent timestamp of the retrieved data
-        max_ts_df = processed_lf.select(pl.col("timestamp").max()).collect()
+        max_ts_df = collect_lazyframe(processed_lf.select(pl.col("timestamp").max()), self.polars_gpu_engine)
         if max_ts_df.height > 0 and max_ts_df.item(0, 0) is not None:
             cutoff_dt = max_ts_df.item(0, 0) - interval_window
         else:
