@@ -76,6 +76,7 @@ class DatabaseConnector:
                                     validator=validators.instance_of(bool))
 
     _tickers_years_info_filepath = field(default=Path('.'))
+    _local_files_cache: Any = field(default=None, init=False)
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -150,6 +151,8 @@ class DatabaseConnector:
         raise NotImplementedError("Subclasses must implement read_last_timestamp")
 
     def _list_local_data(self) -> List[PathType]:
+        if self._local_files_cache is not None:
+            return self._local_files_cache
 
         local_files = []
         local_files_name = []
@@ -160,7 +163,8 @@ class DatabaseConnector:
 
         local_files_name = [file.name for file in local_files]
 
-        return local_files, local_files_name
+        self._local_files_cache = (local_files, local_files_name)
+        return self._local_files_cache
 
     def _list_tables(self) -> List[str]:
 
@@ -669,6 +673,7 @@ class LocalDBConnector(DatabaseConnector):
         clean: bool = False
     ) -> None:
 
+        self._local_files_cache = None
         items = self._get_items_from_db_key(target_table)
 
         filename = self._get_filename(items[DATA_KEY.MARKET],
@@ -1275,6 +1280,7 @@ class LocalDBYearConnector(DatabaseConnector):
             Clean data before writing, by default False
         '''
 
+        self._local_files_cache = None
         items = self._get_items_from_db_key(target_table)
 
         filename = self._get_filename(items[DATA_KEY.MARKET],
