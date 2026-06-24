@@ -676,6 +676,7 @@ class LocalDBConnector(DatabaseConnector):
     ) -> None:
 
         self._local_files_cache = None
+        self._last_timestamp_cache = {}
         items = self._get_items_from_db_key(target_table)
 
         filename = self._get_filename(items[DATA_KEY.MARKET],
@@ -1289,6 +1290,7 @@ class LocalDBYearConnector(DatabaseConnector):
         '''
 
         self._local_files_cache = None
+        self._last_timestamp_cache = {}
         items = self._get_items_from_db_key(target_table)
 
         filename = self._get_filename(items[DATA_KEY.MARKET],
