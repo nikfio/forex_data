@@ -511,12 +511,13 @@ class HistoricalManagerDB:
                                       None]:
 
         year_tick_df = empty_dataframe(self.engine)
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
 
         for month in MONTHS:
 
             month_num = MONTHS.index(month) + 1
 
-            if year == datetime.now().year and month_num > datetime.now().month:
+            if year == now_utc.year and month_num > now_utc.month:
                 break
 
             month_data = None
@@ -524,8 +525,8 @@ class HistoricalManagerDB:
             for connector in self._histdata_connector:
                 if (
                     isinstance(connector, HistDataConnector) and
-                    year == datetime.now().year and
-                    month_num == datetime.now().month
+                    year == now_utc.year and
+                    month_num == now_utc.month
                 ):
                     continue
 
@@ -570,8 +571,8 @@ class HistoricalManagerDB:
 
             if last_err is not None:
                 if (
-                    year == datetime.now().year and
-                    month_num >= datetime.now().month
+                    year == now_utc.year and
+                    month_num >= now_utc.month
                 ):
                     logger.bind(target='histmanager').warning(
                         f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data"
@@ -881,11 +882,12 @@ class HistoricalManagerDB:
                 f'date in database {HISTORICAL_DB_MIN_DATE}')
             return self._dataframe_type([])
 
-        if start > datetime.now():
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        if start > now_utc:
 
             logger.bind(target='histmanager').error(
                 f'start date {start} is newer than the maximum '
-                f'date in database {datetime.now()}')
+                f'date in database {now_utc}')
             raise ValueError(f'start date {start} is newer now date')
 
         # get years including interval requested
@@ -901,7 +903,7 @@ class HistoricalManagerDB:
 
         # determine if current year data new download
         # has to be requested
-        current_year = datetime.now().year
+        current_year = now_utc.year
         is_current_year_requested = False
 
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
@@ -919,11 +921,11 @@ class HistoricalManagerDB:
                 # determine if to include and update of current year data
                 # if not is on a weekend day (Saturday or Sunday)
                 # set now as previous Friday at 17:00
-                if datetime.now().weekday() in [5, 6]:
-                    now_ref = datetime.now() - timedelta(days=datetime.now().weekday() + 1)
+                if now_utc.weekday() in [5, 6]:
+                    now_ref = now_utc - timedelta(days=now_utc.weekday() + 1)
                     now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
                 else:
-                    now_ref = datetime.now()
+                    now_ref = now_utc
 
                 is_current_year_requested = (
                     (
@@ -1156,11 +1158,12 @@ class HistoricalManagerDB:
                 f'date in database {HISTORICAL_DB_MIN_DATE}')
             return self._dataframe_type([])
 
-        if start > datetime.now():
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        if start > now_utc:
 
             logger.bind(target='histmanager').error(
                 f'start date {start} is newer than the maximum '
-                f'date in database {datetime.now()}')
+                f'date in database {now_utc}')
             raise ValueError(f'start date {start} is newer now date')
 
         # get years including interval requested
@@ -1177,7 +1180,7 @@ class HistoricalManagerDB:
         # determine if current year data new download
         # has to be requested
         is_current_year_requested = False
-        current_year = datetime.now().year
+        current_year = now_utc.year
 
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
 
@@ -1194,11 +1197,11 @@ class HistoricalManagerDB:
                 # determine if to include and update of current year data
                 # if not is on a weekend day (Saturday or Sunday)
                 # set now as previous Friday at 17:00
-                if datetime.now().weekday() in [5, 6]:
-                    now_ref = datetime.now() - timedelta(days=datetime.now().weekday() + 1)
+                if now_utc.weekday() in [5, 6]:
+                    now_ref = now_utc - timedelta(days=now_utc.weekday() + 1)
                     now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
                 else:
-                    now_ref = datetime.now()
+                    now_ref = now_utc
 
                 is_current_year_requested = (
                     (
