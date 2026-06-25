@@ -927,11 +927,19 @@ class HistoricalManagerDB:
                 else:
                     now_ref = now_utc
 
+                # Use the requested end date as the reference point for update,
+                # but capped at the current time (now_ref) since we cannot download future data.
+                # This prevents downloads when the requested end date is in the past
+                # and the database already has data up to that end date.
+                now_ref_ts = to_datetime(now_ref)
+                end_ts = to_datetime(end)
+                reference_time = min(end_ts, now_ref_ts)
+
                 is_current_year_requested = (
                     (
-                        now_ref
+                        reference_time
                         -
-                        ticker_available_last_timestamp
+                        to_datetime(ticker_available_last_timestamp)
                     ).total_seconds()
                     >
                     to_timedelta(self.max_discrepancy_with_now).total_seconds()
@@ -1203,11 +1211,19 @@ class HistoricalManagerDB:
                 else:
                     now_ref = now_utc
 
+                # Use the requested end date as the reference point for update,
+                # but capped at the current time (now_ref) since we cannot download future data.
+                # This prevents downloads when the requested end date is in the past
+                # and the database already has data up to that end date.
+                now_ref_ts = to_datetime(now_ref)
+                end_ts = to_datetime(end)
+                reference_time = min(end_ts, now_ref_ts)
+
                 is_current_year_requested = (
                     (
-                        now_ref
+                        reference_time
                         -
-                        ticker_available_last_timestamp
+                        to_datetime(ticker_available_last_timestamp)
                     ).total_seconds()
                     >
                     to_timedelta(self.max_discrepancy_with_now).total_seconds()
