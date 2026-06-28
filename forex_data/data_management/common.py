@@ -117,7 +117,7 @@ __all__ = [
     'HISTDATA_BASE_DOWNLOAD_URL',
     'DEFAULT_PATHS',
     'DATA_TYPE',
-    'BASE_DATA_COLUMN_NAME',
+    'COLUMN_NAME',
     'DATA_FILE_COLUMN_INDEX',
     'SUPPORTED_DATA_FILES',
     'SUPPORTED_DATA_ENGINES',
@@ -136,7 +136,7 @@ __all__ = [
     'DATE_NO_HOUR_FORMAT',
     'SQL_COMPARISON_OPERATORS',
     'SUPPORTED_SQL_COMPARISON_OPERATORS',
-    'SUPPORTED_BASE_DATA_COLUMN_NAME',
+    'SUPPORTED_COLUMN_NAME',
     'SQL_CONDITION_AGGREGATION_MODES',
     'SUPPORTED_SQL_CONDITION_AGGREGATION_MODES',
     'HISTORICAL_DB_MIN_DATE',
@@ -400,18 +400,84 @@ SUPPORTED_DATA_ENGINES = [
 # OHLC and related column names
 
 
+class COLUMN_NAME:
+
+    TIMESTAMP = 'timestamp'
+    OPEN = 'open'
+    HIGH = 'high'
+    LOW = 'low'
+    CLOSE = 'close'
+    ASK = 'ask'
+    BID = 'bid'
+    VOLUME = 'volume'
+    ASK_VOLUME = 'ask_volume'
+    BID_VOLUME = 'bid_volume'
+    VWMP = 'vwmp' # volume weighted mid price
+    VWMP_AVG = 'vwmp_avg' # average volume weighted mid price
+    P_VALUE = 'p'
+    TRANSACTIONS = 'transactions'
+    OTC = 'otc'
+    VWAP = 'vwap'
+
+
+SUPPORTED_COLUMN_NAME = Literal[
+    COLUMN_NAME.TIMESTAMP,
+    COLUMN_NAME.OPEN,
+    COLUMN_NAME.HIGH,
+    COLUMN_NAME.LOW,
+    COLUMN_NAME.CLOSE,
+    COLUMN_NAME.ASK,
+    COLUMN_NAME.BID,
+    COLUMN_NAME.VOLUME,
+    COLUMN_NAME.P_VALUE,
+    COLUMN_NAME.TRANSACTIONS,
+    COLUMN_NAME.VWAP,
+    COLUMN_NAME.VWMP_AVG
+]
+
+
 class DATA_COLUMN_NAMES:
 
-    TICK_DATA_NO_PVALUE = ['timestamp', 'ask', 'bid', 'vol']
-    TICK_DATA = ['timestamp', 'ask', 'bid', 'vol', 'p']
-    TF_DATA = ['timestamp', 'open', 'high', 'low', 'close']
-    TICK_DATA_TIME_INDEX = ['ask', 'bid', 'vol', 'p']
-    TF_DATA_TIME_INDEX = ['open', 'high', 'low', 'close']
-
-
-# SELECTED AS SINGLE BASE DATA COMPOSION TEMPLATE
-BASE_DATA = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
-BASE_DATA_WITH_TIME = DATA_COLUMN_NAMES.TF_DATA
+    TICK_DATA = [
+        COLUMN_NAME.TIMESTAMP, 
+        COLUMN_NAME.ASK,  
+        COLUMN_NAME.BID,    
+        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.BID_VOLUME,
+        COLUMN_NAME.VWMP
+    ]
+    TF_DATA = [
+        COLUMN_NAME.TIMESTAMP, 
+        COLUMN_NAME.OPEN, 
+        COLUMN_NAME.HIGH, 
+        COLUMN_NAME.LOW, 
+        COLUMN_NAME.CLOSE,
+        COLUMN_NAME.ASK,
+        COLUMN_NAME.BID,
+        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.BID_VOLUME,
+        COLUMN_NAME.VWMP,
+        COLUMN_NAME.VWMP_AVG
+    ]
+    TICK_DATA_TIME_INDEX = [
+        COLUMN_NAME.ASK,  
+        COLUMN_NAME.BID,
+        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.BID_VOLUME,
+        COLUMN_NAME.VWMP
+    ]
+    TF_DATA_TIME_INDEX = [
+        COLUMN_NAME.OPEN, 
+        COLUMN_NAME.HIGH, 
+        COLUMN_NAME.LOW, 
+        COLUMN_NAME.CLOSE,
+        COLUMN_NAME.ASK,
+        COLUMN_NAME.BID,
+        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.BID_VOLUME,
+        COLUMN_NAME.VWMP,
+        COLUMN_NAME.VWMP_AVG
+    ]
 
 
 class DB_MODE:
@@ -428,36 +494,6 @@ class ASSET_TYPE:
     FOREX = 'FOREX'
 
 
-class BASE_DATA_COLUMN_NAME:
-
-    TIMESTAMP = 'timestamp'
-    OPEN = 'open'
-    HIGH = 'high'
-    LOW = 'low'
-    CLOSE = 'close'
-    ASK = 'ask'
-    BID = 'bid'
-    VOL = 'vol'
-    P_VALUE = 'p'
-    TRANSACTIONS = 'transactions'
-    VWAP = 'vwap'
-    OTC = 'otc'
-
-
-SUPPORTED_BASE_DATA_COLUMN_NAME = Literal[
-    BASE_DATA_COLUMN_NAME.TIMESTAMP,
-    BASE_DATA_COLUMN_NAME.OPEN,
-    BASE_DATA_COLUMN_NAME.HIGH,
-    BASE_DATA_COLUMN_NAME.LOW,
-    BASE_DATA_COLUMN_NAME.CLOSE,
-    BASE_DATA_COLUMN_NAME.ASK,
-    BASE_DATA_COLUMN_NAME.BID,
-    BASE_DATA_COLUMN_NAME.VOL,
-    BASE_DATA_COLUMN_NAME.P_VALUE,
-    BASE_DATA_COLUMN_NAME.TRANSACTIONS,
-    BASE_DATA_COLUMN_NAME.VWAP,
-    BASE_DATA_COLUMN_NAME.OTC
-]
 
 
 class SQL_COMPARISON_OPERATORS:
@@ -772,68 +808,134 @@ def random_date_between(start_date, end_date):
 # DATA ENGINES TYPES DICTIONARY
 class DTYPE_DICT:
 
-    TICK_DTYPE = {'ask': 'float32',
-                  'bid': 'float32',
-                  'vol': 'float32',
-                  'p': 'float32'}
-    TF_DTYPE = {'open': 'float32',
-                'high': 'float32',
-                'low': 'float32',
-                'close': 'float32'}
-    TIME_TICK_DTYPE = {'timestamp': 'datetime64[ms]',
-                       'ask': 'float32',
-                       'bid': 'float32',
-                       'vol': 'float32',
-                       'p': 'float32'}
-    TIME_TF_DTYPE = {'timestamp': 'datetime64[ms]',
-                     'open': 'float32',
-                     'high': 'float32',
-                     'low': 'float32',
-                     'close': 'float32'}
+    TICK_DTYPE = {
+        COLUMN_NAME.ASK: 'float32',
+        COLUMN_NAME.BID: 'float32',
+        COLUMN_NAME.ASK_VOLUME: 'float32',
+        COLUMN_NAME.BID_VOLUME: 'float32',
+        COLUMN_NAME.VWMP: 'float32'
+    }
+    TF_DTYPE = {
+        COLUMN_NAME.OPEN: 'float32',
+        COLUMN_NAME.HIGH: 'float32',
+        COLUMN_NAME.LOW: 'float32',
+        COLUMN_NAME.CLOSE: 'float32',
+        COLUMN_NAME.ASK: 'float32',
+        COLUMN_NAME.BID: 'float32',
+        COLUMN_NAME.ASK_VOLUME: 'float32',
+        COLUMN_NAME.BID_VOLUME: 'float32',
+        COLUMN_NAME.VWMP: 'float32',
+        COLUMN_NAME.VWMP_AVG: 'float32'
+    }
+    TIME_TICK_DTYPE = {
+        COLUMN_NAME.TIMESTAMP: 'datetime64[ms]',
+        COLUMN_NAME.ASK: 'float32',
+        COLUMN_NAME.BID: 'float32',
+        COLUMN_NAME.ASK_VOLUME: 'float32',
+        COLUMN_NAME.BID_VOLUME: 'float32',
+        COLUMN_NAME.VWMP: 'float32'
+    }
+    TIME_TF_DTYPE = {
+        COLUMN_NAME.TIMESTAMP: 'datetime64[ms]',
+        COLUMN_NAME.OPEN: 'float32',
+        COLUMN_NAME.HIGH: 'float32',
+        COLUMN_NAME.LOW: 'float32',
+        COLUMN_NAME.CLOSE: 'float32',
+        COLUMN_NAME.ASK: 'float32',
+        COLUMN_NAME.BID: 'float32',
+        COLUMN_NAME.ASK_VOLUME: 'float32',
+        COLUMN_NAME.BID_VOLUME: 'float32',
+        COLUMN_NAME.VWMP: 'float32',
+        COLUMN_NAME.VWMP_AVG: 'float32'
+    }
 
 
 class PYARROW_DTYPE_DICT:
 
-    TICK_DTYPE = {'ask': pyarrow_float32(),
-                  'bid': pyarrow_float32(),
-                  'vol': pyarrow_float32(),
-                  'p': pyarrow_float32()}
-    TF_DTYPE = {'open': pyarrow_float32(),
-                'high': pyarrow_float32(),
-                'low': pyarrow_float32(),
-                'close': pyarrow_float32()}
-    TIME_TICK_DTYPE = {'timestamp': pyarrow_timestamp('ms'),
-                       'ask': pyarrow_float32(),
-                       'bid': pyarrow_float32(),
-                       'vol': pyarrow_float32(),
-                       'p': pyarrow_float32()}
-    TIME_TF_DTYPE = {'timestamp': pyarrow_timestamp('ms'),
-                     'open': pyarrow_float32(),
-                     'high': pyarrow_float32(),
-                     'low': pyarrow_float32(),
-                     'close': pyarrow_float32()}
+    TICK_DTYPE = {
+        COLUMN_NAME.ASK: pyarrow_float32(),
+        COLUMN_NAME.BID: pyarrow_float32(),
+        COLUMN_NAME.ASK_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.BID_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.VWMP: pyarrow_float32()
+    }
+    TF_DTYPE = {
+        COLUMN_NAME.OPEN: pyarrow_float32(),
+        COLUMN_NAME.HIGH: pyarrow_float32(),
+        COLUMN_NAME.LOW: pyarrow_float32(),
+        COLUMN_NAME.CLOSE: pyarrow_float32(),
+        COLUMN_NAME.ASK: pyarrow_float32(),
+        COLUMN_NAME.BID: pyarrow_float32(),
+        COLUMN_NAME.ASK_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.BID_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.VWMP: pyarrow_float32(),
+        COLUMN_NAME.VWMP_AVG: pyarrow_float32()
+    }
+    TIME_TICK_DTYPE = {
+        COLUMN_NAME.TIMESTAMP: pyarrow_timestamp('ms'),
+        COLUMN_NAME.ASK: pyarrow_float32(),
+        COLUMN_NAME.BID: pyarrow_float32(),
+        COLUMN_NAME.ASK_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.BID_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.VWMP: pyarrow_float32()
+    }
+    TIME_TF_DTYPE = {
+        COLUMN_NAME.TIMESTAMP: pyarrow_timestamp('ms'),
+        COLUMN_NAME.OPEN: pyarrow_float32(),
+        COLUMN_NAME.HIGH: pyarrow_float32(),
+        COLUMN_NAME.LOW: pyarrow_float32(),
+        COLUMN_NAME.CLOSE: pyarrow_float32(),
+        COLUMN_NAME.ASK: pyarrow_float32(),
+        COLUMN_NAME.BID: pyarrow_float32(),
+        COLUMN_NAME.ASK_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.BID_VOLUME: pyarrow_float32(),
+        COLUMN_NAME.VWMP: pyarrow_float32(),
+        COLUMN_NAME.VWMP_AVG: pyarrow_float32()
+    }
 
 
 class POLARS_DTYPE_DICT:
 
-    TICK_DTYPE = {'ask': PolarsFloat32,
-                  'bid': PolarsFloat32,
-                  'vol': PolarsFloat32,
-                  'p': PolarsFloat32}
-    TF_DTYPE = {'open': PolarsFloat32,
-                'high': PolarsFloat32,
-                'low': PolarsFloat32,
-                'close': PolarsFloat32}
-    TIME_TICK_DTYPE = {'timestamp': PolarsDatetime('ms'),
-                       'ask': PolarsFloat32,
-                       'bid': PolarsFloat32,
-                       'vol': PolarsFloat32,
-                       'p': PolarsFloat32}
-    TIME_TF_DTYPE = {'timestamp': PolarsDatetime('ms'),
-                     'open': PolarsFloat32,
-                     'high': PolarsFloat32,
-                     'low': PolarsFloat32,
-                     'close': PolarsFloat32}
+    TICK_DTYPE = {
+        COLUMN_NAME.ASK: PolarsFloat32,
+        COLUMN_NAME.BID: PolarsFloat32,
+        COLUMN_NAME.ASK_VOLUME: PolarsFloat32,
+        COLUMN_NAME.BID_VOLUME: PolarsFloat32,
+        COLUMN_NAME.VWMP: PolarsFloat32
+    }
+    TF_DTYPE = {
+        COLUMN_NAME.OPEN: PolarsFloat32,
+        COLUMN_NAME.HIGH: PolarsFloat32,
+        COLUMN_NAME.LOW: PolarsFloat32,
+        COLUMN_NAME.CLOSE: PolarsFloat32,
+        COLUMN_NAME.ASK: PolarsFloat32,
+        COLUMN_NAME.BID: PolarsFloat32,
+        COLUMN_NAME.ASK_VOLUME: PolarsFloat32,
+        COLUMN_NAME.BID_VOLUME: PolarsFloat32,
+        COLUMN_NAME.VWMP: PolarsFloat32,
+        COLUMN_NAME.VWMP_AVG: PolarsFloat32
+    }
+    TIME_TICK_DTYPE = {
+        COLUMN_NAME.TIMESTAMP: PolarsDatetime('ms'),
+        COLUMN_NAME.ASK: PolarsFloat32,
+        COLUMN_NAME.BID: PolarsFloat32,
+        COLUMN_NAME.ASK_VOLUME: PolarsFloat32,
+        COLUMN_NAME.BID_VOLUME: PolarsFloat32,
+        COLUMN_NAME.VWMP: PolarsFloat32
+    }
+    TIME_TF_DTYPE = {
+        COLUMN_NAME.TIMESTAMP: PolarsDatetime('ms'),
+        COLUMN_NAME.OPEN: PolarsFloat32,
+        COLUMN_NAME.HIGH: PolarsFloat32,
+        COLUMN_NAME.LOW: PolarsFloat32,
+        COLUMN_NAME.CLOSE: PolarsFloat32,
+        COLUMN_NAME.ASK: PolarsFloat32,
+        COLUMN_NAME.BID: PolarsFloat32,
+        COLUMN_NAME.ASK_VOLUME: PolarsFloat32,
+        COLUMN_NAME.BID_VOLUME: PolarsFloat32,
+        COLUMN_NAME.VWMP: PolarsFloat32,
+        COLUMN_NAME.VWMP_AVG: PolarsFloat32
+    }
 
 # DATA ENGINES FUNCTIONS
 
@@ -1335,15 +1437,15 @@ def reframe_data(dataframe, tf):
 
         if not is_datetime64_any_dtype(dataframe.index):
 
-            if BASE_DATA_COLUMN_NAME.TIMESTAMP in dataframe.columns:
+            if COLUMN_NAME.TIMESTAMP in dataframe.columns:
 
                 if not is_datetime64_any_dtype(
-                        dataframe[BASE_DATA_COLUMN_NAME.TIMESTAMP]):
+                        dataframe[COLUMN_NAME.TIMESTAMP]):
 
                     try:
 
-                        dataframe[BASE_DATA_COLUMN_NAME.TIMESTAMP] = any_date_to_datetime64(
-                            dataframe[BASE_DATA_COLUMN_NAME.TIMESTAMP])
+                        dataframe[COLUMN_NAME.TIMESTAMP] = any_date_to_datetime64(
+                            dataframe[COLUMN_NAME.TIMESTAMP])
 
                     except Exception as e:
 
@@ -1355,24 +1457,37 @@ def reframe_data(dataframe, tf):
             else:
 
                 logger.error('Pandas engine: required column with '
-                             f'name {BASE_DATA_COLUMN_NAME.TIMESTAMP}')
+                             f'name {COLUMN_NAME.TIMESTAMP}')
                 raise ValueError
 
         # use pandas functions to reframe data on pandas Dataframe
 
-        dataframe = sort_dataframe(dataframe, BASE_DATA_COLUMN_NAME.TIMESTAMP)
+        dataframe = sort_dataframe(dataframe, COLUMN_NAME.TIMESTAMP)
 
-        dataframe = dataframe.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+        dataframe = dataframe.set_index(COLUMN_NAME.TIMESTAMP,
                                         inplace=False,
                                         drop=True
                                         )
 
-        # resample based on p value
+        # resample based on TICK_DATA columns
         if all([col in DATA_COLUMN_NAMES.TICK_DATA_TIME_INDEX
                 for col in dataframe.columns]):
 
-            # resample along 'p' column, data in ask, bid, p format
-            dataframe = dataframe.p.resample(tf).ohlc().interpolate(method='nearest')
+            # resample vwmp to ohlc
+            ohlc_df = dataframe[COLUMN_NAME.VWMP].resample(tf).ohlc().interpolate(method='nearest')
+            # Sum the volumes
+            ask_vol_df = dataframe[COLUMN_NAME.ASK_VOLUME].resample(tf).sum()
+            bid_vol_df = dataframe[COLUMN_NAME.BID_VOLUME].resample(tf).sum()
+            # Mean of vwmp for vwmp_avg
+            vwmp_avg_df = dataframe[COLUMN_NAME.VWMP].resample(tf).mean()
+            # Last values for ask, bid, vwmp
+            ask_df = dataframe[COLUMN_NAME.ASK].resample(tf).last()
+            bid_df = dataframe[COLUMN_NAME.BID].resample(tf).last()
+            vwmp_df = dataframe[COLUMN_NAME.VWMP].resample(tf).last()
+            
+            # Combine them
+            dataframe = pandas_concat([ohlc_df, ask_df, bid_df, ask_vol_df, bid_vol_df, vwmp_df, vwmp_avg_df], axis=1)
+            dataframe.columns = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
 
         elif all([col in DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX
                   for col in dataframe.columns]):
@@ -1393,20 +1508,6 @@ def reframe_data(dataframe, tf):
 
         # assert timeframe input value
         tf = check_timeframe_str(tf, engine='pyarrow')
-
-        '''
-            use pyarrow functions to reframe data on pyarrow Table
-            could not find easy way to filter an arrow table
-            based on time interval
-
-            opened an enhancement issue on github
-
-            https://github.com/apache/arrow/issues/41049
-
-            As a temporary alternative, convert arrow Table to polars
-            and perform reframe with polars engine
-
-        '''
 
         if all([col in DATA_COLUMN_NAMES.TICK_DATA
                 for col in dataframe.column_names]):
@@ -1433,28 +1534,40 @@ def reframe_data(dataframe, tf):
 
         tf = tf.lower()
 
-        dataframe = sort_dataframe(dataframe, BASE_DATA_COLUMN_NAME.TIMESTAMP)
+        dataframe = sort_dataframe(dataframe, COLUMN_NAME.TIMESTAMP)
 
         if all([col in DATA_COLUMN_NAMES.TICK_DATA
                 for col in dataframe.columns]):
 
             return dataframe.group_by_dynamic(
-                BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                every=tf).agg(col('p').first().alias(BASE_DATA_COLUMN_NAME.OPEN),
-                              col('p').max().alias(BASE_DATA_COLUMN_NAME.HIGH),
-                              col('p').min().alias(BASE_DATA_COLUMN_NAME.LOW),
-                              col('p').last().alias(BASE_DATA_COLUMN_NAME.CLOSE)
+                COLUMN_NAME.TIMESTAMP,
+                every=tf).agg(col(COLUMN_NAME.VWMP).first().alias(COLUMN_NAME.OPEN),
+                              col(COLUMN_NAME.VWMP).max().alias(COLUMN_NAME.HIGH),
+                              col(COLUMN_NAME.VWMP).min().alias(COLUMN_NAME.LOW),
+                              col(COLUMN_NAME.VWMP).last().alias(COLUMN_NAME.CLOSE),
+                              col(COLUMN_NAME.ASK).last().alias(COLUMN_NAME.ASK),
+                              col(COLUMN_NAME.BID).last().alias(COLUMN_NAME.BID),
+                              col(COLUMN_NAME.ASK_VOLUME).sum().alias(COLUMN_NAME.ASK_VOLUME),
+                              col(COLUMN_NAME.BID_VOLUME).sum().alias(COLUMN_NAME.BID_VOLUME),
+                              col(COLUMN_NAME.VWMP).last().alias(COLUMN_NAME.VWMP),
+                              col(COLUMN_NAME.VWMP).mean().alias(COLUMN_NAME.VWMP_AVG)
                               )
 
         elif all([col in DATA_COLUMN_NAMES.TF_DATA
                   for col in dataframe.columns]):
 
             return dataframe.group_by_dynamic(
-                BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                every=tf).agg(col(BASE_DATA_COLUMN_NAME.OPEN).first(),
-                              col(BASE_DATA_COLUMN_NAME.HIGH).max(),
-                              col(BASE_DATA_COLUMN_NAME.LOW).min(),
-                              col(BASE_DATA_COLUMN_NAME.CLOSE).last()
+                COLUMN_NAME.TIMESTAMP,
+                every=tf).agg(col(COLUMN_NAME.OPEN).first(),
+                              col(COLUMN_NAME.HIGH).max(),
+                              col(COLUMN_NAME.LOW).min(),
+                              col(COLUMN_NAME.CLOSE).last(),
+                              col(COLUMN_NAME.ASK).last(),
+                              col(COLUMN_NAME.BID).last(),
+                              col(COLUMN_NAME.ASK_VOLUME).sum(),
+                              col(COLUMN_NAME.BID_VOLUME).sum(),
+                              col(COLUMN_NAME.VWMP).last(),
+                              col(COLUMN_NAME.VWMP_AVG).mean()
                               )
 
         else:
@@ -1468,28 +1581,40 @@ def reframe_data(dataframe, tf):
 
         tf = tf.lower()
 
-        dataframe = dataframe.sort('timestamp', nulls_last=True)
+        dataframe = dataframe.sort(COLUMN_NAME.TIMESTAMP, nulls_last=True)
 
         if all([col in DATA_COLUMN_NAMES.TICK_DATA
                 for col in dataframe.collect_schema().names()]):
 
             return dataframe.group_by_dynamic(
-                BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                every=tf).agg(col('p').first().alias(BASE_DATA_COLUMN_NAME.OPEN),
-                              col('p').max().alias(BASE_DATA_COLUMN_NAME.HIGH),
-                              col('p').min().alias(BASE_DATA_COLUMN_NAME.LOW),
-                              col('p').last().alias(BASE_DATA_COLUMN_NAME.CLOSE)
+                COLUMN_NAME.TIMESTAMP,
+                every=tf).agg(col(COLUMN_NAME.VWMP).first().alias(COLUMN_NAME.OPEN),
+                              col(COLUMN_NAME.VWMP).max().alias(COLUMN_NAME.HIGH),
+                              col(COLUMN_NAME.VWMP).min().alias(COLUMN_NAME.LOW),
+                              col(COLUMN_NAME.VWMP).last().alias(COLUMN_NAME.CLOSE),
+                              col(COLUMN_NAME.ASK).last().alias(COLUMN_NAME.ASK),
+                              col(COLUMN_NAME.BID).last().alias(COLUMN_NAME.BID),
+                              col(COLUMN_NAME.ASK_VOLUME).sum().alias(COLUMN_NAME.ASK_VOLUME),
+                              col(COLUMN_NAME.BID_VOLUME).sum().alias(COLUMN_NAME.BID_VOLUME),
+                              col(COLUMN_NAME.VWMP).last().alias(COLUMN_NAME.VWMP),
+                              col(COLUMN_NAME.VWMP).mean().alias(COLUMN_NAME.VWMP_AVG)
                               )
 
         elif all([col in DATA_COLUMN_NAMES.TF_DATA
                   for col in dataframe.collect_schema().names()]):
 
             return dataframe.group_by_dynamic(
-                BASE_DATA_COLUMN_NAME.TIMESTAMP,
-                every=tf).agg(col(BASE_DATA_COLUMN_NAME.OPEN).first(),
-                              col(BASE_DATA_COLUMN_NAME.HIGH).max(),
-                              col(BASE_DATA_COLUMN_NAME.LOW).min(),
-                              col(BASE_DATA_COLUMN_NAME.CLOSE).last()
+                COLUMN_NAME.TIMESTAMP,
+                every=tf).agg(col(COLUMN_NAME.OPEN).first(),
+                              col(COLUMN_NAME.HIGH).max(),
+                              col(COLUMN_NAME.LOW).min(),
+                              col(COLUMN_NAME.CLOSE).last(),
+                              col(COLUMN_NAME.ASK).last(),
+                              col(COLUMN_NAME.BID).last(),
+                              col(COLUMN_NAME.ASK_VOLUME).sum(),
+                              col(COLUMN_NAME.BID_VOLUME).sum(),
+                              col(COLUMN_NAME.VWMP).last(),
+                              col(COLUMN_NAME.VWMP_AVG).mean()
                               )
 
         else:

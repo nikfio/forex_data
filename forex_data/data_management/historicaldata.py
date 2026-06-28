@@ -103,6 +103,8 @@ class HistoricalManagerDB:
                                                             validators.instance_of(Path)))
     db_files_year_partitioning: bool = field(default=True,
                                              validator=validators.instance_of(bool))
+    volume_data: bool = field(default=False,
+                              validator=validators.instance_of(bool))
     ssl_verify: bool = field(default=True,
                              validator=validators.instance_of(bool))
     polars_gpu_engine: bool = field(default=False,
@@ -277,20 +279,33 @@ class HistoricalManagerDB:
             raise ValueError(f'Data type {self.data_type} not supported')
 
         # initialize histdata connectors
-        self._histdata_connector = [
-            HistDataConnector(
-                ssl_verify=self.ssl_verify,
-                data_path=str(self._histdata_path / 'histdata'),
-                engine=self.engine,
-                data_type=self.data_type,
-            ),
-            DukascopyConnector(
-                ssl_verify=self.ssl_verify,
-                data_path=str(self._histdata_path / 'dukascopy'),
-                engine=self.engine,
-                data_type=self.data_type,
-            )
-        ]
+        if self.volume_data:
+            self._histdata_connector = [
+                DukascopyConnector(
+                    ssl_verify=self.ssl_verify,
+                    data_path=str(self._histdata_path / 'dukascopy'),
+                    engine=self.engine,
+                    data_type=self.data_type,
+                    volume_data=self.volume_data,
+                )
+            ]
+        else:
+            self._histdata_connector = [
+                HistDataConnector(
+                    ssl_verify=self.ssl_verify,
+                    data_path=str(self._histdata_path / 'histdata'),
+                    engine=self.engine,
+                    data_type=self.data_type,
+                    volume_data=self.volume_data,
+                ),
+                DukascopyConnector(
+                    ssl_verify=self.ssl_verify,
+                    data_path=str(self._histdata_path / 'dukascopy'),
+                    engine=self.engine,
+                    data_type=self.data_type,
+                    volume_data=self.volume_data,
+                )
+            ]
 
         # cache histdata tickers list at initialization (merged from all connectors)
         tickers_set = set()
@@ -434,9 +449,9 @@ class HistoricalManagerDB:
                     # Read missing year from tick_dataframe
                     # use filter to get just the year needed
                     dataframe = tick_dataframe.filter(
-                        (col(BASE_DATA_COLUMN_NAME.TIMESTAMP) >= start)
+                        (col(COLUMN_NAME.TIMESTAMP) >= start)
                         &
-                        (col(BASE_DATA_COLUMN_NAME.TIMESTAMP) < end)
+                        (col(COLUMN_NAME.TIMESTAMP) < end)
                     )
 
                     for tf in year_to_tfs[year]:
@@ -554,7 +569,8 @@ class HistoricalManagerDB:
                         elif self.engine == 'pyarrow':
                             month_data = month_data.to_arrow()
 
-                    is_empty_dataframe(month_data)
+                    if is_empty_dataframe(month_data):
+                        raise TickerDataNotFoundError("Ticker data is empty/not found")
 
                     last_err = None
                     break
@@ -563,11 +579,22 @@ class HistoricalManagerDB:
                     logger.bind(target='histmanager').warning(
                         f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
                     )
+                    if connector == self._histdata_connector[-1]:
+                        raise e
+                except TickerDataNotFoundError as e:
+                    last_err = e
+                    logger.bind(target='histmanager').warning(
+                        f"Ticker {ticker}-{year}-{month} not found for connector {connector.__class__.__name__}."
+                    )
+                    if connector == self._histdata_connector[-1]:
+                        raise e
                 except Exception as e:
                     last_err = e
                     logger.bind(target='histmanager').warning(
                         f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
                     )
+                    if connector == self._histdata_connector[-1]:
+                        raise e
 
             if last_err is not None:
                 if (
@@ -595,7 +622,7 @@ class HistoricalManagerDB:
                     year_tick_df = concat_data([year_tick_df, month_data])
 
         return sort_dataframe(year_tick_df,
-                              BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                              COLUMN_NAME.TIMESTAMP)
 
     def _download(self,
                   ticker,
@@ -1367,16 +1394,16 @@ class HistoricalManagerDB:
 
         chart_data = to_pandas_dataframe(chart_data)
 
-        if chart_data.index.name != BASE_DATA_COLUMN_NAME.TIMESTAMP:
+        if chart_data.index.name != COLUMN_NAME.TIMESTAMP:
 
-            chart_data.set_index(BASE_DATA_COLUMN_NAME.TIMESTAMP,
+            chart_data.set_index(COLUMN_NAME.TIMESTAMP,
                                  inplace=True)
 
             chart_data.index = to_datetime(chart_data.index)
 
         else:
             logger.bind(target='histmanager').trace(
-                f'Chart data already has {BASE_DATA_COLUMN_NAME.TIMESTAMP} as index')
+                f'Chart data already has {COLUMN_NAME.TIMESTAMP} as index')
 
         # candlestick chart type
         # use mplfinance

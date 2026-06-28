@@ -18,7 +18,7 @@ from sys import stdout
 
 from forex_data import (
     HistoricalManagerDB,
-    BASE_DATA_COLUMN_NAME,
+    COLUMN_NAME,
     SQL_COMPARISON_OPERATORS,
     SQL_CONDITION_AGGREGATION_MODES,
     is_empty_dataframe,
@@ -129,7 +129,7 @@ def _try_line_profiler(manager: HistoricalManagerDB, ex_ticker: str) -> None:
     for _ in range(2):
         wrapped_get_data(
             ticker=ex_ticker, timeframe='1D', start='2018-01-01', end='2018-12-31',
-            comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+            comparison_column_name=COLUMN_NAME.OPEN,
             check_level=1.13, comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN
         )
 
@@ -186,7 +186,7 @@ def main():
             timeframe=ex_timeframe,
             start=ex_start_date_1,
             end=ex_end_date_1,
-            comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+            comparison_column_name=COLUMN_NAME.OPEN,
             check_level=min_open_value,
             comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN
         )
@@ -205,8 +205,8 @@ def main():
             start=ex_start_date_2,
             end=ex_end_date_2,
             comparison_column_name=[
-                BASE_DATA_COLUMN_NAME.HIGH,
-                BASE_DATA_COLUMN_NAME.LOW],
+                COLUMN_NAME.HIGH,
+                COLUMN_NAME.LOW],
             check_level=[
                 high_threshold,
                 low_threshold],
@@ -234,7 +234,7 @@ def main():
             timeframe=ex_timeframe,
             start=ex_start_date_3,
             end=ex_end_date_3,
-            comparison_column_name=BASE_DATA_COLUMN_NAME.CLOSE,
+            comparison_column_name=COLUMN_NAME.CLOSE,
             check_level=close_threshold,
             comparison_operator=SQL_COMPARISON_OPERATORS.GREATER_THAN_OR_EQUAL
         )
@@ -257,7 +257,7 @@ def main():
             timeframe=ex_timeframe,
             start=ex_start_date_1,
             end=ex_end_date_1,
-            comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+            comparison_column_name=COLUMN_NAME.OPEN,
             check_level=min_open_value,
             comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN)
         timings['Example 1'].append(time.perf_counter() - t0)
@@ -269,8 +269,8 @@ def main():
             start=ex_start_date_2,
             end=ex_end_date_2,
             comparison_column_name=[
-                BASE_DATA_COLUMN_NAME.HIGH,
-                BASE_DATA_COLUMN_NAME.LOW],
+                COLUMN_NAME.HIGH,
+                COLUMN_NAME.LOW],
             check_level=[
                 high_threshold,
                 low_threshold],
@@ -294,7 +294,7 @@ def main():
             timeframe=ex_timeframe,
             start=ex_start_date_3,
             end=ex_end_date_3,
-            comparison_column_name=BASE_DATA_COLUMN_NAME.CLOSE,
+            comparison_column_name=COLUMN_NAME.CLOSE,
             check_level=close_threshold,
             comparison_operator=SQL_COMPARISON_OPERATORS.GREATER_THAN_OR_EQUAL)
         timings['Example 3 Close Filter'].append(time.perf_counter() - t0)

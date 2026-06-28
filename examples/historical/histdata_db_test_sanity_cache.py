@@ -14,7 +14,7 @@ from sys import stdout
 
 from forex_data import (
     HistoricalManagerDB,
-    BASE_DATA_COLUMN_NAME,
+    COLUMN_NAME,
     SQL_COMPARISON_OPERATORS,
     is_empty_dataframe,
     shape_dataframe,
@@ -115,7 +115,7 @@ def main():
                         timeframe=tf,
                         start=start,
                         end=end,
-                        comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+                        comparison_column_name=COLUMN_NAME.OPEN,
                         check_level=threshold,
                         comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN
                     )

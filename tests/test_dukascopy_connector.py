@@ -134,7 +134,7 @@ class TestDukascopyConnector(unittest.TestCase):
         # Act
         result = self.connector.download_month_raw(
             ticker="EURUSD",
-            year=2024,
+            year=2026,
             month_num=5,
             engine="polars_lazy"
         )
