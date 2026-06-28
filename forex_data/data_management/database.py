@@ -651,7 +651,7 @@ class LocalDBConnector(DatabaseConnector):
             try:
 
                 query = f'''SELECT DISTINCT STRFTIME({
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP}, '%Y')
+                    COLUMN_NAME.TIMESTAMP}, '%Y')
                             AS YEAR
                             FROM self'''
                 read = dataframe.sql(query)
@@ -714,9 +714,9 @@ class LocalDBConnector(DatabaseConnector):
                 # clean duplicated timestamps rows, keep first by default
                 dataframe = dataframe.unique(
                     subset=[
-                        BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                        COLUMN_NAME.TIMESTAMP],
                     keep='first').sort(
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                    COLUMN_NAME.TIMESTAMP)
 
             if self.data_type == DATA_TYPE.CSV_FILETYPE:
 
@@ -753,13 +753,13 @@ class LocalDBConnector(DatabaseConnector):
             if isinstance(comparison_operator, str):
                 comparison_operator = [comparison_operator]
 
-            if any([col not in list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)
+            if any([col not in list(SUPPORTED_COLUMN_NAME.__args__)
                    for col in comparison_column_name]):
                 logger.bind(
                     target='localdb').error(
                     f'comparison_column_name must be a supported column name: {
                         list(
-                            SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
+                            SUPPORTED_COLUMN_NAME.__args__)}')
                 raise ValueError(
                     'comparison_column_name must be a supported column name')
 
@@ -859,9 +859,9 @@ class LocalDBConnector(DatabaseConnector):
                 # Build base query with timestamp filter
                 query = f'''SELECT * FROM self
                         WHERE
-                        {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_str}'
+                        {COLUMN_NAME.TIMESTAMP} >= '{start_str}'
                         AND
-                        {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_str}'
+                        {COLUMN_NAME.TIMESTAMP} <= '{end_str}'
                         '''
                 # Aggregate conditional filters if provided
                 # with the aggregation mode specified
@@ -893,7 +893,7 @@ class LocalDBConnector(DatabaseConnector):
                                     {col} {cond} {level}
                                     '''
                 # Close query with timestamp ordering
-                query += f'ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}'
+                query += f'ORDER BY {COLUMN_NAME.TIMESTAMP}'
                 dataframe = dataframe.sql(query)
 
             except Exception as e:
@@ -956,8 +956,8 @@ class LocalDBConnector(DatabaseConnector):
         year_filter_str = ", ".join([str(y) for y in years_list])
         query = f'''SELECT * FROM self
                 WHERE
-                EXTRACT(YEAR FROM {BASE_DATA_COLUMN_NAME.TIMESTAMP}) IN ({year_filter_str})
-                ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}
+                EXTRACT(YEAR FROM {COLUMN_NAME.TIMESTAMP}) IN ({year_filter_str})
+                ORDER BY {COLUMN_NAME.TIMESTAMP}
                 '''
 
         try:
@@ -1031,22 +1031,22 @@ class LocalDBConnector(DatabaseConnector):
                     dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
         if direction == 'backward':
-            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
-                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+            query = f'''SELECT MIN({COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
                         FROM (
-                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
-                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_date}'
-                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} DESC
+                            SELECT {COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {COLUMN_NAME.TIMESTAMP} <= '{end_date}'
+                            ORDER BY {COLUMN_NAME.TIMESTAMP} DESC
                             LIMIT {periods}
                         ) AS sub
                         '''
         elif direction == 'forward':
-            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
-                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+            query = f'''SELECT MIN({COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
                         FROM (
-                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
-                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_date}'
-                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} ASC
+                            SELECT {COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {COLUMN_NAME.TIMESTAMP} >= '{start_date}'
+                            ORDER BY {COLUMN_NAME.TIMESTAMP} ASC
                             LIMIT {periods}
                         ) AS sub
                         '''
@@ -1129,7 +1129,7 @@ class LocalDBConnector(DatabaseConnector):
                 if hasattr(dataframe, 'collect'):
                     dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
-        query = f'''SELECT MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+        query = f'''SELECT MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
                     FROM self
                     '''
 
@@ -1352,11 +1352,11 @@ class LocalDBYearConnector(DatabaseConnector):
             if isinstance(comparison_operator, str):
                 comparison_operator = [comparison_operator]
 
-            if any([col not in list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)
+            if any([col not in list(SUPPORTED_COLUMN_NAME.__args__)
                    for col in comparison_column_name]):
                 logger.bind(
                     target='localdb').error(
-                    f'comparison_column_name must be a supported column name: {list(SUPPORTED_BASE_DATA_COLUMN_NAME.__args__)}')
+                    f'comparison_column_name must be a supported column name: {list(SUPPORTED_COLUMN_NAME.__args__)}')
                 raise ValueError(
                     'comparison_column_name must be a supported column name')
 
@@ -1433,9 +1433,9 @@ class LocalDBYearConnector(DatabaseConnector):
 
             query = f'''SELECT * FROM self
                     WHERE
-                    {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_str}'
+                    {COLUMN_NAME.TIMESTAMP} >= '{start_str}'
                     AND
-                    {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_str}'
+                    {COLUMN_NAME.TIMESTAMP} <= '{end_str}'
                     '''
             if comparisons_len > 0:
                 if comparisons_len == 1:
@@ -1456,7 +1456,7 @@ class LocalDBYearConnector(DatabaseConnector):
                             query += f'''{comparison_aggregation_mode}
                                 {col} {cond} {level}
                                 '''
-            query += f'ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}'
+            query += f'ORDER BY {COLUMN_NAME.TIMESTAMP}'
             dataframe = dataframe.sql(query)
 
         except Exception as e:
@@ -1510,8 +1510,8 @@ class LocalDBYearConnector(DatabaseConnector):
         year_filter_str = ", ".join([str(y) for y in years_list])
         query = f'''SELECT * FROM self
                 WHERE
-                EXTRACT(YEAR FROM {BASE_DATA_COLUMN_NAME.TIMESTAMP}) IN ({year_filter_str})
-                ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP}
+                EXTRACT(YEAR FROM {COLUMN_NAME.TIMESTAMP}) IN ({year_filter_str})
+                ORDER BY {COLUMN_NAME.TIMESTAMP}
                 '''
 
         try:
@@ -1636,22 +1636,22 @@ class LocalDBYearConnector(DatabaseConnector):
         # the query shall return the first and last datetime entries
         # in ascending order of timestamp
         if direction == 'backward':
-            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
-                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+            query = f'''SELECT MIN({COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
                         FROM (
-                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
-                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} <= '{end_date}'
-                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} DESC
+                            SELECT {COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {COLUMN_NAME.TIMESTAMP} <= '{end_date}'
+                            ORDER BY {COLUMN_NAME.TIMESTAMP} DESC
                             LIMIT {periods}
                         ) AS sub
                         '''
         elif direction == 'forward':
-            query = f'''SELECT MIN({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS start_time,
-                        MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+            query = f'''SELECT MIN({COLUMN_NAME.TIMESTAMP}) AS start_time,
+                        MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
                         FROM (
-                            SELECT {BASE_DATA_COLUMN_NAME.TIMESTAMP} FROM self
-                            WHERE {BASE_DATA_COLUMN_NAME.TIMESTAMP} >= '{start_date}'
-                            ORDER BY {BASE_DATA_COLUMN_NAME.TIMESTAMP} ASC
+                            SELECT {COLUMN_NAME.TIMESTAMP} FROM self
+                            WHERE {COLUMN_NAME.TIMESTAMP} >= '{start_date}'
+                            ORDER BY {COLUMN_NAME.TIMESTAMP} ASC
                             LIMIT {periods}
                         ) AS sub
                         '''
@@ -1764,7 +1764,7 @@ class LocalDBYearConnector(DatabaseConnector):
                 if hasattr(dataframe, 'collect'):
                     dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
-        query = f'''SELECT MAX({BASE_DATA_COLUMN_NAME.TIMESTAMP}) AS end_time
+        query = f'''SELECT MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
                     FROM self
                     '''
 

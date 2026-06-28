@@ -60,7 +60,7 @@ from .common import (
     SUPPORTED_DATA_ENGINES,
     DATA_COLUMN_NAMES,
     DATA_FILE_COLUMN_INDEX,
-    BASE_DATA_COLUMN_NAME,
+    COLUMN_NAME,
     DATE_FORMAT_HISTDATA_CSV,
     HISTDATA_URL_TICKDATA_TEMPLATE,
     HISTDATA_BASE_DOWNLOAD_METHOD,
@@ -102,6 +102,8 @@ class RemoteConnector:
                         validator=validators.in_(SUPPORTED_DATA_ENGINES))
     polars_gpu_engine: bool = field(default=False,
                                     validator=validators.instance_of(bool))
+    volume_data: bool = field(default=False,
+                              validator=validators.instance_of(bool))
 
     # internal parameters
     _tickers_years_info_filepath = field(default=Path('.'))
@@ -162,10 +164,24 @@ class RemoteConnector:
                 logger.bind(target='dukascopy').warning(
                     f"Failed to delete temporary directory {self._temporary_data_path}: {e}"
                 )
+
+        # Clean up any orphaned temp directories from previous crashed sessions
+        # that are older than 15 minutes.
         temp_root = self.data_path / TEMP_FOLDER
         if temp_root.exists() and temp_root.is_dir():
+            import time
+            now = time.time()
+            for p in temp_root.iterdir():
+                if p.is_dir() and p != self._temporary_data_path:
+                    try:
+                        # If the folder is older than 15 minutes, clean it up
+                        if now - p.stat().st_mtime > 900:
+                            shutil.rmtree(p)
+                    except Exception:
+                        pass
+
             try:
-                # If the directory is empty, remove it
+                # If the root temp directory is empty, remove it
                 if not any(temp_root.iterdir()):
                     temp_root.rmdir()
             except Exception:
@@ -402,99 +418,98 @@ class HistDataConnector(RemoteConnector):
             If the extracted file type is unexpected.
         """
 
-        temp_filepath = str(
-            self._temporary_data_path /
-            (f'{ticker}_' +
-             f'{year}_' +
-             f'{MONTHS[month_num - 1]}_' +
-             TEMP_CSV_FILE)
-        )
-
-        url = HISTDATA_URL_TICKDATA_TEMPLATE.format(
-            ticker=ticker.lower(),
-            year=year,
-            month_num=month_num
-        )
-        r = self._session.get(url)
-
-        token = None
-        try:
-            token = search('id="tk" value="(.*?)"', r.text).groups()[0]
-        except AttributeError:
-            logger.bind(target='histdata').critical(
-                f'token value was not found scraping '
-                f'url {url}: {ticker} not existing or'
-                f'not supported by histdata.com: {ticker} - '
-                f'{year}-{MONTHS[month_num - 1]}')
-
-        # If exception was caught, token will still be None
-        if token is None:
-            raise TickerNotFoundError(
-                f"Ticker {ticker} not found or not supported by histdata.com")
-
-        headers = {'Referer': url}
-        data = {
-            'tk': token,
-            'date': year,
-            'datemonth': "%d%02d" % (year, month_num),
-            'platform': 'ASCII',
-            'timeframe': 'T',
-            'fxpair': ticker
-        }
-
-        # logger trace ticker year and month specifed are being downloaded
-        logger.bind(target='histdata').trace(
-            f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
-        r = self._session.request(
-            HISTDATA_BASE_DOWNLOAD_METHOD,
-            HISTDATA_BASE_DOWNLOAD_URL,
-            data=data,
-            headers=headers,
-            stream=True
-        )
-
-        bio = BytesIO()
-
-        # write content to stream
-        bio.write(r.content)
+        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
 
         try:
+            temp_filepath = str(
+                self._temporary_data_path /
+                (f'{ticker}_' +
+                 f'{year}_' +
+                 f'{MONTHS[month_num - 1]}_' +
+                 TEMP_CSV_FILE)
+            )
 
-            zf = ZipFile(bio)
+            url = HISTDATA_URL_TICKDATA_TEMPLATE.format(
+                ticker=ticker.lower(),
+                year=year,
+                month_num=month_num
+            )
+            r = self._session.get(url)
 
-        except BadZipFile as e:
-
-            # here will be a warning log
-            logger.bind(target='histdata').error(
-                dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]}: {e}
-                           url: {url}'''))
-            raise TickerDataBadTypeException(
-                dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}
-                           url: {url}'''))
-
-        else:
-
-            # extract and parse zip file content
+            token = None
             try:
-                ExtFile = zf.open(zf.namelist()[0])
-            except Exception as e:
-                logger.bind(target='histdata').error(
-                    f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
-                    f'not found or invalid download: {e}')
-                raise TickerDataNotFoundError(
-                    f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
+                token = search('id="tk" value="(.*?)"', r.text).groups()[0]
+            except AttributeError:
+                logger.bind(target='histdata').critical(
+                    f'token value was not found scraping '
+                    f'url {url}: {ticker} not existing or'
+                    f'not supported by histdata.com: {ticker} - '
+                    f'{year}-{MONTHS[month_num - 1]}')
 
+            # If exception was caught, token will still be None
+            if token is None:
+                raise TickerNotFoundError(
+                    f"Ticker {ticker} not found or not supported by histdata.com")
+
+            headers = {'Referer': url}
+            data = {
+                'tk': token,
+                'date': year,
+                'datemonth': "%d%02d" % (year, month_num),
+                'platform': 'ASCII',
+                'timeframe': 'T',
+                'fxpair': ticker
+            }
+
+            # logger trace ticker year and month specifed are being downloaded
+            logger.bind(target='histdata').trace(
+                f'{ticker} - {year} - {MONTHS[month_num - 1]}: downloading')
+            r = self._session.request(
+                HISTDATA_BASE_DOWNLOAD_METHOD,
+                HISTDATA_BASE_DOWNLOAD_URL,
+                data=data,
+                headers=headers,
+                stream=True
+            )
+
+            bio = BytesIO()
+
+            # write content to stream
+            bio.write(r.content)
+
+            try:
+                zf = ZipFile(bio)
+            except BadZipFile as e:
+                # here will be a warning log
+                logger.bind(target='histdata').error(
+                    dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]}: {e}
+                               url: {url}'''))
+                raise TickerDataBadTypeException(
+                    dedent(f'''Data {ticker} - {year} - {MONTHS[month_num - 1]} BadZipFile error: {e}
+                               url: {url}'''))
             else:
-                if isinstance(ExtFile, ZipExtFile):
-                    return self._raw_zipfile_to_df(
-                        ExtFile, temp_filepath, engine=engine
-                    )
-                else:
+                # extract and parse zip file content
+                try:
+                    ExtFile = zf.open(zf.namelist()[0])
+                except Exception as e:
                     logger.bind(target='histdata').error(
                         f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
-                        f'data type not expected')
-                    raise TickerDataBadTypeException(
-                        f"Data {ticker} - {year} - {MONTHS[month_num - 1]} type not expected")
+                        f'not found or invalid download: {e}')
+                    raise TickerDataNotFoundError(
+                        f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
+                else:
+                    if isinstance(ExtFile, ZipExtFile):
+                        return self._raw_zipfile_to_df(
+                            ExtFile, temp_filepath, engine=engine
+                        )
+                    else:
+                        logger.bind(target='histdata').error(
+                            f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
+                            f'data type not expected')
+                        raise TickerDataBadTypeException(
+                            f"Data {ticker} - {year} - {MONTHS[month_num - 1]} type not expected")
+        finally:
+            self.clear_temporary_folder()
 
     def _raw_zipfile_to_df(
         self,
@@ -534,41 +549,36 @@ class HistDataConnector(RemoteConnector):
             # pandas with python engine can read a runtime opened
             # zip file
 
-            # function is specific for format of files downloaded
-            # parse file passed as input
-
             df = read_csv(
                 'pandas',
                 raw_file,
                 sep=',',
-                names=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-                dtype=DTYPE_DICT.TICK_DTYPE,
-                parse_dates=[DATA_FILE_COLUMN_INDEX.TIMESTAMP],
+                names=[COLUMN_NAME.TIMESTAMP, COLUMN_NAME.ASK, COLUMN_NAME.BID, COLUMN_NAME.VOLUME],
+                dtype={COLUMN_NAME.ASK: 'float32', COLUMN_NAME.BID: 'float32', COLUMN_NAME.VOLUME: 'float32'},
+                parse_dates=[0],
                 date_format=DATE_FORMAT_HISTDATA_CSV,
                 engine='c'
             )
 
             # Localize and convert timezone from America/New_York (EST/EDT) to UTC
-            df['timestamp'] = (
-                pd.to_datetime(df['timestamp'])
+            df[COLUMN_NAME.TIMESTAMP] = (
+                pd.to_datetime(df[COLUMN_NAME.TIMESTAMP])
                 .dt.tz_localize('America/New_York', ambiguous='NaT', nonexistent='NaT')
                 .dt.tz_convert('UTC')
                 .dt.tz_localize(None)
             )
-            df = df.dropna(subset=['timestamp'])
+            df = df.dropna(subset=[COLUMN_NAME.TIMESTAMP])
 
-            # calculate 'p'
-            df['p'] = (df['ask'] + df['bid']) / 2
+            # calculate ask_volume, bid_volume, vwmp
+            df[COLUMN_NAME.ASK_VOLUME] = 0.0
+            df[COLUMN_NAME.BID_VOLUME] = 0.0
+            df[COLUMN_NAME.VWMP] = (df[COLUMN_NAME.ASK] + df[COLUMN_NAME.BID]) / 2
+
+            # select columns matching TICK_DATA schema
+            df = df[DATA_COLUMN_NAMES.TICK_DATA]
 
         elif engine == 'pyarrow':
 
-            # no way found to directly open a runtime zip file
-            # with pyarrow
-            # strategy rolls back to temporary file download
-            # open and read all
-            # delete temporary file
-
-            # alternative using pyarrow
             buf = BufferReader(raw_file.read())
 
             if (
@@ -590,23 +600,25 @@ class HistDataConnector(RemoteConnector):
             # use pyarrow native options
             read_opts = arrow_csv.ReadOptions(
                 use_threads=True,
-                column_names=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
-
+                column_names=[COLUMN_NAME.TIMESTAMP, COLUMN_NAME.ASK, COLUMN_NAME.BID, COLUMN_NAME.VOLUME]
             )
 
             parse_opts = arrow_csv.ParseOptions(
                 delimiter=','
             )
 
-            modtypes = PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-            modtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = pyarrow_string()
-            modtypes.pop(BASE_DATA_COLUMN_NAME.P_VALUE)
+            modtypes = {
+                COLUMN_NAME.TIMESTAMP: pyarrow_string(),
+                COLUMN_NAME.ASK: pyarrow_float32(),
+                COLUMN_NAME.BID: pyarrow_float32(),
+                COLUMN_NAME.VOLUME: pyarrow_float32()
+            }
 
             convert_opts = arrow_csv.ConvertOptions(
                 column_types=modtypes
             )
 
-            # at first read file with timestmap as a string
+            # at first read file with timestamp as a string
             df = read_csv(
                 'pyarrow',
                 temp_filepath,
@@ -615,16 +627,11 @@ class HistDataConnector(RemoteConnector):
                 convert_options=convert_opts
             )
 
-            # convert timestamp  string array to pyarrow timestamp('ms')
-
-            # all pyarrow ops solution
-            # suggested here
-            # https://github.com/apache/arrow/issues/41132#issuecomment-2052555361
-
+            # convert timestamp string array to pyarrow timestamp('ms')
             mod_format = DATE_FORMAT_HISTDATA_CSV.removesuffix('%f')
             ts2 = pc.strptime(pc.utf8_slice_codeunits(
-                df[BASE_DATA_COLUMN_NAME.TIMESTAMP], 0, 15), format=mod_format, unit="ms")
-            d = pc.utf8_slice_codeunits(df[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+                df[COLUMN_NAME.TIMESTAMP], 0, 15), format=mod_format, unit="ms")
+            d = pc.utf8_slice_codeunits(df[COLUMN_NAME.TIMESTAMP],
                                         15,
                                         99).cast(pyarrow_int64()).cast(duration("ms"))
             timecol = pc.add(ts2, d)
@@ -634,20 +641,23 @@ class HistDataConnector(RemoteConnector):
             timecol_utc = pc.cast(timecol_aware, pyarrow_timestamp('ms', tz='UTC'))
             timecol = pc.cast(timecol_utc, pyarrow_timestamp('ms', tz=None))
 
-            # calculate 'p'
-            p_value = pc.divide(
-                pc.add_checked(df['ask'], df['bid']),
+            # calculate ask_volume, bid_volume, vwmp
+            ask_volume = pc.cast(pc.multiply(df[COLUMN_NAME.VOLUME], 0.0), pyarrow_float32())
+            bid_volume = pc.cast(pc.multiply(df[COLUMN_NAME.VOLUME], 0.0), pyarrow_float32())
+            vwmp = pc.divide(
+                pc.add_checked(df[COLUMN_NAME.ASK], df[COLUMN_NAME.BID]),
                 2
             )
 
-            # aggregate in a new table
+            # aggregate in a new table matching pyarrow schema
             df = Table.from_arrays(
                 [
                     timecol,
-                    df[BASE_DATA_COLUMN_NAME.ASK],
-                    df[BASE_DATA_COLUMN_NAME.BID],
-                    df[BASE_DATA_COLUMN_NAME.VOL],
-                    p_value
+                    df[COLUMN_NAME.ASK],
+                    df[COLUMN_NAME.BID],
+                    ask_volume,
+                    bid_volume,
+                    vwmp
                 ],
                 schema=schema(PYARROW_DTYPE_DICT.TIME_TICK_DTYPE.copy().items())
             )
@@ -655,9 +665,6 @@ class HistDataConnector(RemoteConnector):
         elif engine == 'polars':
 
             # download to temporary csv file
-            # for best performance with polars
-
-            # alternative using pyarrow
             buf = BufferReader(raw_file.read())
 
             if (
@@ -675,24 +682,26 @@ class HistDataConnector(RemoteConnector):
 
             buf.download(temp_filepath)
 
-            # from histdata raw files column 'p' is not present
             try:
                 # Fast path: try reading directly as Float32
-                raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-                raw_file_dtypes.pop('p')
-                raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
+                raw_file_dtypes = {
+                    COLUMN_NAME.TIMESTAMP: polars_string,
+                    COLUMN_NAME.ASK: PolarsFloat32,
+                    COLUMN_NAME.BID: PolarsFloat32,
+                    COLUMN_NAME.VOLUME: PolarsFloat32
+                }
 
                 df = read_csv(
                     'polars',
                     temp_filepath,
                     separator=',',
                     has_header=False,
-                    new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
+                    new_columns=[COLUMN_NAME.TIMESTAMP, COLUMN_NAME.ASK, COLUMN_NAME.BID, COLUMN_NAME.VOLUME],
                     schema_overrides=raw_file_dtypes,
                     use_pyarrow=True
                 )
                 df = df.with_columns(
-                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                    col(COLUMN_NAME.TIMESTAMP).str.strptime(
                         PolarsDatetime('ms'),
                         format=DATE_FORMAT_HISTDATA_CSV
                     )
@@ -717,39 +726,41 @@ class HistDataConnector(RemoteConnector):
                     }
                 )
                 df = df.rename({
-                    'column_1': 'timestamp',
-                    'column_2': 'ask',
-                    'column_3': 'bid',
-                    'column_4': 'vol'
+                    'column_1': COLUMN_NAME.TIMESTAMP,
+                    'column_2': COLUMN_NAME.ASK,
+                    'column_3': COLUMN_NAME.BID,
+                    'column_4': COLUMN_NAME.VOLUME
                 })
                 df = df.with_columns([
-                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                    col(COLUMN_NAME.TIMESTAMP).str.strptime(
                         PolarsDatetime('ms'),
                         format=DATE_FORMAT_HISTDATA_CSV
                     ),
-                    col('ask').str.strip_chars().cast(PolarsFloat32),
-                    col('bid').str.strip_chars().cast(PolarsFloat32),
-                    col('vol').str.strip_chars().cast(PolarsFloat32)
+                    col(COLUMN_NAME.ASK).str.strip_chars().cast(PolarsFloat32),
+                    col(COLUMN_NAME.BID).str.strip_chars().cast(PolarsFloat32),
+                    col(COLUMN_NAME.VOLUME).str.strip_chars().cast(PolarsFloat32)
                 ])
 
             # Localize and convert timezone from America/New_York (EST/EDT) to UTC
             df = df.with_columns(
-                col(BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                col(COLUMN_NAME.TIMESTAMP)
                 .dt.replace_time_zone('America/New_York', ambiguous='earliest', non_existent='null')
                 .dt.convert_time_zone('UTC')
                 .dt.replace_time_zone(None)
-            ).filter(col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_not_null())
+            ).filter(col(COLUMN_NAME.TIMESTAMP).is_not_null())
 
-            # calculate 'p'
-            df = df.with_columns(
-                ((col('ask') + col('bid')) / 2).alias('p')
-            )
+            # calculate ask_volume, bid_volume, vwmp
+            df = df.with_columns([
+                (col(COLUMN_NAME.VOLUME) * 0.0).alias(COLUMN_NAME.ASK_VOLUME),
+                (col(COLUMN_NAME.VOLUME) * 0.0).alias(COLUMN_NAME.BID_VOLUME),
+                ((col(COLUMN_NAME.ASK) + col(COLUMN_NAME.BID)) / 2).alias(COLUMN_NAME.VWMP)
+            ])
 
             # final cast to standard dtypes
-            df = df.cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            df = df.select(DATA_COLUMN_NAMES.TICK_DATA).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
 
             # clean duplicated timestamps rows, keep first by default
-            df = df.unique(subset=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+            df = df.unique(subset=[COLUMN_NAME.TIMESTAMP],
                            keep='first')
 
             # remove business days
@@ -758,9 +769,6 @@ class HistDataConnector(RemoteConnector):
         elif engine == 'polars_lazy':
 
             # download to temporary csv file
-            # for best performance with polars
-
-            # alternative using pyarrow
             buf = BufferReader(raw_file.read())
 
             if (
@@ -779,30 +787,29 @@ class HistDataConnector(RemoteConnector):
             # download buffer to file
             buf.download(temp_filepath)
 
-            # from histdata raw files column 'p' is not present
             try:
                 # Fast path: try reading directly as Float32
-                raw_file_dtypes = POLARS_DTYPE_DICT.TIME_TICK_DTYPE.copy()
-                raw_file_dtypes.pop('p')
-                raw_file_dtypes[BASE_DATA_COLUMN_NAME.TIMESTAMP] = polars_string
+                raw_file_dtypes = {
+                    COLUMN_NAME.TIMESTAMP: polars_string,
+                    COLUMN_NAME.ASK: PolarsFloat32,
+                    COLUMN_NAME.BID: PolarsFloat32,
+                    COLUMN_NAME.VOLUME: PolarsFloat32
+                }
 
                 df = read_csv(
                     'polars_lazy',
                     temp_filepath,
                     separator=',',
                     has_header=False,
-                    new_columns=DATA_COLUMN_NAMES.TICK_DATA_NO_PVALUE,
+                    new_columns=[COLUMN_NAME.TIMESTAMP, COLUMN_NAME.ASK, COLUMN_NAME.BID, COLUMN_NAME.VOLUME],
                     schema_overrides=raw_file_dtypes
                 )
                 df = df.with_columns(
-                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                    col(COLUMN_NAME.TIMESTAMP).str.strptime(
                         PolarsDatetime('ms'),
                         format=DATE_FORMAT_HISTDATA_CSV
                     )
                 )
-                # Eagerly collect to force schema/parsing validation on all rows.
-                # If there are parsing errors anywhere in the file, this will raise ComputeError.
-                # Then convert it back to a LazyFrame so it matches the expected return type.
                 df = collect_lazyframe(df, self.polars_gpu_engine).lazy()
 
             except Exception as e:
@@ -823,46 +830,42 @@ class HistDataConnector(RemoteConnector):
                     }
                 )
                 df = df.rename({
-                    'column_1': 'timestamp',
-                    'column_2': 'ask',
-                    'column_3': 'bid',
-                    'column_4': 'vol'
+                    'column_1': COLUMN_NAME.TIMESTAMP,
+                    'column_2': COLUMN_NAME.ASK,
+                    'column_3': COLUMN_NAME.BID,
+                    'column_4': COLUMN_NAME.VOLUME
                 })
                 df = df.with_columns([
-                    col(BASE_DATA_COLUMN_NAME.TIMESTAMP).str.strptime(
+                    col(COLUMN_NAME.TIMESTAMP).str.strptime(
                         PolarsDatetime('ms'),
                         format=DATE_FORMAT_HISTDATA_CSV
                     ),
-                    col('ask').str.strip_chars().cast(PolarsFloat32),
-                    col('bid').str.strip_chars().cast(PolarsFloat32),
-                    col('vol').str.strip_chars().cast(PolarsFloat32)
+                    col(COLUMN_NAME.ASK).str.strip_chars().cast(PolarsFloat32),
+                    col(COLUMN_NAME.BID).str.strip_chars().cast(PolarsFloat32),
+                    col(COLUMN_NAME.VOLUME).str.strip_chars().cast(PolarsFloat32)
                 ])
                 df = collect_lazyframe(df, self.polars_gpu_engine).lazy()
 
             # Localize and convert timezone from America/New_York (EST/EDT) to UTC
             df = df.with_columns(
-                col(BASE_DATA_COLUMN_NAME.TIMESTAMP)
+                col(COLUMN_NAME.TIMESTAMP)
                 .dt.replace_time_zone('America/New_York', ambiguous='earliest', non_existent='null')
                 .dt.convert_time_zone('UTC')
                 .dt.replace_time_zone(None)
-            ).filter(col(BASE_DATA_COLUMN_NAME.TIMESTAMP).is_not_null())
+            ).filter(col(COLUMN_NAME.TIMESTAMP).is_not_null())
 
-            # calculate 'p'
-            df = df.with_columns(
-                ((col('ask') + col('bid')) / 2).alias('p')
-            )
-
-            # final cast to standard dtypes
-            df = df.select([
-                col('timestamp').cast(PolarsDatetime('ms')),
-                col('ask').cast(PolarsFloat32),
-                col('bid').cast(PolarsFloat32),
-                col('vol').cast(PolarsFloat32),
-                col('p').cast(PolarsFloat32)
+            # calculate ask_volume, bid_volume, vwmp
+            df = df.with_columns([
+                (col(COLUMN_NAME.VOLUME) * 0.0).alias(COLUMN_NAME.ASK_VOLUME),
+                (col(COLUMN_NAME.VOLUME) * 0.0).alias(COLUMN_NAME.BID_VOLUME),
+                ((col(COLUMN_NAME.ASK) + col(COLUMN_NAME.BID)) / 2).alias(COLUMN_NAME.VWMP)
             ])
 
+            # final cast to standard dtypes
+            df = df.select(DATA_COLUMN_NAMES.TICK_DATA).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+
             # clean duplicated timestamps rows, keep first by default
-            df = df.unique(subset=[BASE_DATA_COLUMN_NAME.TIMESTAMP],
+            df = df.unique(subset=[COLUMN_NAME.TIMESTAMP],
                            keep='first')
 
             # remove business days
@@ -1079,54 +1082,71 @@ class DukascopyConnector(RemoteConnector):
             logger.bind(target='dukascopy').error("tick_vault is not installed. Cannot download data.")
             raise RuntimeError("tick_vault is not installed.")
 
-        # Determine start and end date for the month
-        start = datetime(year, month_num, 1)
-        if month_num == 12:
-            end = datetime(year + 1, 1, 1)
-        else:
-            end = datetime(year, month_num + 1, 1)
-
-        # Run async download process in the event loop
-        logger.bind(target='dukascopy').info(f"Downloading {ticker_upper} for {year}-{month_num:02d}...")
+        # Ensure temporary data path exists and reconfigure tick_vault to use it
+        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
         try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            from tick_vault import reload_config
+            reload_config(
+                base_directory=str(self._temporary_data_path),
+                worker_per_proxy=3,
+                fetch_max_retry_attempts=3,
+            )
+        except ImportError:
+            pass
 
-        loop.run_until_complete(download_range(symbol=ticker_upper, start=start, end=end))
+        try:
+            # Determine start and end date for the month
+            start = datetime(year, month_num, 1)
+            if month_num == 12:
+                end = datetime(year + 1, 1, 1)
+            else:
+                end = datetime(year, month_num + 1, 1)
 
-        # Read downloaded tick data into Pandas DataFrame
-        logger.bind(target='dukascopy').info(f"Reading downloaded tick data for {ticker_upper}...")
-        pandas_df = read_tick_data(symbol=ticker_upper, start=start, end=end, strict=False)
+            # Run async download process in the event loop
+            logger.bind(target='dukascopy').info(f"Downloading {ticker_upper} for {year}-{month_num:02d}...")
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-        if pandas_df.empty:
-            logger.bind(target='dukascopy').warning(f"No data returned for {ticker_upper} {year}-{month_num}")
-            empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
-            return empty_df.lazy() if engine == 'polars_lazy' else empty_df
+            loop.run_until_complete(download_range(symbol=ticker_upper, start=start, end=end))
 
-        # Convert to Polars LazyFrame
-        pl_df = pl.from_pandas(pandas_df).lazy()
+            # Read downloaded tick data into Pandas DataFrame
+            logger.bind(target='dukascopy').info(f"Reading downloaded tick data for {ticker_upper}...")
+            pandas_df = read_tick_data(symbol=ticker_upper, start=start, end=end, strict=False)
 
-        # Rename columns to match TIME_TICK_DTYPE
-        pl_df = pl_df.rename({"time": "timestamp"})
+            if pandas_df.empty:
+                logger.bind(target='dukascopy').warning(f"No data returned for {ticker_upper} {year}-{month_num}")
+                empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                return empty_df.lazy() if engine == 'polars_lazy' else empty_df
 
-        # Calculate vol (ask_volume + bid_volume) and p (mid price)
-        pl_df = pl_df.with_columns([
-            (pl.col("ask_volume") + pl.col("bid_volume")).cast(pl.Float32).alias("vol"),
-            ((pl.col("ask") + pl.col("bid")) / 2).cast(pl.Float32).alias("p")
-        ])
+            # Convert to Polars LazyFrame
+            pl_df = pl.from_pandas(pandas_df).lazy()
 
-        # Cast to required TICK schema
-        pl_df = pl_df.select(list(POLARS_DTYPE_DICT.TIME_TICK_DTYPE.keys())).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            # Rename columns to match TIME_TICK_DTYPE
+            pl_df = pl_df.rename({"time": COLUMN_NAME.TIMESTAMP})
 
-        # Deduplicate on timestamp and sort chronologically
-        pl_df = pl_df.unique(subset=["timestamp"], keep='first', maintain_order=True).sort("timestamp")
+            # Calculate vwmp (volume weighted mid price)
+            pl_df = pl_df.with_columns([
+                pl.col(COLUMN_NAME.ASK_VOLUME).cast(pl.Float32),
+                pl.col(COLUMN_NAME.BID_VOLUME).cast(pl.Float32),
+                ((pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)) / 
+                 (pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.BID_VOLUME))).cast(pl.Float32).alias(COLUMN_NAME.VWMP)
+            ])
 
-        # Filter out business days/hours using standard helper
-        pl_df = business_days_data(pl_df)
+            # Cast to required TICK schema
+            pl_df = pl_df.select(list(POLARS_DTYPE_DICT.TIME_TICK_DTYPE.keys())).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
 
-        return pl_df if engine == 'polars_lazy' else collect_lazyframe(pl_df, self.polars_gpu_engine)
+            # Deduplicate on timestamp and sort chronologically
+            pl_df = pl_df.unique(subset=[COLUMN_NAME.TIMESTAMP], keep='first', maintain_order=True).sort(COLUMN_NAME.TIMESTAMP)
+
+            # Filter out business days/hours using standard helper
+            pl_df = business_days_data(pl_df)
+
+            return pl_df if engine == 'polars_lazy' else collect_lazyframe(pl_df, self.polars_gpu_engine)
+        finally:
+            self.clear_temporary_folder()
 
     def get_recent_data(
         self,
@@ -1168,78 +1188,95 @@ class DukascopyConnector(RemoteConnector):
             logger.bind(target='dukascopy').error("tick_vault is not installed. Cannot fetch recent data.")
             raise RuntimeError("tick_vault is not installed.")
 
-        from datetime import timezone
-        # Subtract 2 hours from current UTC time because Dukascopy CDN historical files
-        # are uploaded with some latency (usually up to 1-2 hours).
-        end = datetime.now(timezone.utc) - timedelta(hours=2)
-
-        # Roll back to Friday 21:00 UTC if the end time falls on a weekend.
-        # Weekday: 0=Monday, ..., 4=Friday, 5=Saturday, 6=Sunday.
-        # Market close: Friday 22:00 UTC. Market open: Sunday 22:00 UTC.
-        wd = end.weekday()
-        if (wd == 4 and end.hour >= 22) or (wd == 5) or (wd == 6 and end.hour < 22):
-            days_to_subtract = {4: 0, 5: 1, 6: 2}[wd]
-            end = end - timedelta(days=days_to_subtract)
-            end = end.replace(hour=21, minute=0, second=0, microsecond=0)
-
-            # In case the input end date is greater than the available range in the metadata DB,
-            # use the last available date in the DB if one exists.
-            try:
-                from tick_vault.metadata import MetadataDB
-                with MetadataDB() as db:
-                    db._ensure_table_exists(symbol_upper)
-                    table_name = db._get_table_name(symbol_upper)
-                    cursor = db.conn.execute(
-                        f"SELECT MAX(timestamp) FROM {table_name} WHERE has_data = 1"
-                    )
-                    row = cursor.fetchone()
-                    if row and row[0] is not None:
-                        last_available = datetime.fromtimestamp(row[0], tz=timezone.utc)
-                        last_available_end = last_available
-                        if end > last_available_end:
-                            end = last_available_end
-            except Exception as e:
-                logger.bind(target='dukascopy').debug(
-                    f"Could not check metadata database for last available range: {e}"
-                )
-
-        start = end - interval_window
-
-        # Run async download process
-        logger.bind(target='dukascopy').info(f"Downloading recent data for {symbol_upper} from {start} to {end}...")
+        # Ensure temporary data path exists and reconfigure tick_vault to use it
+        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
         try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            from tick_vault import reload_config
+            reload_config(
+                base_directory=str(self._temporary_data_path),
+                worker_per_proxy=3,
+                fetch_max_retry_attempts=3,
+            )
+        except ImportError:
+            pass
 
-        loop.run_until_complete(download_range(symbol=symbol_upper, start=start, end=end))
+        try:
+            from datetime import timezone
+            # Subtract 2 hours from current UTC time because Dukascopy CDN historical files
+            # are uploaded with some latency (usually up to 1-2 hours).
+            end = datetime.now(timezone.utc) - timedelta(hours=2)
 
-        # Read downloaded tick data
-        pandas_df = read_tick_data(symbol=symbol_upper, start=start, end=end, strict=False)
+            # Roll back to Friday 21:00 UTC if the end time falls on a weekend.
+            # Weekday: 0=Monday, ..., 4=Friday, 5=Saturday, 6=Sunday.
+            # Market close: Friday 22:00 UTC. Market open: Sunday 22:00 UTC.
+            wd = end.weekday()
+            if (wd == 4 and end.hour >= 22) or (wd == 5) or (wd == 6 and end.hour < 22):
+                days_to_subtract = {4: 0, 5: 1, 6: 2}[wd]
+                end = end - timedelta(days=days_to_subtract)
+                end = end.replace(hour=21, minute=0, second=0, microsecond=0)
 
-        if pandas_df.empty:
-            logger.bind(target='dukascopy').warning(f"No recent data returned for {symbol_upper}")
-            empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
-            return empty_df.lazy() if engine == 'polars_lazy' else empty_df
+                # In case the input end date is greater than the available range in the metadata DB,
+                # use the last available date in the DB if one exists.
+                try:
+                    from tick_vault.metadata import MetadataDB
+                    with MetadataDB() as db:
+                        db._ensure_table_exists(symbol_upper)
+                        table_name = db._get_table_name(symbol_upper)
+                        cursor = db.conn.execute(
+                            f"SELECT MAX(timestamp) FROM {table_name} WHERE has_data = 1"
+                        )
+                        row = cursor.fetchone()
+                        if row and row[0] is not None:
+                            last_available = datetime.fromtimestamp(row[0], tz=timezone.utc)
+                            last_available_end = last_available
+                            if end > last_available_end:
+                                end = last_available_end
+                except Exception as e:
+                    logger.bind(target='dukascopy').debug(
+                        f"Could not check metadata database for last available range: {e}"
+                    )
 
-        # Convert to Polars LazyFrame
-        pl_df = pl.from_pandas(pandas_df).lazy()
-        pl_df = pl_df.rename({"time": "timestamp"})
-        pl_df = pl_df.with_columns([
-            (pl.col("ask_volume") + pl.col("bid_volume")).cast(pl.Float32).alias("vol"),
-            ((pl.col("ask") + pl.col("bid")) / 2).cast(pl.Float32).alias("p")
-        ])
-        pl_df = pl_df.select(list(POLARS_DTYPE_DICT.TIME_TICK_DTYPE.keys())).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
-        pl_df = pl_df.unique(subset=["timestamp"], keep='first', maintain_order=True).sort("timestamp")
-        pl_df = business_days_data(pl_df)
+            start = end - interval_window
 
-        # Reframe data if timeframe is not TICK
-        if timeframe.lower() != TICK_TIMEFRAME.lower():
-            # reframe_data
-            pl_df = reframe_data(pl_df, timeframe)
+            # Run async download process
+            logger.bind(target='dukascopy').info(f"Downloading recent data for {symbol_upper} from {start} to {end}...")
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-        return pl_df if engine == 'polars_lazy' else collect_lazyframe(pl_df, self.polars_gpu_engine)
+            loop.run_until_complete(download_range(symbol=symbol_upper, start=start, end=end))
+
+            # Read downloaded tick data
+            pandas_df = read_tick_data(symbol=symbol_upper, start=start, end=end, strict=False)
+
+            if pandas_df.empty:
+                logger.bind(target='dukascopy').warning(f"No recent data returned for {symbol_upper}")
+                empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                return empty_df.lazy() if engine == 'polars_lazy' else empty_df
+
+            # Convert to Polars LazyFrame
+            pl_df = pl.from_pandas(pandas_df).lazy()
+            pl_df = pl_df.rename({"time": COLUMN_NAME.TIMESTAMP})
+            pl_df = pl_df.with_columns([
+                pl.col(COLUMN_NAME.ASK_VOLUME).cast(pl.Float32),
+                pl.col(COLUMN_NAME.BID_VOLUME).cast(pl.Float32),
+                ((pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)) / 
+                 (pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.BID_VOLUME))).cast(pl.Float32).alias(COLUMN_NAME.VWMP)
+            ])
+            pl_df = pl_df.select(list(POLARS_DTYPE_DICT.TIME_TICK_DTYPE.keys())).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            pl_df = pl_df.unique(subset=[COLUMN_NAME.TIMESTAMP], keep='first', maintain_order=True).sort(COLUMN_NAME.TIMESTAMP)
+            pl_df = business_days_data(pl_df)
+
+            # Reframe data if timeframe is not TICK
+            if timeframe.lower() != TICK_TIMEFRAME.lower():
+                # reframe_data
+                pl_df = reframe_data(pl_df, timeframe)
+
+            return pl_df if engine == 'polars_lazy' else collect_lazyframe(pl_df, self.polars_gpu_engine)
+        finally:
+            self.clear_temporary_folder()
 
 
 # REAL-TIME DATABASE CONNECTOR CLASS
@@ -1448,6 +1485,16 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
         return (
             lf.with_columns([
                 pl.col("datetime").str.to_datetime("%Y-%m-%d %H:%M:%S").alias("timestamp"),
+                pl.col("open").cast(pl.Float32),
+                pl.col("high").cast(pl.Float32),
+                pl.col("low").cast(pl.Float32),
+                pl.col("close").cast(pl.Float32),
+                pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.ASK),
+                pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.BID),
+                pl.lit(0.0).cast(pl.Float32).alias(COLUMN_NAME.ASK_VOLUME),
+                pl.lit(0.0).cast(pl.Float32).alias(COLUMN_NAME.BID_VOLUME),
+                pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.VWMP),
+                pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.VWMP_AVG)
             ])
             .filter(~is_weekend)
             .select(list(tf_schema.keys()))
@@ -1513,6 +1560,16 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
 
         processed_lf = lf.with_columns([
             pl.col("datetime").str.to_datetime("%Y-%m-%d %H:%M:%S").alias("timestamp"),
+            pl.col("open").cast(pl.Float32),
+            pl.col("high").cast(pl.Float32),
+            pl.col("low").cast(pl.Float32),
+            pl.col("close").cast(pl.Float32),
+            pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.ASK),
+            pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.BID),
+            pl.lit(0.0).cast(pl.Float32).alias(COLUMN_NAME.ASK_VOLUME),
+            pl.lit(0.0).cast(pl.Float32).alias(COLUMN_NAME.BID_VOLUME),
+            pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.VWMP),
+            pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.VWMP_AVG)
         ])
 
         # Convert timestamp to America/New_York to filter weekends with DST

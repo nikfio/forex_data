@@ -14,7 +14,7 @@ from sys import stdout
 
 from forex_data import (
     HistoricalManagerDB,
-    BASE_DATA_COLUMN_NAME,
+    COLUMN_NAME,
     is_empty_dataframe,
     shape_dataframe,
     get_dataframe_element,
@@ -253,11 +253,11 @@ def main():
                 shape_dataframe(yeardata1)[0]}, " f"start {
                 get_dataframe_element(
                     yeardata1,
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    COLUMN_NAME.TIMESTAMP,
                     0)}, " f"end {
                         get_dataframe_element(
                             yeardata1,
-                            BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                            COLUMN_NAME.TIMESTAMP,
                             shape_dataframe(yeardata1)[0] - 1)}")
     else:
         logger.bind(target='profiler').warning("get_data (1D): no data found")
@@ -269,11 +269,11 @@ def main():
                 shape_dataframe(yeardata2)[0]}, " f"start {
                 get_dataframe_element(
                     yeardata2,
-                    BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                    COLUMN_NAME.TIMESTAMP,
                     0)}, " f"end {
                         get_dataframe_element(
                             yeardata2,
-                            BASE_DATA_COLUMN_NAME.TIMESTAMP,
+                            COLUMN_NAME.TIMESTAMP,
                             shape_dataframe(yeardata2)[0] - 1)}")
     else:
         logger.bind(target='profiler').warning("get_data (3D): no data found")
