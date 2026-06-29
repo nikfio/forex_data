@@ -410,10 +410,19 @@ class HistoricalManagerDB:
 
             for tf in self._tf_list:
                 if tf not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][tf] = []
+                    self._tickers_years_dict[ticker][tf] = YearMonthList()
 
                 ticker_years_list = self._tickers_years_dict[ticker][tf]
-                missing_years = sorted(list(set(years_tick).difference(ticker_years_list)))
+                missing_years = []
+                for y in years_tick:
+                    if y not in ticker_years_list:
+                        missing_years.append(y)
+                    else:
+                        tick_months = getattr(years_tick, "months", {}).get(y, [])
+                        tf_months = getattr(ticker_years_list, "months", {}).get(y, [])
+                        if not set(tick_months).issubset(tf_months):
+                            missing_years.append(y)
+
                 if missing_years:
                     missing_years_per_tf[tf] = missing_years
                     all_missing_years.update(missing_years)
@@ -469,11 +478,8 @@ class HistoricalManagerDB:
                         # write to database
                         self._db_connector.write_data(tf_key, dataframe_tf)
 
-                        # update metadata
                         self._db_connector.add_tickers_years_info_to_file(ticker, tf, [year])
-                        if year not in self._tickers_years_dict[ticker][tf]:
-                            self._tickers_years_dict[ticker][tf].append(year)
-                            self._tickers_years_dict[ticker][tf].sort()
+                        self._tickers_years_dict = self._db_connector.load_tickers_years_info()
 
                 # After all years are processed, verify consistency for each TF
                 for tf, missing_years in missing_years_per_tf.items():
@@ -500,8 +506,7 @@ class HistoricalManagerDB:
 
                     # update metadata
                     self._db_connector.add_tickers_years_info_to_file(ticker, tf, missing_years)
-                    self._tickers_years_dict[ticker][tf].extend(missing_years)
-                    self._tickers_years_dict[ticker][tf] = sorted(list(set(self._tickers_years_dict[ticker][tf])))
+                    self._tickers_years_dict = self._db_connector.load_tickers_years_info()
 
                     # REDO THE CHECK FOR CONSISTENCY
                     if set(years_tick).difference(self._tickers_years_dict[ticker][tf]):
@@ -519,11 +524,14 @@ class HistoricalManagerDB:
 
     def _download_year(self,
                        ticker,
-                       year) -> Union[PolarsDataFrame,
-                                      PolarsLazyFrame,
-                                      pandas_dataframe,
-                                      Table,
-                                      None]:
+                       year,
+                       start_month: int = 1,
+                       end_month: int = 12,
+                       missing_downloads: Optional[list] = None) -> Union[PolarsDataFrame,
+                                                                     PolarsLazyFrame,
+                                                                     pandas_dataframe,
+                                                                     Table,
+                                                                     None]:
 
         year_tick_df = empty_dataframe(self.engine)
         now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -532,8 +540,24 @@ class HistoricalManagerDB:
 
             month_num = MONTHS.index(month) + 1
 
+            if month_num < start_month:
+                continue
+
+            if month_num > end_month:
+                break
+
             if year == now_utc.year and month_num > now_utc.month:
                 break
+
+            # Skip download if the month is already in the db and is not the current month
+            is_current_month = (year == now_utc.year and month_num == now_utc.month)
+            if not is_current_month:
+                available_months = getattr(self._tickers_years_dict.get(ticker, {}).get(TICK_TIMEFRAME, {}), "months", {}).get(year, [])
+                if month_num in available_months:
+                    logger.bind(target='histmanager').info(
+                        f"Skipping download for {ticker} {year}-{month} (already in DB)"
+                    )
+                    continue
 
             month_data = None
             last_err = None
@@ -587,7 +611,8 @@ class HistoricalManagerDB:
                         f"Ticker {ticker}-{year}-{month} not found for connector {connector.__class__.__name__}."
                     )
                     if connector == self._histdata_connector[-1]:
-                        raise e
+                        if missing_downloads is not None:
+                            missing_downloads.append(f"{ticker}-{year}-{month}")
                 except Exception as e:
                     last_err = e
                     logger.bind(target='histmanager').warning(
@@ -605,7 +630,9 @@ class HistoricalManagerDB:
                         f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data"
                     )
                     break
-                if isinstance(last_err, TickerDataBadTypeException):
+                if isinstance(last_err, TickerDataNotFoundError):
+                    continue
+                elif isinstance(last_err, TickerDataBadTypeException):
                     raise last_err
                 else:
                     raise last_err
@@ -626,7 +653,13 @@ class HistoricalManagerDB:
 
     def _download(self,
                   ticker,
-                  years: List[int]) -> None:
+                  years: List[int],
+                  start_month: int = 1,
+                  end_month: int = 12,
+                  start_year: int = None,
+                  end_year: int = None) -> None:
+
+        missing_downloads = []
 
         if not (
             isinstance(years, list)
@@ -649,14 +682,24 @@ class HistoricalManagerDB:
         if not all(isinstance(year, int) for year in years):
             years = [int(year) for year in years]
 
+        if start_year is None:
+            start_year = min(years) if years else None
+        if end_year is None:
+            end_year = max(years) if years else None
+
         # execute differently based on connector type
         if isinstance(self._db_connector, LocalDBYearConnector):
             # download and write data for each year
             for year in years:
+                y_start_month = start_month if year == start_year else 1
+                y_end_month = end_month if year == end_year else 12
 
                 year_tick_df = self._download_year(
                     ticker,
-                    year
+                    year,
+                    start_month=y_start_month,
+                    end_month=y_end_month,
+                    missing_downloads=missing_downloads
                 )
 
                 # get data id key for the year
@@ -676,10 +719,7 @@ class HistoricalManagerDB:
                                                                       [year])
 
                     # update internal ticker years list info
-                    if year not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
-                        self._tickers_years_dict[ticker][TICK_TIMEFRAME].append(year)
-                        # sort
-                        self._tickers_years_dict[ticker][TICK_TIMEFRAME].sort()
+                    self._tickers_years_dict = self._db_connector.load_tickers_years_info()
 
                 else:
                     logger.bind(
@@ -689,10 +729,15 @@ class HistoricalManagerDB:
             # download data for each year and aggregate
             years_data_df = empty_dataframe(self.engine)
             for year in years:
+                y_start_month = start_month if year == start_year else 1
+                y_end_month = end_month if year == end_year else 12
 
                 year_tick_df = self._download_year(
                     ticker,
-                    year
+                    year,
+                    start_month=y_start_month,
+                    end_month=y_end_month,
+                    missing_downloads=missing_downloads
                 )
 
                 # if first iteration, assign instead of concat
@@ -714,19 +759,21 @@ class HistoricalManagerDB:
                 # update years list in local info file
                 self._db_connector.add_tickers_years_info_to_file(ticker,
                                                                   TICK_TIMEFRAME,
-                                                                  years)
+                    years)
 
                 # update internal ticker years list info
-                self._tickers_years_dict[ticker][TICK_TIMEFRAME].extend(years)
-                # sort and remove duplicates
-                self._tickers_years_dict[ticker][TICK_TIMEFRAME].sort()
-                self._tickers_years_dict[ticker][TICK_TIMEFRAME] = \
-                    list_remove_duplicates(self._tickers_years_dict[ticker][TICK_TIMEFRAME])
+                self._tickers_years_dict = self._db_connector.load_tickers_years_info()
 
             else:
                 logger.bind(
                     target='histmanager').warning(
                     f'Years data dataframe for {tick_key} is empty, skipping database write')
+
+        # Download ended
+        if missing_downloads:
+            logger.bind(target='histmanager').warning(
+                f"Missing downloads at the end of run: {missing_downloads}"
+            )
 
     def clear_database(self, filter: Optional[str] = None) -> None:
 
@@ -924,9 +971,9 @@ class HistoricalManagerDB:
         if ticker not in self._tickers_years_dict:
             self._tickers_years_dict[ticker] = {}
         if timeframe not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][timeframe] = []
+            self._tickers_years_dict[ticker][timeframe] = YearMonthList()
         if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
 
         # determine if current year data new download
         # has to be requested
@@ -981,11 +1028,26 @@ class HistoricalManagerDB:
         # here determine if to ask for new download
         # if requested years are not already in localdb (tracked by tickers years dict)
         # or if current year is requested
-        if (
-            not set(years_interval_req).issubset(
-                self._tickers_years_dict[ticker][timeframe]) or
-            is_current_year_requested
-        ):
+        # check if requested year/months are subset
+        requested_subset = True
+        for y in years_interval_req:
+            start_m = start.month if y == start.year else 1
+            end_m = end.month if y == end.year else 12
+            if y == now_utc.year:
+                end_m = min(end_m, now_utc.month)
+            req_months = list(range(start_m, end_m + 1))
+            if not req_months:
+                continue
+            if y not in self._tickers_years_dict[ticker][timeframe]:
+                requested_subset = False
+                break
+            else:
+                available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
+                if not set(req_months).issubset(available_months):
+                    requested_subset = False
+                    break
+
+        if not requested_subset or is_current_year_requested:
 
             # If the current year is requested, we force re-aggregation
             # by removing it from the known timeframe list in memory
@@ -994,13 +1056,38 @@ class HistoricalManagerDB:
                     if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
                         self._tickers_years_dict[ticker][tf].remove(current_year)
 
-            year_tf_missing = list(
-                set(years_interval_req).difference(
-                    self._tickers_years_dict[ticker][timeframe]))
+            year_tf_missing = []
+            for y in years_interval_req:
+                start_m = start.month if y == start.year else 1
+                end_m = end.month if y == end.year else 12
+                if y == now_utc.year:
+                    end_m = min(end_m, now_utc.month)
+                req_months = list(range(start_m, end_m + 1))
+                if not req_months:
+                    continue
+                if y not in self._tickers_years_dict[ticker][timeframe]:
+                    year_tf_missing.append(y)
+                else:
+                    available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
+                    if not set(req_months).issubset(available_months):
+                        year_tf_missing.append(y)
 
-            year_tick_missing = list(set(years_interval_req).difference(
-                self._tickers_years_dict[ticker][TICK_TIMEFRAME]
-            ))
+            year_tick_missing = []
+            for y in years_interval_req:
+                start_m = start.month if y == start.year else 1
+                end_m = end.month if y == end.year else 12
+                if y == now_utc.year:
+                    end_m = min(end_m, now_utc.month)
+                req_months = list(range(start_m, end_m + 1))
+                if not req_months:
+                    continue
+                if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
+                    year_tick_missing.append(y)
+                else:
+                    available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
+                    if not set(req_months).issubset(available_months):
+                        year_tick_missing.append(y)
+
             if is_current_year_requested and current_year not in year_tick_missing:
                 year_tick_missing.append(current_year)
 
@@ -1014,9 +1101,9 @@ class HistoricalManagerDB:
                 if ticker not in self._tickers_years_dict:
                     self._tickers_years_dict[ticker] = {}
                 if timeframe not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][timeframe] = []
+                    self._tickers_years_dict[ticker][timeframe] = YearMonthList()
                 if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
 
                 if is_current_year_requested:
                     for tf in list(self._tickers_years_dict[ticker].keys()):
@@ -1024,9 +1111,22 @@ class HistoricalManagerDB:
                             self._tickers_years_dict[ticker][tf].remove(current_year)
 
                 # Re-calculate missing years after re-reading
-                year_tick_missing = list(set(years_interval_req).difference(
-                    self._tickers_years_dict[ticker][TICK_TIMEFRAME]
-                ))
+                year_tick_missing = []
+                for y in years_interval_req:
+                    start_m = start.month if y == start.year else 1
+                    end_m = end.month if y == end.year else 12
+                    if y == now_utc.year:
+                        end_m = min(end_m, now_utc.month)
+                    req_months = list(range(start_m, end_m + 1))
+                    if not req_months:
+                        continue
+                    if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
+                        year_tick_missing.append(y)
+                    else:
+                        available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
+                        if not set(req_months).issubset(available_months):
+                            year_tick_missing.append(y)
+
                 if is_current_year_requested and current_year not in year_tick_missing:
                     year_tick_missing.append(current_year)
 
@@ -1034,7 +1134,11 @@ class HistoricalManagerDB:
                 if year_tick_missing:
                     self._download(
                         ticker,
-                        year_tick_missing
+                        year_tick_missing,
+                        start_month=start.month,
+                        end_month=end.month,
+                        start_year=start.year,
+                        end_year=end.year
                     )
                 else:
                     logger.bind(
@@ -1047,8 +1151,26 @@ class HistoricalManagerDB:
                 self.add_timeframe(timeframe)
                 self._update_db(ticker)
 
-                if not set(years_interval_req).issubset(
-                        self._tickers_years_dict[ticker][timeframe]):
+                # check if requested year/months are subset after processing
+                completed_ok = True
+                for y in years_interval_req:
+                    start_m = start.month if y == start.year else 1
+                    end_m = end.month if y == end.year else 12
+                    if y == now_utc.year:
+                        end_m = min(end_m, now_utc.month)
+                    req_months = list(range(start_m, end_m + 1))
+                    if not req_months:
+                        continue
+                    if y not in self._tickers_years_dict[ticker][timeframe]:
+                        completed_ok = False
+                        break
+                    else:
+                        available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
+                        if not set(req_months).issubset(available_months):
+                            completed_ok = False
+                            break
+
+                if not completed_ok:
 
                     logger.bind(target='histmanager').critical(
                         f'processing year data completion for '
@@ -1208,9 +1330,9 @@ class HistoricalManagerDB:
         if ticker not in self._tickers_years_dict:
             self._tickers_years_dict[ticker] = {}
         if timeframe not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][timeframe] = []
+            self._tickers_years_dict[ticker][timeframe] = YearMonthList()
         if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
 
         # determine if current year data new download
         # has to be requested
@@ -1265,11 +1387,26 @@ class HistoricalManagerDB:
         # here determine if to ask for new download
         # if requested years are not already in localdb (tracked by tickers years dict)
         # or if current year is requested
-        if (
-            not set(years_interval_req).issubset(
-                self._tickers_years_dict[ticker][timeframe]) or
-            is_current_year_requested
-        ):
+        # check if requested year/months are subset
+        requested_subset = True
+        for y in years_interval_req:
+            start_m = start.month if y == start.year else 1
+            end_m = end.month if y == end.year else 12
+            if y == now_utc.year:
+                end_m = min(end_m, now_utc.month)
+            req_months = list(range(start_m, end_m + 1))
+            if not req_months:
+                continue
+            if y not in self._tickers_years_dict[ticker][timeframe]:
+                requested_subset = False
+                break
+            else:
+                available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
+                if not set(req_months).issubset(available_months):
+                    requested_subset = False
+                    break
+
+        if not requested_subset or is_current_year_requested:
 
             # If the current year is requested, we force re-aggregation by removing it from the known timeframe list in memory
             if is_current_year_requested:
@@ -1277,13 +1414,38 @@ class HistoricalManagerDB:
                     if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
                         self._tickers_years_dict[ticker][tf].remove(current_year)
 
-            year_tf_missing = list(
-                set(years_interval_req).difference(
-                    self._tickers_years_dict[ticker][timeframe]))
+            year_tf_missing = []
+            for y in years_interval_req:
+                start_m = start.month if y == start.year else 1
+                end_m = end.month if y == end.year else 12
+                if y == now_utc.year:
+                    end_m = min(end_m, now_utc.month)
+                req_months = list(range(start_m, end_m + 1))
+                if not req_months:
+                    continue
+                if y not in self._tickers_years_dict[ticker][timeframe]:
+                    year_tf_missing.append(y)
+                else:
+                    available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
+                    if not set(req_months).issubset(available_months):
+                        year_tf_missing.append(y)
 
-            year_tick_missing = list(set(years_interval_req).difference(
-                self._tickers_years_dict[ticker][TICK_TIMEFRAME]
-            ))
+            year_tick_missing = []
+            for y in years_interval_req:
+                start_m = start.month if y == start.year else 1
+                end_m = end.month if y == end.year else 12
+                if y == now_utc.year:
+                    end_m = min(end_m, now_utc.month)
+                req_months = list(range(start_m, end_m + 1))
+                if not req_months:
+                    continue
+                if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
+                    year_tick_missing.append(y)
+                else:
+                    available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
+                    if not set(req_months).issubset(available_months):
+                        year_tick_missing.append(y)
+
             if is_current_year_requested and current_year not in year_tick_missing:
                 year_tick_missing.append(current_year)
 
@@ -1297,9 +1459,9 @@ class HistoricalManagerDB:
                 if ticker not in self._tickers_years_dict:
                     self._tickers_years_dict[ticker] = {}
                 if timeframe not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][timeframe] = []
+                    self._tickers_years_dict[ticker][timeframe] = YearMonthList()
                 if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = []
+                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
 
                 if is_current_year_requested:
                     for tf in list(self._tickers_years_dict[ticker].keys()):
@@ -1307,9 +1469,22 @@ class HistoricalManagerDB:
                             self._tickers_years_dict[ticker][tf].remove(current_year)
 
                 # Re-calculate missing years after re-reading
-                year_tick_missing = list(set(years_interval_req).difference(
-                    self._tickers_years_dict[ticker][TICK_TIMEFRAME]
-                ))
+                year_tick_missing = []
+                for y in years_interval_req:
+                    start_m = start.month if y == start.year else 1
+                    end_m = end.month if y == end.year else 12
+                    if y == now_utc.year:
+                        end_m = min(end_m, now_utc.month)
+                    req_months = list(range(start_m, end_m + 1))
+                    if not req_months:
+                        continue
+                    if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
+                        year_tick_missing.append(y)
+                    else:
+                        available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
+                        if not set(req_months).issubset(available_months):
+                            year_tick_missing.append(y)
+
                 if is_current_year_requested and current_year not in year_tick_missing:
                     year_tick_missing.append(current_year)
 
@@ -1317,7 +1492,11 @@ class HistoricalManagerDB:
                 if year_tick_missing:
                     self._download(
                         ticker,
-                        year_tick_missing
+                        year_tick_missing,
+                        start_month=start.month,
+                        end_month=end.month,
+                        start_year=start.year,
+                        end_year=end.year
                     )
                 else:
                     logger.bind(
@@ -1330,8 +1509,26 @@ class HistoricalManagerDB:
                 self.add_timeframe(timeframe)
                 self._update_db(ticker)
 
-                if not set(years_interval_req).issubset(
-                        self._tickers_years_dict[ticker][timeframe]):
+                # check if requested year/months are subset after processing
+                completed_ok = True
+                for y in years_interval_req:
+                    start_m = start.month if y == start.year else 1
+                    end_m = end.month if y == end.year else 12
+                    if y == now_utc.year:
+                        end_m = min(end_m, now_utc.month)
+                    req_months = list(range(start_m, end_m + 1))
+                    if not req_months:
+                        continue
+                    if y not in self._tickers_years_dict[ticker][timeframe]:
+                        completed_ok = False
+                        break
+                    else:
+                        available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
+                        if not set(req_months).issubset(available_months):
+                            completed_ok = False
+                            break
+
+                if not completed_ok:
 
                     logger.bind(target='histmanager').critical(
                         f'processing year data completion for '

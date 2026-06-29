@@ -131,6 +131,8 @@ __all__ = [
     'FILENAME_TEMPLATE',
     'DATA_KEY',
     'TICK_TIMEFRAME',
+    'YearMonthList',
+    'NormalizedDict',
     'FILENAME_STR',
     'FILENAME_YEAR_STR',
     'DATE_NO_HOUR_FORMAT',
@@ -2248,6 +2250,87 @@ def update_ticker_years_dict(
     return ticker_years_dict, changes_made
 
 
+class YearMonthList(list):
+    def __init__(self, years_dict=None):
+        self.months = {}
+        if years_dict:
+            for y, m in years_dict.items():
+                self.months[int(y)] = sorted(list(set(int(x) for x in m)))
+            super().__init__(sorted(list(self.months.keys())))
+        else:
+            super().__init__()
+
+    def add_month(self, year, month):
+        year = int(year)
+        month = int(month)
+        if year not in self:
+            self.append(year)
+            self.sort()
+        if year not in self.months:
+            self.months[year] = []
+        if month not in self.months[year]:
+            self.months[year].append(month)
+            self.months[year].sort()
+
+    def remove(self, year):
+        year = int(year)
+        if year in self:
+            super().remove(year)
+        if year in self.months:
+            del self.months[year]
+
+    def append(self, year):
+        year = int(year)
+        if year not in self:
+            super().append(year)
+            self.sort()
+        if year not in self.months:
+            self.months[year] = list(range(1, 13))
+
+    def extend(self, years):
+        for y in years:
+            self.append(y)
+
+
+class NormalizedDict(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.update(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        if isinstance(key, str):
+            key = key.lower()
+        if isinstance(value, dict) and not isinstance(value, NormalizedDict):
+            value = NormalizedDict(value)
+        super().__setitem__(key, value)
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            key = key.lower()
+        return super().__getitem__(key)
+
+    def __contains__(self, key):
+        if isinstance(key, str):
+            key = key.lower()
+        return super().__contains__(key)
+
+    def get(self, key, default=None):
+        if isinstance(key, str):
+            key = key.lower()
+        return super().get(key, default)
+
+    def setdefault(self, key, default=None):
+        if isinstance(key, str):
+            key = key.lower()
+        if isinstance(default, dict) and not isinstance(default, NormalizedDict):
+            default = NormalizedDict(default)
+        return super().setdefault(key, default)
+
+    def update(self, *args, **kwargs):
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
+
+
 '''
 HISTORICAL DATA PROVIDERS
 '''
@@ -2310,10 +2393,12 @@ SUPPORTED_REALTIME_DATA_PROVIDERS = [
 
 
 def collect_lazyframe(dataframe: PolarsLazyFrame, use_gpu: bool = False) -> PolarsDataFrame:
-    if use_gpu:
-        try:
-            return dataframe.collect(engine="gpu")
-        except Exception as e:
-            logger.bind(target='env').warning(f"Polars GPU engine collect failed, falling back to CPU: {e}")
-            return dataframe.collect()
-    return dataframe.collect()
+    if isinstance(dataframe, PolarsLazyFrame):
+        if use_gpu:
+            try:
+                return dataframe.collect(engine="gpu")
+            except Exception as e:
+                logger.bind(target='env').warning(f"Polars GPU engine collect failed, falling back to CPU: {e}")
+                return dataframe.collect()
+        return dataframe.collect()
+    return dataframe
