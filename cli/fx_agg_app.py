@@ -115,9 +115,8 @@ def generate_database(
 
             row_count = len(df)
             typer.secho(
-                f"Successfully processed {ticker} "
-                f"({normalized_timeframes[0]}). "
-                f"Cached/retrieved {row_count} rows.",
+                f"Successfully retrieved tick data for {ticker} from start date "
+                f"{start_date} to end date {end_date}",
                 fg=typer.colors.GREEN
             )
 
@@ -135,7 +134,8 @@ def generate_database(
     typer.secho(
         f"Database generation complete, tickers processed: "
         f"{', '.join(normalized_tickers)}, timeframes: "
-        f"{', '.join(normalized_timeframes)}",
+        f"{', '.join(normalized_timeframes)}, "
+        f"Date range: {start_date} to {end_date}",
         fg=typer.colors.GREEN,
         bold=True
     )

@@ -203,6 +203,13 @@ class DatabaseConnector:
         """Get list of years for ticker and timeframe - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement _get_ticker_years_list_from_db")
 
+    def _get_ticker_years_months_from_db(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> Dict[int, List[int]]:
+        """Get dict of years mapped to months list - must be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement _get_ticker_years_months_from_db")
+
     def get_tickers_list(self) -> List[str]:
 
         tickers_list = []
@@ -270,15 +277,15 @@ class DatabaseConnector:
         # and optionally timeframe
         return self._get_ticker_years_list_from_db(ticker, timeframe)
 
-    def create_tickers_years_dict(self) -> Dict[str, Dict[str, List[int]]]:
+    def create_tickers_years_dict(self) -> Dict[str, Dict[str, YearMonthList]]:
         """
         Create a dictionary containing ticker years data, structured as:
-        {ticker: {timeframe: [year1, year2, ...]}}
+        {ticker: {timeframe: YearMonthList}}
 
         If no data files exist yet, returns an empty dictionary.
         """
 
-        tickers_years_dict = {}
+        tickers_years_dict = NormalizedDict()
 
         tickers_list = self.get_tickers_list()
 
@@ -296,9 +303,9 @@ class DatabaseConnector:
             ]))
 
             for timeframe in timeframes:
-                years_list = self._get_ticker_years_list_from_db(ticker, timeframe)
-                if years_list:  # Only add if there are years
-                    tickers_years_dict[ticker][timeframe] = years_list
+                years_months = self._get_ticker_years_months_from_db(ticker, timeframe)
+                if years_months:  # Only add if there are years/months
+                    tickers_years_dict[ticker][timeframe] = YearMonthList(years_months)
 
         # save tickers years info to file
         self.save_tickers_years_info(tickers_years_dict)
@@ -306,25 +313,15 @@ class DatabaseConnector:
 
     def save_tickers_years_info(
         self,
-        ticker_years_dict: Dict[str, Dict[str, List[int]]],
+        ticker_years_dict: Dict[str, Dict[str, Any]],
     ) -> None:
         """
         Save ticker years list to a JSON file.
 
         Parameters
         ----------
-        ticker_years_dict : Dict[str, Dict[str, List[int]]]
-            Dictionary containing ticker years data, structured as:
-            {ticker: {timeframe: [year1, year2, ...]}}
-        filename : str, optional
-            Name of the JSON file to save the data, by default 'tickers_years.json'
-
-        Raises
-        ------
-        TypeError
-            If ticker_years_dict is not a dictionary
-        IOError
-            If there's an error writing the file
+        ticker_years_dict : Dict[str, Dict[str, Any]]
+            Dictionary containing ticker years data
         """
         if not isinstance(ticker_years_dict, dict):
             logger.bind(target='localdb').error(
@@ -334,9 +331,21 @@ class DatabaseConnector:
                 f'ticker_years_dict must be a dictionary, got {
                     type(ticker_years_dict)}')
 
+        # Convert dict of YearMonthList/lists/dicts to serializable dict
+        serializable = {}
+        for ticker, tfs in ticker_years_dict.items():
+            serializable[ticker] = {}
+            for tf, yml in tfs.items():
+                if isinstance(yml, YearMonthList):
+                    serializable[ticker][tf] = yml.months
+                elif isinstance(yml, dict):
+                    serializable[ticker][tf] = yml
+                else:
+                    serializable[ticker][tf] = {str(y): list(range(1, 13)) for y in yml}
+
         try:
             with open(self._tickers_years_info_filepath, 'w') as f:
-                json.dump(ticker_years_dict, f, indent=2)
+                json.dump(serializable, f, indent=2)
         except Exception as e:
             logger.bind(
                 target='localdb').error(
@@ -353,41 +362,9 @@ class DatabaseConnector:
             year: Union[int, List[int]]
     ) -> None:
         """
-        In local info filepath, update just the years list of the given ticker and timeframe
-        by adding the year(s) specified if not already present
-
-        Parameters
-        ----------
-        ticker : str
-            The ticker symbol to update
-        timeframe : str
-            The timeframe for the ticker data
-        year : Union[int, List[int]]
-            The year or list of years to add to the years list
-
-        Raises
-        ------
-        TypeError
-            If year is not an integer or list of integers
+        In local info filepath, update the years/months list of the given ticker and timeframe
+        by reading the actual months present in the DB files and updating the file.
         """
-        # Normalize year to a list
-        if isinstance(year, int):
-            years_to_add = [year]
-        elif isinstance(year, list):
-            # Validate all items in list are integers
-            if not all(isinstance(y, int) for y in year):
-                logger.bind(target='localdb').error(
-                    f'All items in year list must be integers'
-                )
-                raise TypeError(f'All items in year list must be integers')
-            years_to_add = year
-        else:
-            logger.bind(target='localdb').error(
-                f'year must be an integer or list of integers, got {type(year)}'
-            )
-            raise TypeError(
-                f'year must be an integer or list of integers, got {type(year)}')
-
         # Load existing data or create new dict if file doesn't exist
         if self._tickers_years_info_filepath.exists():
             ticker_years_dict = self.load_tickers_years_info()
@@ -398,17 +375,15 @@ class DatabaseConnector:
                 f'File {
                     self._tickers_years_info_filepath} does not exist. Creating new dict.')
 
-        # Update the dictionary with the new years
-        _, changes_made = update_ticker_years_dict(
-            ticker_years_dict,
-            ticker,
-            timeframe,
-            years_to_add
-        )
+        # Query ground truth available months in database file
+        years_months = self._get_ticker_years_months_from_db(ticker, timeframe)
+        
+        if ticker not in ticker_years_dict:
+            ticker_years_dict[ticker] = {}
+            
+        ticker_years_dict[ticker][timeframe] = YearMonthList(years_months)
 
-        # Only save if changes were made
-        if changes_made:
-            self.save_tickers_years_info(ticker_years_dict)
+        self.save_tickers_years_info(ticker_years_dict)
 
     def clear_tickers_years_info(self, filter: Optional[str] = None) -> None:
         """
@@ -480,22 +455,15 @@ class DatabaseConnector:
             # clear the json file containing tickers years info
             self.clear_tickers_years_info()
 
-    def load_tickers_years_info(self) -> Dict[str, Dict[str, List[int]]]:
+    def load_tickers_years_info(self) -> Dict[str, Dict[str, YearMonthList]]:
         """
         Load ticker years list from a JSON file.
 
         Returns
         -------
-        Dict[str, Dict[str, List[int]]]
+        Dict[str, Dict[str, YearMonthList]]
             Dictionary containing ticker years data, structured as:
-            {ticker: {timeframe: [year1, year2, ...]}}
-
-        Raises
-        ------
-        FileNotFoundError
-            If the JSON file doesn't exist
-        IOError
-            If there's an error reading the file
+            {ticker: {timeframe: YearMonthList}}
         """
         if not self._tickers_years_info_filepath.exists():
             logger.bind(target='localdb').error(
@@ -506,8 +474,19 @@ class DatabaseConnector:
 
         try:
             with open(self._tickers_years_info_filepath, 'r') as f:
-                ticker_years_dict = json.load(f)
-            return ticker_years_dict
+                data = json.load(f)
+            parsed = NormalizedDict()
+            for ticker, tfs in data.items():
+                parsed[ticker] = NormalizedDict()
+                for tf, val in tfs.items():
+                    if isinstance(val, dict):
+                        parsed[ticker][tf] = YearMonthList(val)
+                    elif isinstance(val, list):
+                        # old format: list of years
+                        parsed[ticker][tf] = YearMonthList({y: list(range(1, 13)) for y in val})
+                    else:
+                        parsed[ticker][tf] = YearMonthList()
+            return parsed
         except json.JSONDecodeError as e:
             logger.bind(target='localdb').error(
                 f'Error decoding JSON from {self._tickers_years_info_filepath}: {e}'
@@ -667,6 +646,55 @@ class LocalDBConnector(DatabaseConnector):
                 ticker_years_list = [int(row[0]) for row in collect_lazyframe(read, self.polars_gpu_engine).iter_rows()]
 
         return ticker_years_list
+
+    def _get_ticker_years_months_from_db(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> Dict[int, List[int]]:
+
+        years_months = {}
+        local_files, local_files_name = self._list_local_data()
+
+        files = [
+            key for key in local_files
+            if search(f'{ticker.lower()}',
+                      str(key.stem)) and
+            self._get_items_from_db_key(str(key.stem))[DATA_KEY.TF_INDEX] ==
+            timeframe.lower()
+        ]
+
+        if len(files) == 1:
+            if not files[0].is_file():
+                return years_months
+            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                dataframe = read_csv(self.engine, files[0])
+            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                dataframe = read_parquet(self.engine, files[0])
+
+            try:
+                query = f'''SELECT DISTINCT 
+                                EXTRACT(YEAR FROM {COLUMN_NAME.TIMESTAMP}) AS YEAR,
+                                EXTRACT(MONTH FROM {COLUMN_NAME.TIMESTAMP}) AS MONTH
+                            FROM self'''
+                read = dataframe.sql(query)
+                rows = collect_lazyframe(read, self.polars_gpu_engine).iter_rows()
+                for row in rows:
+                    if row[0] is not None and row[1] is not None:
+                        y, m = int(row[0]), int(row[1])
+                        if y not in years_months:
+                            years_months[y] = []
+                        if m not in years_months[y]:
+                            years_months[y].append(m)
+            except Exception as e:
+                logger.bind(target='localdb').error(
+                    f'Error querying Year/Month from db file: {e}')
+                raise
+
+        # Sort months for each year
+        for y in years_months:
+            years_months[y].sort()
+
+        return years_months
 
     def write_data(
         self,
@@ -1266,6 +1294,47 @@ class LocalDBYearConnector(DatabaseConnector):
 
         return years_list
 
+    def _get_ticker_years_months_from_db(
+            self,
+            ticker: str,
+            timeframe: str = TICK_TIMEFRAME) -> Dict[int, List[int]]:
+
+        years_months = {}
+        local_files, local_files_name = self._list_local_data()
+
+        files = [
+            key for key in local_files
+            if search(f'{ticker.lower()}',
+                      str(key.stem)) and
+            len(self._get_items_from_db_key(str(key.stem))) > DATA_KEY.YEAR_INDEX and
+            self._get_items_from_db_key(str(key.stem))[DATA_KEY.TF_INDEX] ==
+            timeframe.lower()
+        ]
+
+        for file in files:
+            if not file.is_file():
+                continue
+            year_val = int(self._get_items_from_db_key(str(file.stem))[DATA_KEY.YEAR_INDEX])
+            if self.data_type == DATA_TYPE.CSV_FILETYPE:
+                dataframe = read_csv(self.engine, file)
+            elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+                dataframe = read_parquet(self.engine, file)
+
+            try:
+                query = f'''SELECT DISTINCT 
+                                EXTRACT(MONTH FROM {COLUMN_NAME.TIMESTAMP}) AS MONTH
+                            FROM self'''
+                read = dataframe.sql(query)
+                months = [int(row[0]) for row in collect_lazyframe(read, self.polars_gpu_engine).iter_rows() if row[0] is not None]
+                if months:
+                    years_months[year_val] = sorted(list(set(months)))
+            except Exception as e:
+                logger.bind(target='localdb').error(
+                    f'Error querying Month from year {year_val} file: {e}')
+                raise
+
+        return years_months
+
     def write_data(
         self,
         target_table: str,
@@ -1316,6 +1385,24 @@ class LocalDBYearConnector(DatabaseConnector):
 
                 filepath.parent.mkdir(parents=True,
                                       exist_ok=True)
+
+            else:
+
+                if self.data_type == DATA_TYPE.CSV_FILETYPE:
+
+                    dataframe_ex = read_csv(self.engine, filepath)
+
+                elif self.data_type == DATA_TYPE.PARQUET_FILETYPE:
+
+                    dataframe_ex = read_parquet(self.engine, filepath)
+
+                dataframe = concat_data([dataframe, dataframe_ex])
+                # clean duplicated timestamps rows, keep first by default
+                dataframe = dataframe.unique(
+                    subset=[
+                        COLUMN_NAME.TIMESTAMP],
+                    keep='first').sort(
+                    COLUMN_NAME.TIMESTAMP)
 
             if self.data_type == DATA_TYPE.CSV_FILETYPE:
 
