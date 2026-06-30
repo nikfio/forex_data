@@ -1,4 +1,3 @@
-import re
 from datetime import UTC, datetime, timedelta
 
 
@@ -130,18 +129,3 @@ def format_relative_tick_path(symbol: str, time: datetime) -> str:
     day = time.day
     hour = time.hour
     return f"{symbol}/{year}/{month:02d}/{day:02d}/{hour:02d}h_ticks.bi5"
-
-
-def get_real_date_str(url: str) -> str:
-    """
-    Parse a Dukascopy URL to extract the actual date with the real (1-indexed) month.
-
-    Returns a string in format: 'YYYY-MM-DD HH:00' or empty string if no match.
-    """
-    pattern = r'/([A-Z0-9]+)/(\d{4})/(\d{2})/(\d{2})/(\d{2})h_ticks\.bi5?'
-    match = re.search(pattern, url)
-    if match:
-        symbol, year, month_zero, day, hour = match.groups()
-        real_month = int(month_zero) + 1
-        return f"{year}-{real_month:02d}-{day} {hour}:00"
-    return ""
