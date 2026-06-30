@@ -20,6 +20,9 @@ Created on Sun Feb 23 00:02:36 2025
 import os
 import shutil
 import time
+import socket
+import ssl
+import struct
 from uuid import uuid4
 import requests
 from requests import Session
@@ -1283,7 +1286,7 @@ class DukascopyConnector(RemoteConnector):
 
 
 @define(kw_only=True, slots=True)
-class RealTimeDBConnectorTwelveData(RemoteConnector):
+class TwelveDataConnector(RemoteConnector):
     """
     Class to read real-time data from the database using TwelveData API.
     """
@@ -1349,7 +1352,7 @@ class RealTimeDBConnectorTwelveData(RemoteConnector):
             self.api_key = os.environ.get("TWELVE_DATA_API_KEY", "")
 
         if not self.api_key:
-            raise ValueError("API key is required for RealTimeDBConnectorTwelveData")
+            raise ValueError("API key is required for TwelveDataConnector")
 
         # set default twelve data chunk size
         self._chunk_size = TWELVE_DATA_CHUNK_SIZE

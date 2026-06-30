@@ -54,9 +54,10 @@ __all__ = [
     'get_class_attr_dict',
     'random_date_between',
     'RemoteConnector',
-    'RealTimeDBConnectorTwelveData',
+    'TwelveDataConnector',
     'HistDataConnector',
-    'DukascopyConnector'
+    'DukascopyConnector',
+    'cTraderDataConnector'
 ]
 
 from . import common
@@ -114,9 +115,10 @@ from .database import (
 
 from .remoteconnector import (
     RemoteConnector,
-    RealTimeDBConnectorTwelveData,
+    TwelveDataConnector,
     HistDataConnector,
-    DukascopyConnector
+    DukascopyConnector,
+    cTraderDataConnector
 )
 
 from .historicaldata import HistoricalManagerDB
