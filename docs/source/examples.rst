@@ -165,7 +165,7 @@ Filter data based on price conditions directly during retrieval:
 
    from forex_data import (
          HistoricalManagerDB,
-         BASE_DATA_COLUMN_NAME,
+         COLUMN_NAME,
          SQL_COMPARISON_OPERATORS,
          SQL_CONDITION_AGGREGATION_MODES
       )
@@ -178,7 +178,7 @@ Filter data based on price conditions directly during retrieval:
       timeframe='1D',
          start='2020-06-01',
          end='2020-06-30',
-         comparison_column_name=BASE_DATA_COLUMN_NAME.CLOSE,
+         comparison_column_name=COLUMN_NAME.CLOSE,
          check_level=1.12,
          comparison_operator=SQL_COMPARISON_OPERATORS.GREATER_THAN_OR_EQUAL
       )
@@ -192,8 +192,8 @@ Filter data based on price conditions directly during retrieval:
          start='2019-01-01',
          end='2019-12-31',
          comparison_column_name=[
-            BASE_DATA_COLUMN_NAME.HIGH,
-            BASE_DATA_COLUMN_NAME.LOW
+            COLUMN_NAME.HIGH,
+            COLUMN_NAME.LOW
          ],
          check_level=[1.145, 1.12],
          comparison_operator=[

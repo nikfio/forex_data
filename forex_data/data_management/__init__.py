@@ -56,8 +56,7 @@ __all__ = [
     'RemoteConnector',
     'TwelveDataConnector',
     'HistDataConnector',
-    'DukascopyConnector',
-    'cTraderDataConnector'
+    'DukascopyConnector'
 ]
 
 from . import common
@@ -117,8 +116,7 @@ from .remoteconnector import (
     RemoteConnector,
     TwelveDataConnector,
     HistDataConnector,
-    DukascopyConnector,
-    cTraderDataConnector
+    DukascopyConnector
 )
 
 from .historicaldata import HistoricalManagerDB

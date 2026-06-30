@@ -7,7 +7,7 @@ from pathlib import Path
 from loguru import logger
 
 from forex_data import (
-    RealTimeDBConnectorTwelveData
+    TwelveDataConnector
 )
 
 
@@ -24,7 +24,7 @@ def main():
     )
 
     # setup connector instance
-    connector = RealTimeDBConnectorTwelveData(
+    connector = TwelveDataConnector(
         plan="free",
         data_path=Path.home() / ".test_database"
     )

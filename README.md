@@ -248,7 +248,7 @@ Let's walk through the [example for historical data source](examples/histdata_db
     ```python
     from forex_data import (
         HistoricalManagerDB, 
-        BASE_DATA_COLUMN_NAME, 
+        COLUMN_NAME, 
         SQL_COMPARISON_OPERATORS
     )
 
@@ -258,7 +258,7 @@ Let's walk through the [example for historical data source](examples/histdata_db
         timeframe='1D',
         start='2018-01-01',
         end='2018-12-31',
-        comparison_column_name=BASE_DATA_COLUMN_NAME.OPEN,
+        comparison_column_name=COLUMN_NAME.OPEN,
         check_level=1.13,
         comparison_operator=SQL_COMPARISON_OPERATORS.LESS_THAN
     )
@@ -272,8 +272,8 @@ Let's walk through the [example for historical data source](examples/histdata_db
         start='2019-01-01',
         end='2019-12-31',
         comparison_column_name=[
-            BASE_DATA_COLUMN_NAME.HIGH, 
-            BASE_DATA_COLUMN_NAME.LOW
+            COLUMN_NAME.HIGH, 
+            COLUMN_NAME.LOW
         ],
         check_level=[1.145, 1.12],
         comparison_operator=[
