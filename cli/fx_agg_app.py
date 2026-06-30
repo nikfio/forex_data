@@ -30,7 +30,7 @@ def generate_database(
         "now",
         help="End date for data retrieval (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)."
     ),
-    timeframes: List[str] = typer.Option(
+    timeframe: List[str] = typer.Option(
         ["1D"],
         "--timeframe",
         "-t",
@@ -58,17 +58,17 @@ def generate_database(
         normalized_tickers.extend(parts)
 
     # Normalize the input timeframes list (splitting by commas if needed)
-    normalized_timeframes = []
-    for tf_arg in timeframes:
+    normalized_timeframe = []
+    for tf_arg in timeframe:
         parts = [t.strip().lower() for t in tf_arg.split(",") if t.strip()]
-        normalized_timeframes.extend(parts)
+        normalized_timeframe.extend(parts)
 
     if not normalized_tickers:
         typer.secho("Error: No valid tickers provided.", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
-    if not normalized_timeframes:
-        normalized_timeframes = ["1d"]
+    if not normalized_timeframe:
+        normalized_timeframe = ["1d"]
 
     typer.secho(
         f"Initializing database manager with config: "
@@ -80,7 +80,7 @@ def generate_database(
         manager = HistoricalManagerDB(config=config)
         # add requested timeframes
         # with this action we need just one tick download if needed
-        manager.add_timeframe(normalized_timeframes)
+        manager.add_timeframe(normalized_timeframe)
     except Exception as e:
         typer.secho(
             f"Failed to initialize HistoricalManagerDB: {e}",
@@ -92,7 +92,7 @@ def generate_database(
     for ticker in normalized_tickers:
         typer.secho(
             f"Generating database for ticker: {ticker} | "
-            f"Timeframes: {', '.join(normalized_timeframes)} | "
+            f"Timeframes: {', '.join(normalized_timeframe)} | "
             f"Range: {start_date} to {end_date}",
             fg=typer.colors.CYAN
         )
@@ -102,7 +102,7 @@ def generate_database(
             # missing historical periods and caches them locally.
             lazy_frame = manager.get_data(
                 ticker=ticker,
-                timeframe=normalized_timeframes[0],
+                timeframe=normalized_timeframe[0],
                 start=start_date,
                 end=end_date
             )
@@ -122,8 +122,8 @@ def generate_database(
 
         except Exception as e:
             typer.secho(
-                f"Error processing ticker {ticker} "
-                f"({normalized_timeframes[0]}): {e}",
+                f"Error downloading tick data for ticker {ticker} "
+                f"and processing timeframes {', '.join(normalized_timeframe)}: {e}",
                 fg=typer.colors.RED,
                 err=True
             )
@@ -134,7 +134,7 @@ def generate_database(
     typer.secho(
         f"Database generation complete, tickers processed: "
         f"{', '.join(normalized_tickers)}, timeframes: "
-        f"{', '.join(normalized_timeframes)}, "
+        f"{', '.join(normalized_timeframe)}, "
         f"Date range: {start_date} to {end_date}",
         fg=typer.colors.GREEN,
         bold=True
