@@ -20,7 +20,7 @@ import polars as pl
 from loguru import logger
 
 from forex_data import (
-    RealTimeDBConnectorTwelveData,
+    TwelveDataConnector,
     POLARS_DTYPE_DICT
 )
 
@@ -34,9 +34,9 @@ while _data_path.exists():
 _data_path = Path.home() / ".test_database" / "Realtime"
 
 
-class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
+class TestTwelveDataConnector(unittest.TestCase):
     """
-    Direct live tests for RealTimeDBConnectorTwelveData.
+    Direct live tests for TwelveDataConnector.
     Verifies that the main interface methods (get_realtime_price, get_data,
     get_recent_data) return valid, non-empty LazyFrames.
     """
@@ -53,7 +53,7 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
                 "<level>{level:<8}</level> | {message}"
             )
         )
-        self.connector = RealTimeDBConnectorTwelveData(
+        self.connector = TwelveDataConnector(
             plan="free",
             data_path=_data_path
         )
@@ -230,10 +230,10 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
 
         # Initialize the connector directly (no real API key needed)
         with patch.dict("os.environ", {"TWELVE_DATA_API_KEY": "dummy"}):
-            connector = RealTimeDBConnectorTwelveData(plan="free", data_path=_data_path)
+            connector = TwelveDataConnector(plan="free", data_path=_data_path)
 
         with patch.object(
-            RealTimeDBConnectorTwelveData,
+            TwelveDataConnector,
             "_execute_request",
             return_value={"values": mock_values}
         ):
@@ -315,12 +315,12 @@ class TestRealTimeDBConnectorTwelveData(unittest.TestCase):
         ]
 
         with patch.dict("os.environ", {"TWELVE_DATA_API_KEY": "dummy"}):
-            connector = RealTimeDBConnectorTwelveData(plan="free", data_path=_data_path)
+            connector = TwelveDataConnector(plan="free", data_path=_data_path)
 
         with patch(
             "forex_data.data_management.remoteconnector.datetime", MockDatetime
         ), patch.object(
-            RealTimeDBConnectorTwelveData,
+            TwelveDataConnector,
             "_execute_request",
             return_value={"values": mock_values}
         ) as mock_execute:
@@ -344,7 +344,7 @@ def main():
     print("=" * 70)
 
     suite = unittest.TestLoader().loadTestsFromTestCase(
-        TestRealTimeDBConnectorTwelveData
+        TestTwelveDataConnector
     )
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
