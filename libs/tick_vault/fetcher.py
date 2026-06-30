@@ -13,7 +13,6 @@ from httpx import (
 
 from .config import CONFIG
 from .logger import logger
-from .utils import get_real_date_str
 
 
 # Custom exceptions for different error categories
@@ -211,11 +210,9 @@ async def fetch_with_retry(client: AsyncClient, url: str) -> bytes | None:
 
     for cooldown in range(CONFIG.fetch_cooldown_retries + 1):
         if cooldown > 0:
-            real_date = get_real_date_str(url)
-            date_info = f" (real date: {real_date})" if real_date else ""
             logger.info(
                 f"Cooldown retry {cooldown}/{CONFIG.fetch_cooldown_retries}, "
-                f"waiting {CONFIG.fetch_cooldown_delay:.0f}s before retrying: {url}{date_info}"
+                f"waiting {CONFIG.fetch_cooldown_delay:.0f}s before retrying: {url}"
             )
             await asyncio.sleep(CONFIG.fetch_cooldown_delay)
 
