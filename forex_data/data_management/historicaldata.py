@@ -527,11 +527,12 @@ class HistoricalManagerDB:
                        year,
                        start_month: int = 1,
                        end_month: int = 12,
-                       missing_downloads: Optional[list] = None) -> Union[PolarsDataFrame,
-                                                                     PolarsLazyFrame,
-                                                                     pandas_dataframe,
-                                                                     Table,
-                                                                     None]:
+                       missing_downloads: Optional[list] = None) -> Union[
+                           PolarsDataFrame,
+                           PolarsLazyFrame,
+                           pandas_dataframe,
+                           Table,
+                           None]:
 
         year_tick_df = empty_dataframe(self.engine)
         now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -756,10 +757,9 @@ class HistoricalManagerDB:
                 self._db_connector.write_data(tick_key,
                                               years_data_df)
 
-                # update years list in local info file
                 self._db_connector.add_tickers_years_info_to_file(ticker,
                                                                   TICK_TIMEFRAME,
-                    years)
+                                                                  years)
 
                 # update internal ticker years list info
                 self._tickers_years_dict = self._db_connector.load_tickers_years_info()
