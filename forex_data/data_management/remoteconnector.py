@@ -41,6 +41,7 @@ from re import search
 from pyarrow import (
     int64 as pyarrow_int64,
     string as pyarrow_string,
+    float32 as pyarrow_float32,
     BufferReader,
     csv as arrow_csv,
     compute as pc,
@@ -1134,7 +1135,7 @@ class DukascopyConnector(RemoteConnector):
             pl_df = pl_df.with_columns([
                 pl.col(COLUMN_NAME.ASK_VOLUME).cast(pl.Float32),
                 pl.col(COLUMN_NAME.BID_VOLUME).cast(pl.Float32),
-                ((pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)) / 
+                ((pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)) /
                  (pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.BID_VOLUME))).cast(pl.Float32).alias(COLUMN_NAME.VWMP)
             ])
 
@@ -1265,7 +1266,7 @@ class DukascopyConnector(RemoteConnector):
             pl_df = pl_df.with_columns([
                 pl.col(COLUMN_NAME.ASK_VOLUME).cast(pl.Float32),
                 pl.col(COLUMN_NAME.BID_VOLUME).cast(pl.Float32),
-                ((pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)) / 
+                ((pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)) /
                  (pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.BID_VOLUME))).cast(pl.Float32).alias(COLUMN_NAME.VWMP)
             ])
             pl_df = pl_df.select(list(POLARS_DTYPE_DICT.TIME_TICK_DTYPE.keys())).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)

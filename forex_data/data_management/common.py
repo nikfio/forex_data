@@ -414,8 +414,8 @@ class COLUMN_NAME:
     VOLUME = 'volume'
     ASK_VOLUME = 'ask_volume'
     BID_VOLUME = 'bid_volume'
-    VWMP = 'vwmp' # volume weighted mid price
-    VWMP_AVG = 'vwmp_avg' # average volume weighted mid price
+    VWMP = 'vwmp'  # volume weighted mid price
+    VWMP_AVG = 'vwmp_avg'  # average volume weighted mid price
     P_VALUE = 'p'
     TRANSACTIONS = 'transactions'
     OTC = 'otc'
@@ -441,41 +441,41 @@ SUPPORTED_COLUMN_NAME = Literal[
 class DATA_COLUMN_NAMES:
 
     TICK_DATA = [
-        COLUMN_NAME.TIMESTAMP, 
-        COLUMN_NAME.ASK,  
-        COLUMN_NAME.BID,    
-        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.TIMESTAMP,
+        COLUMN_NAME.ASK,
+        COLUMN_NAME.BID,
+        COLUMN_NAME.ASK_VOLUME,
         COLUMN_NAME.BID_VOLUME,
         COLUMN_NAME.VWMP
     ]
     TF_DATA = [
-        COLUMN_NAME.TIMESTAMP, 
-        COLUMN_NAME.OPEN, 
-        COLUMN_NAME.HIGH, 
-        COLUMN_NAME.LOW, 
+        COLUMN_NAME.TIMESTAMP,
+        COLUMN_NAME.OPEN,
+        COLUMN_NAME.HIGH,
+        COLUMN_NAME.LOW,
         COLUMN_NAME.CLOSE,
         COLUMN_NAME.ASK,
         COLUMN_NAME.BID,
-        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.ASK_VOLUME,
         COLUMN_NAME.BID_VOLUME,
         COLUMN_NAME.VWMP,
         COLUMN_NAME.VWMP_AVG
     ]
     TICK_DATA_TIME_INDEX = [
-        COLUMN_NAME.ASK,  
+        COLUMN_NAME.ASK,
         COLUMN_NAME.BID,
-        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.ASK_VOLUME,
         COLUMN_NAME.BID_VOLUME,
         COLUMN_NAME.VWMP
     ]
     TF_DATA_TIME_INDEX = [
-        COLUMN_NAME.OPEN, 
-        COLUMN_NAME.HIGH, 
-        COLUMN_NAME.LOW, 
+        COLUMN_NAME.OPEN,
+        COLUMN_NAME.HIGH,
+        COLUMN_NAME.LOW,
         COLUMN_NAME.CLOSE,
         COLUMN_NAME.ASK,
         COLUMN_NAME.BID,
-        COLUMN_NAME.ASK_VOLUME, 
+        COLUMN_NAME.ASK_VOLUME,
         COLUMN_NAME.BID_VOLUME,
         COLUMN_NAME.VWMP,
         COLUMN_NAME.VWMP_AVG
@@ -494,8 +494,6 @@ class ASSET_TYPE:
     STOCK = 'STOCK'
     ETF = 'ETF'
     FOREX = 'FOREX'
-
-
 
 
 class SQL_COMPARISON_OPERATORS:
@@ -1486,7 +1484,7 @@ def reframe_data(dataframe, tf):
             ask_df = dataframe[COLUMN_NAME.ASK].resample(tf).last()
             bid_df = dataframe[COLUMN_NAME.BID].resample(tf).last()
             vwmp_df = dataframe[COLUMN_NAME.VWMP].resample(tf).last()
-            
+
             # Combine them
             dataframe = pandas_concat([ohlc_df, ask_df, bid_df, ask_vol_df, bid_vol_df, vwmp_df, vwmp_avg_df], axis=1)
             dataframe.columns = DATA_COLUMN_NAMES.TF_DATA_TIME_INDEX

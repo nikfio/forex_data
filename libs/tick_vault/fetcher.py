@@ -215,7 +215,8 @@ async def fetch_with_retry(client: AsyncClient, url: str) -> bytes | None:
             date_info = f" (real date: {real_date})" if real_date else ""
             logger.info(
                 f"Cooldown retry {cooldown}/{CONFIG.fetch_cooldown_retries}, "
-                f"waiting {CONFIG.fetch_cooldown_delay:.0f}s before retrying: {url}{date_info}"
+                f"waiting {CONFIG.fetch_cooldown_delay:.0f}s "
+                f"before retrying: {url}{date_info}"
             )
             await asyncio.sleep(CONFIG.fetch_cooldown_delay)
 

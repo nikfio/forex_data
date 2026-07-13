@@ -115,8 +115,8 @@ def generate_database(
 
             row_count = len(df)
             typer.secho(
-                f"Successfully retrieved tick data for {ticker} from start date "
-                f"{start_date} to end date {end_date}",
+                f"Successfully retrieved tick data ({row_count} rows) "
+                f"for {ticker} from start date {start_date} to end date {end_date}",
                 fg=typer.colors.GREEN
             )
 

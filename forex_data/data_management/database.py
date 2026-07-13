@@ -377,10 +377,10 @@ class DatabaseConnector:
 
         # Query ground truth available months in database file
         years_months = self._get_ticker_years_months_from_db(ticker, timeframe)
-        
+
         if ticker not in ticker_years_dict:
             ticker_years_dict[ticker] = {}
-            
+
         ticker_years_dict[ticker][timeframe] = YearMonthList(years_months)
 
         self.save_tickers_years_info(ticker_years_dict)
@@ -672,7 +672,7 @@ class LocalDBConnector(DatabaseConnector):
                 dataframe = read_parquet(self.engine, files[0])
 
             try:
-                query = f'''SELECT DISTINCT 
+                query = f'''SELECT DISTINCT
                                 EXTRACT(YEAR FROM {COLUMN_NAME.TIMESTAMP}) AS YEAR,
                                 EXTRACT(MONTH FROM {COLUMN_NAME.TIMESTAMP}) AS MONTH
                             FROM self'''
@@ -1321,7 +1321,7 @@ class LocalDBYearConnector(DatabaseConnector):
                 dataframe = read_parquet(self.engine, file)
 
             try:
-                query = f'''SELECT DISTINCT 
+                query = f'''SELECT DISTINCT
                                 EXTRACT(MONTH FROM {COLUMN_NAME.TIMESTAMP}) AS MONTH
                             FROM self'''
                 read = dataframe.sql(query)
