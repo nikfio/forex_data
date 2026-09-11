@@ -1,3 +1,8 @@
+[project]
+name = "forex_data_aggregator"
+version = "0.2.5"
+requires-python = ">=3.13,<3.14"
+
 [tool.poetry]
 name = "forex_data_aggregator"
 version = "0.2.5"
