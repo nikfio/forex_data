@@ -103,7 +103,7 @@ class HistoricalManagerDB:
                                                             validators.instance_of(Path)))
     db_files_year_partitioning: bool = field(default=True,
                                              validator=validators.instance_of(bool))
-    volume_data: bool = field(default=False,
+    volume_data: bool = field(default=True,
                               validator=validators.instance_of(bool))
     ssl_verify: bool = field(default=True,
                              validator=validators.instance_of(bool))
