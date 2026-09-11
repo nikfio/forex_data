@@ -2396,7 +2396,7 @@ def collect_lazyframe(dataframe: PolarsLazyFrame, use_gpu: bool = False) -> Pola
             try:
                 return dataframe.collect(engine="gpu")
             except Exception as e:
-                logger.bind(target='env').warning(f"Polars GPU engine collect failed, falling back to CPU: {e}")
+                logger.bind(target='env').debug(f"Polars GPU engine collect failed, falling back to CPU: {e}")
                 return dataframe.collect()
         return dataframe.collect()
     return dataframe
