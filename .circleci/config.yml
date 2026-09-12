@@ -8,31 +8,31 @@ defaults:
 read_cache:
   &read_cache
   keys:
-    - v1-dependencies-{{ checksum "poetry.lock" }}
-    - v1-dependencies-
+    - v1-uv-cache-{{ checksum "uv.lock" }}
+    - v1-uv-cache-
 
 store_cache:
   &store_cache
   paths:
-    - ./repo
-  key: v1-dependencies-{{ checksum "poetry.lock" }}
+    - ~/.cache/uv
+  key: v1-uv-cache-{{ checksum "uv.lock" }}
 
-install_poetry:
-  &install_poetry
-  name: install poetry
-  command: pip install poetry
+install_uv:
+  &install_uv
+  name: install uv
+  command: curl -LsSf https://astral.sh/uv/install.sh | sh
 
 install_deps:
   &install_deps
   name: install dependencies
-  command: poetry install
+  command: uv sync
 
 run_tests:
   &run_tests
   name: run tests
   command: |
     mkdir -p test-results
-    poetry run pytest --flake8 -vv --junitxml=test-results/junit.xml 2>&1 | tee test-results/console_output.log
+    uv run pytest --flake8 -vv --junitxml=test-results/junit.xml 2>&1 | tee test-results/console_output.log
 
 run_profiling:
   &run_profiling
@@ -40,10 +40,10 @@ run_profiling:
   command: |
     mkdir -p test-results/profiling
     echo "Profiling test suite execution..."
-    poetry run pyinstrument --renderer html \
+    uv run pyinstrument --renderer html \
       --outfile test-results/profiling/full_test_suite.html \
       -m pytest --flake8 -vvv
-    poetry run pyinstrument --renderer json \
+    uv run pyinstrument --renderer json \
       --outfile test-results/profiling/full_test_suite.json \
       -m pytest --flake8 -vvv
     echo "Profiling completed. Reports saved to test-results/profiling/"
@@ -58,7 +58,7 @@ jobs:
           API_KEY: ${API_KEY}
     steps:
       - checkout
-      - run: *install_poetry
+      - run: *install_uv
       - restore_cache: *read_cache
       - run: *install_deps
       - save_cache: *store_cache
