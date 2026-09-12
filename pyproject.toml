@@ -1,11 +1,11 @@
 [project]
 name = "forex_data_aggregator"
-version = "0.2.5"
+version = "0.2.6"
 requires-python = ">=3.13,<3.14"
 
 [tool.poetry]
 name = "forex_data_aggregator"
-version = "0.2.5"
+version = "0.2.6"
 description = "Data aggregation for forex market data"
 authors = ["Nicola Fiorato <fiorato.nicola@gmail.com>"]
 license = "MIT"
@@ -59,6 +59,14 @@ sphinx-autodoc-typehints = "^3.6.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "autopep8>=2.3.2",
+    "sphinx>=9.1.0",
+    "sphinx-autodoc-typehints>=3.13.6",
+    "sphinx-rtd-theme>=3.1.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["libs"]
