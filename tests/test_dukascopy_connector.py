@@ -124,8 +124,8 @@ class TestDukascopyConnector(unittest.TestCase):
         )
 
     @unittest.skipUnless(
-        os.environ.get("RUN_DOWNLOAD_MONTH_TESTS") == "1",
-        "Skipped by default. Run with RUN_DOWNLOAD_MONTH_TESTS=1"
+        os.environ.get("RUN_DUCKASCOPY_DOWNLOAD_TESTS") == "1",
+        "Skipped by default. Run with RUN_DUCKASCOPY_DOWNLOAD_TESTS=1"
     )
     def test_download_month_raw_polars_lazy(self):
         if not self.connector.check_connection():

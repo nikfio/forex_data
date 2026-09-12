@@ -545,20 +545,20 @@ The package includes comprehensive tests. Run them with:
 
 .. code-block:: bash
 
-   poetry run pytest
+   uv run pytest
 
 Run specific test files:
 
 .. code-block:: bash
 
-   poetry run pytest tests/test_hist_data_manager.py
-   poetry run pytest tests/test_realtime_data_manager.py
+   uv run pytest tests/test_historical_manager_db.py
+   uv run pytest tests/test_realtime_twelvedata_connector.py
 
 Run with verbose output:
 
 .. code-block:: bash
 
-   poetry run pytest -v
+   uv run pytest -v
 
 Tips and Best Practices
 ========================

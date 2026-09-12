@@ -13,7 +13,7 @@ echo "Building documentation with Sphinx..."
 # -E: don't use a saved environment, always read all files
 # docs/source: source directory
 # docs/build/html: output directory
-poetry run sphinx-build -b html docs/source docs/build/html
+uv run --group dev sphinx-build -b html docs/source docs/build/html
 
 # Check if build was successful
 if [ $? -eq 0 ]; then

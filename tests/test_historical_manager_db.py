@@ -63,6 +63,7 @@ DATA_FILETYPE: 'parquet'
 ENGINE: 'polars_lazy'
 DB_FILES_YEAR_PARTITIONING: True
 SSL_VERIFY: True
+VOLUME_DATA: False
 '''
 
 
@@ -1105,8 +1106,8 @@ class TestHistoricalManagerDB(unittest.TestCase):
             HistoricalManagerDB(max_discrepancy_with_now='invalid_td')
 
     @unittest.skipUnless(
-        os.environ.get("RUN_DOWNLOAD_MONTH_TESTS") == "1",
-        "Skipped by default. Run with RUN_DOWNLOAD_MONTH_TESTS=1"
+        os.environ.get("RUN_DUCKASCOPY_DOWNLOAD_TESTS") == "1",
+        "Skipped by default. Run with RUN_DUCKASCOPY_DOWNLOAD_TESTS=1"
     )
     def test_34_histdata_dukascopy_timezone_alignment(self):
         """
