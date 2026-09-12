@@ -4,13 +4,13 @@
 🚀 Welcome to forex_data Documentation
 =============================================
 
-.. image:: https://img.shields.io/badge/python-3.12-blue?style=for-the-badge&logo=python
+.. image:: https://img.shields.io/badge/python-3.13-blue?style=for-the-badge&logo=python
    :target: https://www.python.org/
    :alt: Python Version
 
-.. image:: https://img.shields.io/badge/Poetry-Package%20Manager-blue?style=for-the-badge&logo=poetry
-   :target: https://python-poetry.org/
-   :alt: Poetry
+.. image:: https://img.shields.io/badge/uv-Package%20Manager-blueviolet?style=for-the-badge&logo=astral
+   :target: https://astral.sh/uv
+   :alt: uv
 
 .. image:: https://img.shields.io/circleci/build/github/nikfio/forex_data/master?style=for-the-badge&logo=circleci
    :target: https://circleci.com/gh/nikfio/forex_data

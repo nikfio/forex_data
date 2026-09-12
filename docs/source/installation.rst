@@ -9,45 +9,45 @@ Prerequisites
 
 Before installing forex_data, make sure you have:
 
-* **Python 3.8 or higher** installed on your system
-* **Poetry** package manager (recommended)
+* **Python 3.13** installed on your system
+* **uv** package manager (recommended)
 
 .. note::
-   Poetry is the recommended way to manage this package. If you don't have Poetry installed,
-   visit the `Poetry documentation <https://python-poetry.org/docs/>`_ for installation instructions.
+   `uv` is the recommended way to manage this package. If you don't have `uv` installed,
+   visit the `uv documentation <https://docs.astral.sh/uv/>`_ for installation instructions.
 
-Installing Poetry
------------------
+Installing uv
+-------------
 
-To install Poetry, run:
+To install uv, run:
 
 .. code-block:: bash
 
-   curl -sSL https://install.python-poetry.org | python3 -
+   curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Or on Windows PowerShell:
 
 .. code-block:: powershell
 
-   (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 Quick Installation
 ==================
 
-Using pip or Poetry (Recommended)
----------------------------------
+Using pip or uv (Recommended)
+-----------------------------
 
 The easiest way to install forex_data is from PyPI:
 
 .. code-block:: bash
 
-   pip install forex-data-aggregator
+   uv pip install forex-data-aggregator
 
-Or using Poetry:
+Or using pip:
 
 .. code-block:: bash
 
-   poetry add forex-data-aggregator
+   pip install forex-data-aggregator
 
 This will install the latest stable version with all dependencies.
 
@@ -72,35 +72,29 @@ First, clone the forex_data repository:
    git clone https://github.com/nikfio/forex_data.git -b master forex-data
    cd forex-data
 
-2. Install Poetry
-^^^^^^^^^^^^^^^^^
+2. Install uv
+^^^^^^^^^^^^^
 
-Ensure you have Poetry installed:
+Ensure you have uv installed:
 
 .. code-block:: bash
 
-   curl -sSL https://install.python-poetry.org | python3 -
-
-Or on Windows PowerShell:
-
-.. code-block:: powershell
-
-   (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+   curl -LsSf https://astral.sh/uv/install.sh | sh
 
 3. Install Dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-Use Poetry to install the package and all its dependencies:
+Use uv to synchronize the environment and install all dependencies:
 
 .. code-block:: bash
 
-   poetry install
+   uv sync
 
 This will:
 
-* Create a virtual environment
-* Install all required dependencies
-* Install the package in development mode
+* Create a virtual environment at ``.venv``
+* Install all required dependencies from ``uv.lock``
+* Install the package in editable development mode
 
 4. Verify Installation
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -109,22 +103,9 @@ Run the test suite to ensure everything is working correctly:
 
 .. code-block:: bash
 
-   poetry run pytest
+   uv run pytest
 
 If all tests pass, your installation is successful! ✅
-
-Alternative: Using pip from Source
------------------------------------
-
-You can also install directly from the source directory:
-
-.. code-block:: bash
-
-   pip install -e .
-
-.. warning::
-   Using pip directly may not ensure all dependency versions are correctly resolved.
-   Poetry is strongly recommended for development.
 
 Installation Options
 ====================
@@ -132,27 +113,27 @@ Installation Options
 Development Installation
 ------------------------
 
-For development work, install with all development dependencies:
+For development work including documentation tools, install with development dependencies:
 
 .. code-block:: bash
 
-   poetry install --with dev
+   uv sync --group dev
 
 This includes additional tools for:
 
 * Testing (pytest)
 * Linting (flake8, mypy)
-* Documentation (sphinx)
-* Code formatting
+* Documentation (sphinx, sphinx-rtd-theme, sphinx-autodoc-typehints)
+* Code formatting (autopep8)
 
-Minimal Installation
+Default Installation
 --------------------
 
-For a minimal installation with only required dependencies:
+For a standard environment with core project dependencies:
 
 .. code-block:: bash
 
-   poetry install --only main
+   uv sync --no-dev
 
 Requirements
 ============

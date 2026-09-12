@@ -1,3 +1,4 @@
+import os
 import unittest
 import shutil
 import concurrent.futures
@@ -108,6 +109,10 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
         if _data_path.exists():
             shutil.rmtree(_data_path)
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_DUCKASCOPY_DOWNLOAD_TESTS") == "1",
+        "Skipped by default. Run with RUN_DUCKASCOPY_DOWNLOAD_TESTS=1"
+    )
     def test_01_multiprocessing_get_data(self):
         """Test concurrent get_data using a ProcessPoolExecutor."""
         num_workers = 4
@@ -141,6 +146,10 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
             "Workers returned different lengths of data!"
         )
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_DUCKASCOPY_DOWNLOAD_TESTS") == "1",
+        "Skipped by default. Run with RUN_DUCKASCOPY_DOWNLOAD_TESTS=1"
+    )
     def test_02_multithreading_get_data(self):
         """Test concurrent get_data using a ThreadPoolExecutor."""
         num_workers = 4

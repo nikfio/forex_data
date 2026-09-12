@@ -123,17 +123,17 @@ Planned for v0.4.0
 How to Upgrade
 ==============
 
-Update with Poetry:
+Update with uv:
 
 .. code-block:: bash
 
-   poetry update forex_data
+   uv lock --upgrade-package forex-data-aggregator
 
 Or with pip:
 
 .. code-block:: bash
 
-   pip install --upgrade forex_data
+   pip install --upgrade forex-data-aggregator
 
 Contributing to Changelog
 ==========================

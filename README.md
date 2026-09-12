@@ -3,8 +3,8 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue?style=for-the-badge&logo=read-the-docs)](https://nikfio.github.io/forex_data/)
 [![CI Status](https://img.shields.io/circleci/build/github/nikfio/forex_data/master?style=for-the-badge&logo=circleci)](https://circleci.com/gh/nikfio/forex_data)
 [![PyPI version](https://img.shields.io/pypi/v/forex-data-aggregator?style=for-the-badge&logo=pypi)](https://pypi.org/project/forex-data-aggregator/)
-[![Python Version](https://img.shields.io/badge/python-3.12-blue?style=for-the-badge&logo=python)](https://www.python.org/)
-[![Poetry](https://img.shields.io/badge/Poetry-Package%20Manager-blue?style=for-the-badge&logo=poetry)](https://python-poetry.org/)
+[![Python Version](https://img.shields.io/badge/python-3.13-blue?style=for-the-badge&logo=python)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/uv-Package%20Manager-blueviolet?style=for-the-badge&logo=astral)](https://astral.sh/uv)
 
 > 📚 **[View Full Documentation](https://nikfio.github.io/forex_data/)** | 🚀 **[Quick Start](#installation)** | 💡 **[Examples](#examples)**
 
@@ -46,23 +46,19 @@ As of now, [Twelve Data](https://twelvedata.com/) is integrated for real-time ma
 
 ### From PyPI (Recommended)
 
-The easiest way to install forex_data is via pip:
+The easiest way to install forex_data is via uv or pip:
 
 ```bash
+uv pip install forex-data-aggregator
+# or
 pip install forex-data-aggregator
-```
-
-Or with Poetry:
-
-```bash
-poetry add forex-data-aggregator
 ```
 
 ### From Source
 
 If you want to install from source or contribute to development:
 
-1. Ensure you have [Poetry](https://python-poetry.org/docs/) installed
+1. Ensure you have [uv](https://docs.astral.sh/uv/) installed
 2. Clone the repository:
 ```bash
 git clone https://github.com/nikfio/forex_data.git -b master forex-data
@@ -70,11 +66,11 @@ cd forex-data
 ```
 3. Install dependencies:
 ```bash
-poetry install
+uv sync
 ```
 4. Run tests to verify installation:
 ```bash
-poetry run pytest
+uv run pytest
 ```
 
 ## DOCUMENTATION
@@ -149,11 +145,11 @@ To run the examples:
 
 ```bash
 # Historical data example
-poetry run python examples/histdata_db_manager.py
+uv run python examples/histdata_db_manager.py
 
 # Real-time data example (requires Twelve Data API key as environment variable)
 export TWELVE_DATA_API_KEY="your_key_here"
-poetry run python examples/realtime/realtime_twelvedata_connector.py
+uv run python examples/realtime/realtime_twelvedata_connector.py
 ```
 
 #### Historical data 
@@ -440,16 +436,16 @@ To run tests locally:
 
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run tests with flake8 linting (same as CI)
-poetry run pytest --flake8
+uv run pytest --flake8
 
 # Run tests with verbose output
-poetry run pytest -v
+uv run pytest -v
 
 # Run specific test file
-poetry run pytest tests/test_file.py
+uv run pytest tests/test_historical_manager_db.py
 ```
 
 ### CircleCI Pipeline
@@ -460,20 +456,20 @@ The CI/CD pipeline is configured via `.circleci/config.yml` and automatically ru
 
 **Version:** CircleCI 2.1
 
-**Docker Image:** `cimg/python:3.12.12`
+**Docker Image:** `cimg/python:3.13.13`
 
 **Workflow:** `unit-tests`
 
 #### Pipeline Steps
 
-The pipeline executes the following steps for Python 3.12:
+The pipeline executes the following steps for Python 3.13:
 
 1. **Checkout**: Clone the repository code
-2. **Install Poetry**: Install the Poetry package manager (`pip install poetry`)
-3. **Restore Cache**: Restore dependencies from cache if available (cache key based on `poetry.lock` checksum)
-4. **Install Dependencies**: Install project dependencies using `poetry install`
-5. **Save Cache**: Cache the installed dependencies for faster future builds
-6. **Run Tests**: Execute tests with flake8 linting using `poetry run pytest --flake8`
+2. **Install uv**: Install uv via the official standalone script
+3. **Restore Cache**: Restore dependency cache based on `uv.lock` checksum
+4. **Install Dependencies**: Install project dependencies using `uv sync`
+5. **Save Cache**: Cache `~/.cache/uv` for faster future builds
+6. **Run Tests**: Execute tests with flake8 linting using `uv run pytest --flake8`
 
 #### Environment Variables
 
@@ -484,11 +480,10 @@ The pipeline supports the following environment variables (configured in CircleC
 
 #### Jobs
 
-- **py312**: Runs the complete test suite on Python 3.12
+- **py313**: Runs the complete test suite on Python 3.13
 
 #### Workflow
 
-The `unit-tests` workflow triggers on every commit and runs the `py312` job to validate:
+The `unit-tests` workflow triggers on every commit and runs the `py313` job to validate:
 - Code functionality through pytest
 - Code quality and style through flake8 integration
-```

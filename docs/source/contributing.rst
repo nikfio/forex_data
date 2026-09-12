@@ -19,17 +19,17 @@ Development Setup
       git clone https://github.com/YOUR_USERNAME/forex_data.git
       cd forex_data
 
-3. **Install Poetry** if you haven't already:
+3. **Install uv** if you haven't already:
 
    .. code-block:: bash
 
-      curl -sSL https://install.python-poetry.org | python3 -
+      curl -LsSf https://astral.sh/uv/install.sh | sh
 
 4. **Install dependencies**:
 
    .. code-block:: bash
 
-      poetry install --with dev
+      uv sync --group dev
 
 5. **Create a branch** for your changes:
 
@@ -59,13 +59,13 @@ The project uses several tools to maintain code quality:
 
 .. code-block:: bash
 
-   poetry run flake8 forex_data/
+   uv run flake8 forex_data/
 
 **MyPy** - Type checking:
 
 .. code-block:: bash
 
-   poetry run mypy forex_data/
+   uv run mypy forex_data/
 
 Configuration files are available:
 
@@ -77,8 +77,8 @@ Running all checks:
 
 .. code-block:: bash
 
-   poetry run flake8 forex_data/
-   poetry run mypy --config-file=mypy.ini forex_data/
+   uv run flake8 forex_data/
+   uv run mypy --config-file=mypy.ini forex_data/
 
 Testing
 =======
@@ -98,19 +98,19 @@ Run the full test suite:
 
 .. code-block:: bash
 
-   poetry run pytest
+   uv run pytest
 
 Run specific test files:
 
 .. code-block:: bash
 
-   poetry run pytest tests/test_hist_data_manager.py
+   uv run pytest tests/test_historical_manager_db.py
 
 Run with coverage:
 
 .. code-block:: bash
 
-   poetry run pytest --cov=forex_data --cov-report=html
+   uv run pytest --cov=forex_data --cov-report=html
 
 Test with different engines:
 
@@ -124,14 +124,14 @@ Test with different engines:
 Continuous Integration
 ----------------------
 
-The project uses CircleCI for continuous integration. All PRs must:
+The project uses CircleCI and GitHub Actions for continuous integration. All PRs must:
 
 * ✅ Pass all tests
 * ✅ Pass linting checks
 * ✅ Pass type checking
 * ✅ Maintain or improve code coverage
 
-See ``.circleci/config.yml`` for CI configuration.
+See ``.circleci/config.yml`` and ``.github/workflows/`` for CI configurations.
 
 Documentation
 =============
@@ -144,7 +144,7 @@ Documentation is built using Sphinx. To build locally:
 .. code-block:: bash
 
    cd docs
-   poetry run sphinx-build -b html source build/html
+   uv run --group dev sphinx-build -b html source build/html
 
 View the built documentation:
 
@@ -208,9 +208,9 @@ Making Changes
 
    .. code-block:: bash
 
-      poetry run pytest
-      poetry run flake8 forex_data/
-      poetry run mypy forex_data/
+      uv run pytest
+      uv run flake8 forex_data/
+      uv run mypy forex_data/
 
 5. **Commit your changes**:
 
