@@ -283,7 +283,7 @@ wheels = [
 
 [[package]]
 name = "forex-data-aggregator"
-version = "0.2.6"
+version = "0.2.7"
 source = { editable = "." }
 dependencies = [
     { name = "bs4" },
