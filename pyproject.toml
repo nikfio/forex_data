@@ -2,9 +2,6 @@
 name = "forex_data_aggregator"
 version = "0.2.7"
 requires-python = ">=3.13,<3.14"
-dependencies = [
-    "ctrader-open-api",
-]
 
 [tool.poetry]
 name = "forex_data_aggregator"
@@ -52,6 +49,8 @@ pydantic = ">=2.0.0"
 pydantic-settings = ">=2.0.0"
 httpx = ">=0.27.0"
 tqdm = ">=4.66.0"
+ctrader-open-api = ">=0.9.2"
+service-identity = ">=24.1.0"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.3.2"
@@ -73,6 +72,3 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["libs"]
-
-[tool.uv.sources]
-ctrader-open-api = { path = "../../Lib/brokers/ctrader/OpenApiPy", editable = true }
