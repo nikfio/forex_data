@@ -2,6 +2,9 @@
 name = "forex_data_aggregator"
 version = "0.2.7"
 requires-python = ">=3.13,<3.14"
+dependencies = [
+    "ctrader-open-api",
+]
 
 [tool.poetry]
 name = "forex_data_aggregator"
@@ -70,3 +73,6 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["libs"]
+
+[tool.uv.sources]
+ctrader-open-api = { path = "../../Lib/brokers/ctrader/OpenApiPy", editable = true }

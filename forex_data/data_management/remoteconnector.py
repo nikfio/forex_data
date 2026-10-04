@@ -35,7 +35,7 @@ import polars as pl
 from attrs import define, field, validators, validate
 from typing import Any, Dict, List, Union
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from re import search
 
 from pyarrow import (
@@ -79,6 +79,13 @@ from .common import (
     TWELVEDATA_PROVIDER_PLAN_LIST,
     TICK_TIMEFRAME,
     TWELVE_DATA_TIMEFRAMES,
+    TIINGO_PROVIDER,
+    TIINGO_PROVIDER_PLAN_LIST,
+    TIINGO_CHUNK_SIZE,
+    TIINGO_TIMEFRAMES,
+    CTRADER_PROVIDER,
+    CTRADER_CHUNK_SIZE,
+    CTRADER_TIMEFRAMES,
     read_csv,
     PolarsDatetime,
     any_date_to_datetime64,
@@ -90,6 +97,22 @@ from .common import (
     get_attrs_names,
     collect_lazyframe,
 )
+
+from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import ProtoMessage
+from ctrader_open_api.messages.OpenApiMessages_pb2 import (
+    ProtoOAAccountAuthReq,
+    ProtoOAAccountAuthRes,
+    ProtoOAApplicationAuthReq,
+    ProtoOAApplicationAuthRes,
+    ProtoOAErrorRes,
+    ProtoOAGetTickDataReq,
+    ProtoOAGetTickDataRes,
+    ProtoOAGetTrendbarsReq,
+    ProtoOAGetTrendbarsRes,
+    ProtoOASymbolsListReq,
+    ProtoOASymbolsListRes,
+)
+from ctrader_open_api.messages.OpenApiModelMessages_pb2 import ProtoOATrendbarPeriod
 
 from ..config import _apply_config
 
@@ -1607,3 +1630,637 @@ class TwelveDataConnector(RemoteConnector):
             .filter(pl.col("timestamp") >= cutoff_dt)
             .sort("timestamp")
         )
+
+
+@define(kw_only=True, slots=False)
+class TiingoConnector(RemoteConnector):
+    """
+    Real-time and intraday market data connector for Forex using Tiingo API.
+    Provides top-of-book bid/ask quotes and size liquidity in base currency units.
+    """
+
+    api_key: str = field(default='', validator=validators.instance_of(str))
+    plan: str = field(
+        default='free',
+        validator=validators.and_(
+            validators.instance_of(str),
+            validators.in_(TIINGO_PROVIDER_PLAN_LIST)
+        ),
+        converter=str.lower
+    )
+
+    _chunk_size: int = field(
+        default=TIINGO_CHUNK_SIZE,
+        validator=validators.instance_of(int)
+    )
+    _max_requests_per_hour: int = field(
+        default=45,
+        validator=validators.instance_of(int)
+    )
+    _request_timestamps: List[float] = field(factory=list, init=False)
+    _base_url: str = field(default="https://api.tiingo.com", init=False)
+
+    @property
+    def tier(self) -> str:
+        return self.plan
+
+    @property
+    def chunk_size(self) -> int:
+        """Max number of data points per request."""
+        return self._chunk_size
+
+    @property
+    def max_requests_per_hour(self) -> int:
+        """Max number of requests per hour."""
+        return self._max_requests_per_hour
+
+    def __init__(self, **kwargs: Any) -> None:
+        _class_attributes_name = get_attrs_names(self, **kwargs)
+        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
+
+        if not _apply_config(
+                self,
+                kwargs,
+                _class_attributes_name,
+                _not_assigned_attrs_index_mask):
+            self.__attrs_init__(**kwargs)  # type: ignore[attr-defined]
+        else:
+            self.__attrs_post_init__(**kwargs)
+
+        validate(self)
+
+    def __attrs_post_init__(self, **kwargs: Any) -> None:
+        super().__attrs_post_init__()
+
+        # set up log sink for tiingo connector
+        log_path = Path(self.data_path) / 'log' / 'tiingo.log'
+
+        if not self.api_key:
+            self.api_key = os.environ.get("TIINGO_API_KEY", "")
+
+        if not self.api_key:
+            logger.bind(target='tiingo').warning("API key is not set for TiingoConnector. Live queries may fail.")
+
+        self._chunk_size = TIINGO_CHUNK_SIZE
+
+        handlers_to_remove = []
+        for handler_id, handler in logger._core.handlers.items():
+            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
+                if str(handler._sink._path) == str(log_path):
+                    handlers_to_remove.append(handler_id)
+
+        for handler_id in handlers_to_remove:
+            try:
+                logger.remove(handler_id)
+            except ValueError:
+                pass
+
+        logger.add(log_path,
+                   level="TRACE",
+                   rotation="5 MB",
+                   filter=lambda record: ('tiingo' == record['extra'].get('target') and
+                                          bool(record["extra"].get('target'))))
+
+    def _rate_limit(self) -> None:
+        """Enforces request rate limits for free / starter tier."""
+        now = time.time()
+        self._request_timestamps = [ts for ts in self._request_timestamps if now - ts < 3600]
+
+        if len(self._request_timestamps) >= self._max_requests_per_hour:
+            sleep_duration = 3600 - (now - self._request_timestamps[0]) + 1
+            if sleep_duration > 0:
+                logger.bind(target='tiingo').warning(
+                    f"Tiingo hourly rate limit reached ({self._max_requests_per_hour}/hour). "
+                    f"Sleeping for {sleep_duration:.2f} seconds."
+                )
+                time.sleep(sleep_duration)
+        self._request_timestamps.append(time.time())
+
+    def _execute_request(self, endpoint: str, params: Dict[str, Any] = None) -> Any:
+        self._rate_limit()
+
+        url = f"{self._base_url}/{endpoint.lstrip('/')}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Token {self.api_key}"
+        }
+
+        try:
+            response = requests.get(url, params=params, headers=headers, timeout=30)
+            if response.status_code == 429:
+                logger.bind(target='tiingo').error("Tiingo rate limit exceeded (HTTP 429).")
+                return {}
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.bind(target='tiingo').error(f"Error querying Tiingo API ({url}): {e}")
+            return {}
+
+    def _format_symbol(self, symbol: str) -> str:
+        """Format ticker to tiingo forex format, e.g. EUR/USD -> eurusd."""
+        return symbol.replace('/', '').replace('-', '').replace('_', '').lower()
+
+    def _format_timeframe(self, tf: str) -> str:
+        """Format timeframe string to Tiingo resampleFreq."""
+        mapping = {
+            '1m': '1min',
+            '5m': '5min',
+            '15m': '15min',
+            '30m': '30min',
+            '1h': '1hour',
+            '2h': '2hour',
+            '4h': '4hour',
+            '1d': '1day',
+        }
+        return mapping.get(tf.lower(), tf.lower())
+
+    def get_top_of_book(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetches current top-of-book data (bidPrice, bidSize, askPrice, askSize, midPrice).
+        """
+        clean_symbol = self._format_symbol(symbol)
+        data = self._execute_request("tiingo/fx/top", params={"tickers": clean_symbol})
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
+        return {}
+
+    def get_realtime_price(self, symbol: str) -> PolarsLazyFrame:
+        """
+        Fetches current real-time top-of-book price and returns it as a PolarsLazyFrame.
+        """
+        tob = self.get_top_of_book(symbol)
+        if not tob:
+            return PolarsLazyFrame({})
+
+        ts = tob.get("quoteTimestamp") or datetime.now(timezone.utc).isoformat()
+        mid_price = tob.get("midPrice")
+        if mid_price is None:
+            bid = tob.get("bidPrice", 0.0)
+            ask = tob.get("askPrice", 0.0)
+            mid_price = (bid + ask) / 2.0 if (bid + ask) > 0 else 0.0
+
+        record = {
+            "timestamp": pd.to_datetime(ts),
+            "ticker": symbol,
+            "price": float(mid_price),
+            "bid": float(tob.get("bidPrice", mid_price)),
+            "ask": float(tob.get("askPrice", mid_price)),
+            "bid_volume": float(tob.get("bidSize", 0.0)),
+            "ask_volume": float(tob.get("askSize", 0.0)),
+            "timezone": "UTC"
+        }
+        return PolarsDataFrame([record]).lazy()
+
+    def get_data(self, symbol: str, timeframe: str, start_date: str, end_date: str) -> PolarsLazyFrame:
+        """
+        Fetches intraday historical candles and enriches them with top-of-book spread and volume.
+        """
+        clean_symbol = self._format_symbol(symbol)
+        tiingo_tf = self._format_timeframe(timeframe)
+
+        params = {
+            "startDate": pd.to_datetime(start_date).strftime("%Y-%m-%d"),
+            "endDate": pd.to_datetime(end_date).strftime("%Y-%m-%d"),
+            "resampleFreq": tiingo_tf
+        }
+
+        data = self._execute_request(f"tiingo/fx/{clean_symbol}/prices", params=params)
+        if not isinstance(data, list) or len(data) == 0:
+            logger.bind(target='tiingo').warning(f"No price data returned from Tiingo for {clean_symbol}")
+            return PolarsLazyFrame({})
+
+        lf = PolarsLazyFrame(data)
+        tf_schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE
+
+        # Fetch latest top-of-book for spread and volume sizing reference
+        tob = self.get_top_of_book(symbol)
+        ref_spread = 0.00015
+        ref_bid_size = 1500000.0
+        ref_ask_size = 1500000.0
+        if tob:
+            bid_p = tob.get("bidPrice")
+            ask_p = tob.get("askPrice")
+            if bid_p and ask_p and ask_p > bid_p:
+                ref_spread = float(ask_p - bid_p)
+            if tob.get("bidSize"):
+                ref_bid_size = float(tob["bidSize"])
+            if tob.get("askSize"):
+                ref_ask_size = float(tob["askSize"])
+
+        half_spread = ref_spread / 2.0
+
+        ts_utc = pl.col("date").str.to_datetime(time_zone="UTC")
+        ny_time = ts_utc.dt.convert_time_zone("America/New_York")
+
+        is_weekend = (
+            (ny_time.dt.weekday() == 6)
+            | ((ny_time.dt.weekday() == 5) & (ny_time.dt.hour() >= 17))
+            | ((ny_time.dt.weekday() == 7) & (ny_time.dt.hour() < 17))
+        )
+
+        processed_lf = (
+            lf.with_columns([
+                ts_utc.dt.replace_time_zone(None).alias("timestamp"),
+                pl.col("open").cast(pl.Float32),
+                pl.col("high").cast(pl.Float32),
+                pl.col("low").cast(pl.Float32),
+                pl.col("close").cast(pl.Float32),
+                (pl.col("close") + half_spread).cast(pl.Float32).alias(COLUMN_NAME.ASK),
+                (pl.col("close") - half_spread).cast(pl.Float32).alias(COLUMN_NAME.BID),
+                pl.lit(ref_ask_size).cast(pl.Float32).alias(COLUMN_NAME.ASK_VOLUME),
+                pl.lit(ref_bid_size).cast(pl.Float32).alias(COLUMN_NAME.BID_VOLUME),
+                pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.VWMP),
+                pl.col("close").cast(pl.Float32).alias(COLUMN_NAME.VWMP_AVG)
+            ])
+            .filter(~is_weekend)
+            .select(list(tf_schema.keys()))
+            .cast(tf_schema)
+            .sort("timestamp")
+        )
+        return processed_lf
+
+    def get_recent_data(self, symbol: str, timeframe: str, interval_window: timedelta) -> PolarsLazyFrame:
+        """
+        Fetches recent data up to current time minus interval_window.
+        """
+        end_dt = datetime.now(timezone.utc)
+        start_dt = end_dt - interval_window
+        return self.get_data(
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_dt.strftime("%Y-%m-%d %H:%M:%S"),
+            end_date=end_dt.strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+
+@define(kw_only=True, slots=True)
+class CTraderConnector(RemoteConnector):
+    """
+    Connector class to retrieve market data from cTrader OpenAPI.
+    Fetches real broker trendbars and ticks, applying a 50/50 volume split
+    formula to derive ask_volume and bid_volume from total tick volume.
+    """
+    client_id: str = field(default='', validator=validators.instance_of(str))
+    client_secret: str = field(default='', validator=validators.instance_of(str))
+    access_token: str = field(default='', validator=validators.instance_of(str))
+    refresh_token: str = field(default='', validator=validators.instance_of(str))
+    broker_account_id: str = field(default='', validator=validators.instance_of(str))
+    broker_account_is_demo: bool = field(default=True, validator=validators.instance_of(bool))
+    chunk_size: int = field(default=CTRADER_CHUNK_SIZE, validator=validators.instance_of(int))
+
+    _socket: Any = field(init=False, default=None)
+    _symbol_name_to_id: Dict[str, int] = field(init=False, factory=dict)
+    _asset_id_to_name: Dict[int, str] = field(init=False, factory=dict)
+
+    def __init__(self, **kwargs: Any) -> None:
+        _class_attributes_name = get_attrs_names(self, **kwargs)
+        _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
+
+        if not _apply_config(self, kwargs, _class_attributes_name, _not_assigned_attrs_index_mask):
+            self.__attrs_init__(**kwargs)
+        else:
+            self.__attrs_post_init__(**kwargs)
+        validate(self)
+
+    def __attrs_post_init__(self, **kwargs: Any) -> None:
+        super().__attrs_post_init__()
+
+        # Fallbacks to env
+        if not self.client_id:
+            self.client_id = os.environ.get("CTRADER_CLIENT_ID", "")
+        if not self.client_secret:
+            self.client_secret = os.environ.get("CTRADER_CLIENT_SECRET", "")
+        if not self.access_token:
+            self.access_token = os.environ.get("CTRADER_ACCESS_TOKEN", "")
+        if not self.refresh_token:
+            self.refresh_token = os.environ.get("CTRADER_REFRESH_ACCESS_TOKEN", "")
+        if not self.broker_account_id:
+            self.broker_account_id = os.environ.get("CTRADER_ACCOUNT_ID", "")
+
+        if not self.client_id or not self.client_secret or not self.access_token or not self.broker_account_id:
+            raise ValueError("cTrader credentials and account ID are required.")
+
+        self.connect()
+
+    def connect(self) -> None:
+        if self._socket is not None:
+            return
+
+        host = "demo.ctraderapi.com" if self.broker_account_is_demo else "live.ctraderapi.com"
+        port = 5035
+
+        logger.bind(target='ctrader').info(f"Connecting to cTrader at {host}:{port}...")
+        demo_fallback_ip = "145.241.247.143"
+        live_fallback_ip = "143.47.254.136"
+
+        try:
+            connect_host = socket.gethostbyname(host)
+        except Exception:
+            connect_host = demo_fallback_ip if self.broker_account_is_demo else live_fallback_ip
+
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(15.0)
+            context = ssl.create_default_context()
+            ssl_sock = context.wrap_socket(sock, server_hostname=host)
+            ssl_sock.connect((connect_host, port))
+            self._socket = ssl_sock
+        except Exception as e:
+            logger.bind(target='ctrader').error(f"Failed to connect: {e}")
+            raise ConnectionError(f"Failed to connect to cTrader: {e}") from e
+
+        try:
+            # 1. Application auth
+            app_req = ProtoOAApplicationAuthReq()
+            app_req.clientId = self.client_id
+            app_req.clientSecret = self.client_secret
+            self._send_and_receive_raw(app_req, ProtoOAApplicationAuthRes)
+
+            # 2. Account auth
+            acc_req = ProtoOAAccountAuthReq()
+            acc_req.ctidTraderAccountId = int(self.broker_account_id)
+            acc_req.accessToken = self.access_token
+            self._send_and_receive_raw(acc_req, ProtoOAAccountAuthRes)
+
+            # 3. Retrieve Symbols list
+            sym_req = ProtoOASymbolsListReq()
+            sym_req.ctidTraderAccountId = int(self.broker_account_id)
+            sym_res = self._send_and_receive_raw(sym_req, ProtoOASymbolsListRes)
+
+            self._symbol_name_to_id = {
+                s.symbolName.upper().replace('/', '').replace('_', ''): s.symbolId
+                for s in sym_res.symbol
+            }
+        except Exception as e:
+            self.close()
+            raise ConnectionError(f"Failed during cTrader handshake / authorization: {e}") from e
+
+    def _send_and_receive_raw(self, request_msg: Any, expected_res_klass: Any) -> Any:
+        ssl_sock = self._socket
+        if ssl_sock is None:
+            raise ConnectionError("Socket is not initialized.")
+
+        proto_msg = ProtoMessage()
+        proto_msg.payloadType = request_msg.payloadType
+        proto_msg.payload = request_msg.SerializeToString()
+
+        serialized = proto_msg.SerializeToString()
+        length_header = struct.pack(">I", len(serialized))
+        ssl_sock.sendall(length_header + serialized)
+
+        while True:
+            length_data = ssl_sock.recv(4)
+            if not length_data or len(length_data) < 4:
+                raise ConnectionError("Disconnected or incomplete header from cTrader.")
+            length = struct.unpack(">I", length_data)[0]
+
+            payload_data = b""
+            while len(payload_data) < length:
+                chunk = ssl_sock.recv(length - len(payload_data))
+                if not chunk:
+                    raise ConnectionError("Disconnected while reading payload.")
+                payload_data += chunk
+
+            res_proto_msg = ProtoMessage()
+            res_proto_msg.ParseFromString(payload_data)
+
+            if res_proto_msg.payloadType == expected_res_klass().payloadType:
+                res_msg = expected_res_klass()
+                res_msg.ParseFromString(res_proto_msg.payload)
+                return res_msg
+            elif res_proto_msg.payloadType == ProtoOAErrorRes().payloadType:
+                err_msg = ProtoOAErrorRes()
+                err_msg.ParseFromString(res_proto_msg.payload)
+                raise ValueError(f"cTrader error: {err_msg.errorCode} - {err_msg.description}")
+
+    def _send_and_receive(self, request_msg: Any, expected_res_klass: Any) -> Any:
+        try:
+            self.connect()
+            return self._send_and_receive_raw(request_msg, expected_res_klass)
+        except Exception:
+            self.close()
+            self.connect()
+            return self._send_and_receive_raw(request_msg, expected_res_klass)
+
+    def close(self) -> None:
+        if self._socket:
+            try:
+                self._socket.close()
+            except Exception:
+                pass
+            self._socket = None
+
+    def check_connection(self) -> bool:
+        try:
+            self.connect()
+            return self._socket is not None
+        except Exception:
+            return False
+
+    def get_available_tickers(self) -> List[str]:
+        return list(self._symbol_name_to_id.keys())
+
+    def get_data(self, symbol: str, timeframe: str, start_date: str, end_date: str) -> PolarsLazyFrame:
+        symbol_norm = symbol.upper().replace("/", "").replace("_", "").replace("-", "")
+        symbol_id = self._symbol_name_to_id.get(symbol_norm)
+        if symbol_id is None:
+            raise TickerNotFoundError(f"Symbol {symbol} not found in cTrader symbols.")
+
+        if timeframe.lower() == TICK_TIMEFRAME.lower():
+            return self._get_tick_data(symbol_id, start_date, end_date)
+        else:
+            return self._get_trendbar_data(symbol_id, symbol_norm, timeframe, start_date, end_date)
+
+    def _get_trendbar_data(
+        self, symbol_id: int, symbol_norm: str, timeframe: str, start_date: str, end_date: str
+    ) -> PolarsLazyFrame:
+        tf_lower = timeframe.lower()
+        reframe_timeframes = {"2h", "3h", "4h", "6h", "8h", "12h", "1d"}
+        needs_reframe = tf_lower in reframe_timeframes
+        fetch_tf = "1h" if needs_reframe else tf_lower
+
+        tf_mapping = {
+            "1m": ProtoOATrendbarPeriod.M1,
+            "2m": ProtoOATrendbarPeriod.M2,
+            "3m": ProtoOATrendbarPeriod.M3,
+            "4m": ProtoOATrendbarPeriod.M4,
+            "5m": ProtoOATrendbarPeriod.M5,
+            "10m": ProtoOATrendbarPeriod.M10,
+            "15m": ProtoOATrendbarPeriod.M15,
+            "30m": ProtoOATrendbarPeriod.M30,
+            "1h": ProtoOATrendbarPeriod.H1,
+            "4h": ProtoOATrendbarPeriod.H4,
+            "12h": ProtoOATrendbarPeriod.H12,
+            "1d": ProtoOATrendbarPeriod.D1,
+        }
+        period = tf_mapping.get(fetch_tf)
+        if period is None:
+            raise ValueError(f"Unsupported timeframe for cTrader: {timeframe}")
+
+        ts_from = int(pd.to_datetime(start_date, utc=True).timestamp() * 1000)
+        ts_to = int(pd.to_datetime(end_date, utc=True).timestamp() * 1000)
+
+        tb_req = ProtoOAGetTrendbarsReq()
+        tb_req.ctidTraderAccountId = int(self.broker_account_id)
+        tb_req.symbolId = symbol_id
+        tb_req.period = period
+        tb_req.fromTimestamp = ts_from
+        tb_req.toTimestamp = ts_to
+
+        tb_res = self._send_and_receive(tb_req, ProtoOAGetTrendbarsRes)
+        if not tb_res.trendbar:
+            return PolarsLazyFrame(schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        digits = 3 if "JPY" in symbol_norm else 5
+        scale = float(10 ** digits)
+        spread_offset = 0.00010 if digits == 5 else 0.010
+
+        records = []
+        for b in tb_res.trendbar:
+            ts = datetime.fromtimestamp(b.utcTimestampInMinutes * 60, tz=timezone.utc).replace(tzinfo=None)
+            low_p = float(b.low) / scale
+            open_p = float(b.low + b.deltaOpen) / scale
+            high_p = float(b.low + b.deltaHigh) / scale
+            close_p = float(b.low + b.deltaClose) / scale
+            vol = float(b.volume)
+            # 50/50 volume split formula applied directly to tick volume
+            ask_vol = 0.5 * vol
+            bid_vol = 0.5 * vol
+            vwmp = (open_p + high_p + low_p + close_p) / 4.0
+
+            records.append({
+                "timestamp": ts,
+                "open": open_p,
+                "high": high_p,
+                "low": low_p,
+                "close": close_p,
+                "ask": close_p + spread_offset,
+                "bid": close_p - spread_offset,
+                "ask_volume": ask_vol,
+                "bid_volume": bid_vol,
+                "vwmp": vwmp,
+                "vwmp_avg": vwmp,
+            })
+
+        df = pl.DataFrame(records)
+        if df.is_empty():
+            return PolarsLazyFrame(schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        if needs_reframe:
+            df = reframe_data(df, timeframe)
+
+        tf_schema = POLARS_DTYPE_DICT.TIME_TF_DTYPE
+        df = df.select(list(tf_schema.keys())).cast(tf_schema).sort("timestamp")
+        return df.lazy()
+
+    def _get_tick_data(self, symbol_id: int, start_date: str, end_date: str) -> PolarsLazyFrame:
+        start_dt = any_date_to_datetime64(start_date)
+        end_dt = any_date_to_datetime64(end_date)
+
+        chunks = []
+        chunk_start = start_dt
+        while chunk_start < end_dt:
+            chunk_end = min(chunk_start + timedelta(days=7), end_dt)
+            chunks.append((chunk_start, chunk_end))
+            chunk_start = chunk_end
+
+        all_dfs = []
+        for c_start, c_end in chunks:
+            bid_df = self._fetch_ticks_type(symbol_id, 1, c_start, c_end)  # 1 = BID
+            ask_df = self._fetch_ticks_type(symbol_id, 2, c_start, c_end)  # 2 = ASK
+
+            if bid_df.height == 0 and ask_df.height == 0:
+                continue
+
+            merged = bid_df.join(ask_df, on="timestamp", how="full")
+            merged = merged.with_columns(
+                pl.coalesce(["timestamp", "timestamp_right"]).alias("timestamp")
+            ).drop("timestamp_right").sort("timestamp")
+            merged = merged.with_columns([
+                pl.col("bid").forward_fill(),
+                pl.col("ask").forward_fill()
+            ]).drop_nulls(subset=["bid", "ask"])
+
+            if merged.height == 0:
+                continue
+
+            merged = merged.with_columns([
+                pl.lit(0.0, dtype=pl.Float32).alias(COLUMN_NAME.ASK_VOLUME),
+                pl.lit(0.0, dtype=pl.Float32).alias(COLUMN_NAME.BID_VOLUME),
+                ((pl.col("ask") + pl.col("bid")) / 2.0).cast(pl.Float32).alias(COLUMN_NAME.VWMP)
+            ])
+
+            tick_schema = POLARS_DTYPE_DICT.TIME_TICK_DTYPE
+            final_df = merged.select(list(tick_schema.keys())).cast(tick_schema)
+            all_dfs.append(final_df)
+
+        if not all_dfs:
+            return PolarsLazyFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+
+        combined_df = pl.concat(all_dfs).unique(subset=[COLUMN_NAME.TIMESTAMP], keep='first', maintain_order=True).sort(COLUMN_NAME.TIMESTAMP)
+        return business_days_data(combined_df.lazy())
+
+    def _fetch_ticks_type(self, symbol_id: int, quote_type: int, start: Any, end: Any) -> pl.DataFrame:
+        from_ts = int(pd.to_datetime(start, utc=True).timestamp() * 1000)
+        to_ts = int(pd.to_datetime(end, utc=True).timestamp() * 1000)
+
+        all_timestamps = []
+        all_prices = []
+
+        current_to = to_ts
+        while current_to > from_ts:
+            req = ProtoOAGetTickDataReq()
+            req.ctidTraderAccountId = int(self.broker_account_id)
+            req.symbolId = symbol_id
+            req.type = quote_type
+            req.fromTimestamp = from_ts
+            req.toTimestamp = current_to
+
+            res = self._send_and_receive(req, ProtoOAGetTickDataRes)
+            ticks = res.tickData
+            if not ticks:
+                break
+
+            current_time = ticks[0].timestamp
+            chunk_timestamps = [current_time]
+            chunk_prices = [ticks[0].tick / 100000.0]
+
+            for tick in ticks[1:]:
+                current_time -= tick.timestamp
+                chunk_timestamps.append(current_time)
+                chunk_prices.append(tick.tick / 100000.0)
+
+            all_timestamps = chunk_timestamps + all_timestamps
+            all_prices = chunk_prices + all_prices
+
+            if res.hasMore:
+                oldest_ts = chunk_timestamps[-1]
+                current_to = oldest_ts - 1
+            else:
+                break
+
+        col_name = "bid" if quote_type == 1 else "ask"
+        if not all_timestamps:
+            return pl.DataFrame(schema={"timestamp": pl.Datetime("ms"), col_name: pl.Float32})
+
+        dt_series = pl.Series("timestamp", all_timestamps, dtype=pl.Int64).cast(pl.Datetime("ms"))
+        return pl.DataFrame({
+            "timestamp": dt_series,
+            col_name: pl.Series(all_prices, dtype=pl.Float32)
+        })
+
+    def get_recent_data(self, symbol: str, timeframe: str, interval_window: timedelta) -> PolarsLazyFrame:
+        """
+        Fetches recent data up to current time minus interval_window.
+        """
+        end_dt = datetime.now(timezone.utc)
+        start_dt = end_dt - interval_window
+        return self.get_data(
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_dt.strftime("%Y-%m-%d %H:%M:%S"),
+            end_date=end_dt.strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+
+cTraderDataConnector = CTraderConnector
