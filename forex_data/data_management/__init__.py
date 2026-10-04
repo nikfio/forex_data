@@ -56,7 +56,15 @@ __all__ = [
     'RemoteConnector',
     'TwelveDataConnector',
     'HistDataConnector',
-    'DukascopyConnector'
+    'DukascopyConnector',
+    'TiingoConnector',
+    'TIINGO_PROVIDER',
+    'TIINGO_PROVIDER_PLAN_LIST',
+    'CTraderConnector',
+    'cTraderDataConnector',
+    'CTRADER_PROVIDER',
+    'CTRADER_CHUNK_SIZE',
+    'CTRADER_TIMEFRAMES'
 ]
 
 from . import common
@@ -78,6 +86,11 @@ from .common import (
     DUKASCOPY_PROVIDER,
     SUPPORTED_HISTORICAL_DATA_PROVIDERS,
     TWELVEDATA_PROVIDER,
+    TIINGO_PROVIDER,
+    TIINGO_PROVIDER_PLAN_LIST,
+    CTRADER_PROVIDER,
+    CTRADER_CHUNK_SIZE,
+    CTRADER_TIMEFRAMES,
     SUPPORTED_REALTIME_DATA_PROVIDERS,
     empty_dataframe,
     is_empty_dataframe,
@@ -116,7 +129,10 @@ from .remoteconnector import (
     RemoteConnector,
     TwelveDataConnector,
     HistDataConnector,
-    DukascopyConnector
+    DukascopyConnector,
+    TiingoConnector,
+    CTraderConnector,
+    cTraderDataConnector
 )
 
 from .historicaldata import HistoricalManagerDB

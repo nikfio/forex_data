@@ -155,6 +155,13 @@ __all__ = [
     'TWELVE_DATA_PRO_DAY_RATE_LIMIT',
     'TWELVE_DATA_LIMIT_DATE',
     'TWELVE_DATA_TIMEFRAMES',
+    'TIINGO_PROVIDER',
+    'TIINGO_PROVIDER_PLAN_LIST',
+    'TIINGO_CHUNK_SIZE',
+    'TIINGO_TIMEFRAMES',
+    'CTRADER_PROVIDER',
+    'CTRADER_CHUNK_SIZE',
+    'CTRADER_TIMEFRAMES',
     'SUPPORTED_REALTIME_DATA_PROVIDERS',
     'collect_lazyframe',
 
@@ -2385,8 +2392,42 @@ TWELVE_DATA_TIMEFRAMES = [
     "1month"
 ]
 
+# TIINGO CONSTANTS
+TIINGO_PROVIDER = 'Tiingo'
+TIINGO_PROVIDER_PLAN_LIST = ["free", "starter", "power"]
+TIINGO_CHUNK_SIZE = 1000
+TIINGO_TIMEFRAMES = [
+    "1min",
+    "5min",
+    "15min",
+    "30min",
+    "1hour",
+    "2hour",
+    "4hour",
+    "1day"
+]
+
+# CTRADER CONSTANTS
+CTRADER_PROVIDER = 'ctrader'
+CTRADER_CHUNK_SIZE = 5000
+CTRADER_TIMEFRAMES = [
+    "1m",
+    "2m",
+    "3m",
+    "4m",
+    "5m",
+    "10m",
+    "15m",
+    "30m",
+    "1h",
+    "2h",
+    "4h",
+    "12h",
+    "1d",
+]
+
 SUPPORTED_REALTIME_DATA_PROVIDERS = [
-    TWELVEDATA_PROVIDER
+    CTRADER_PROVIDER,
 ]
 
 
