@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Compare price and volume values between Dukascopy (LocalDB Historical) and a Realtime Connector.
+Compare price and volume values between Dukascopy (LocalDB Historical)
+and a Realtime Connector.
 
 Supports selecting the remote connector via `--connector` (e.g. tiingo, twelvedata).
 Splits single-source volume into ask/bid components using configurable split formulas,
@@ -11,10 +12,8 @@ Usage:
 """
 
 import os
-import sys
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -24,7 +23,6 @@ import typer
 from loguru import logger
 
 from forex_data import (
-    COLUMN_NAME,
     HistoricalManagerDB,
     CTraderConnector,
     TiingoConnector,
@@ -34,7 +32,10 @@ from forex_data import (
 
 app = typer.Typer(
     name="compare_dukascopy_vs_realtime_connector",
-    help="Compare raw prices and volumes between Dukascopy local database and a realtime connector.",
+    help=(
+        "Compare raw prices and volumes between Dukascopy local database "
+        "and a realtime connector."
+    ),
     add_completion=False,
 )
 
@@ -44,7 +45,7 @@ DEFAULT_OUTPUT_DIR = (
 
 
 def pip_multiplier(ticker: str) -> float:
-    """Return pip multiplier for ticker (100 for JPY pairs, 10000 for standard forex)."""
+    """Return pip multiplier (100 for JPY pairs, 10000 for standard forex)."""
     return 100.0 if "JPY" in ticker.upper() else 10000.0
 
 
@@ -103,7 +104,7 @@ def compute_comparison_metrics(
     df_aligned: pl.DataFrame,
     ticker: str,
 ) -> Dict[str, Any]:
-    """Compute detailed price and volume comparison metrics between Dukascopy and Connector."""
+    """Compute price and volume comparison metrics between Dukascopy and Connector."""
     mult = pip_multiplier(ticker)
     price_cols = [
         "close",
@@ -179,7 +180,11 @@ def compute_comparison_metrics(
     duk_tot = duk_ask + duk_bid
 
     # Connector Volume
-    if "ask_volume_connector" in df_aligned.columns and "bid_volume_connector" in df_aligned.columns:
+    has_conn_split = (
+        "ask_volume_connector" in df_aligned.columns
+        and "bid_volume_connector" in df_aligned.columns
+    )
+    if has_conn_split:
         conn_raw_tot = (
             df_aligned["ask_volume_connector"] + df_aligned["bid_volume_connector"]
         ).to_numpy().astype(np.float64)
@@ -300,7 +305,11 @@ def plot_comparison(
     ]
 
     fig, axes = plt.subplots(
-        3, 1, figsize=(15, 12), sharex=True, gridspec_kw={"height_ratios": [2.0, 1.1, 1.8]}
+        3,
+        1,
+        figsize=(15, 12),
+        sharex=True,
+        gridspec_kw={"height_ratios": [2.0, 1.1, 1.8]},
     )
     plt.subplots_adjust(hspace=0.18)
 
@@ -326,8 +335,14 @@ def plot_comparison(
 
     close_corr = metrics["prices"].get("close", {}).get("correlation", 1.0)
     close_mae = metrics["prices"].get("close", {}).get("mae_pips", 0.0)
+    conn_cap = connector_name.capitalize()
+    title_p1 = (
+        f"Raw Price Comparison — Dukascopy vs {conn_cap} | "
+        f"{ticker} ({timeframe}) | Corr: {close_corr:.5f} | "
+        f"MAE: {close_mae:.2f} pips"
+    )
     ax_price.set_title(
-        f"Raw Price Comparison — Dukascopy vs {connector_name.capitalize()} | {ticker} ({timeframe}) | Corr: {close_corr:.5f} | MAE: {close_mae:.2f} pips",
+        title_p1,
         fontsize=12,
         fontweight="bold",
     )
@@ -425,15 +440,20 @@ def plot_comparison(
             lw=1.2,
         )
         lines = line1 + line2 + line3
-        labels = [l.get_label() for l in lines]
-        ax_vol_duk.legend(lines, labels, loc="upper left", frameon=True, framealpha=0.9)
+        labels = [line.get_label() for line in lines]
+        ax_vol_duk.legend(
+            lines, labels, loc="upper left", frameon=True, framealpha=0.9
+        )
         ax_vol_duk.set_ylabel("Dukascopy (Ticks)", color="#1f77b4", fontsize=11)
-        ax_vol_conn.set_ylabel(f"{connector_name.capitalize()} (Units)", color="#2ca02c", fontsize=11)
+        ax_vol_conn.set_ylabel(
+            f"{connector_name.capitalize()} (Units)", color="#2ca02c", fontsize=11
+        )
         ax_vol_duk.tick_params(axis="y", labelcolor="#1f77b4")
         ax_vol_conn.tick_params(axis="y", labelcolor="#2ca02c")
 
+    vol_formula = metrics["volumes"]["formula_description"]
     ax_vol_duk.set_title(
-        f"Volume Dynamics | Formula: {metrics['volumes']['formula_description']} | Corr: {vol_corr:.4f}",
+        f"Volume Dynamics | Formula: {vol_formula} | Corr: {vol_corr:.4f}",
         fontsize=11,
         fontweight="bold",
     )
@@ -453,7 +473,7 @@ def generate_mock_connector_data(
     connector_name: str,
 ) -> pl.DataFrame:
     """Generate realistic synthetic connector data for offline testing."""
-    logger.warning(f"Generating synthetic mock {connector_name} data for demonstration...")
+    logger.warning(f"Generating mock {connector_name} data for demonstration...")
     n = len(df_duk)
     np.random.seed(42)
 
@@ -534,12 +554,15 @@ def main(
         help="Use mock data for offline dry-run testing.",
     ),
 ) -> None:
-    """Compare raw prices and volumes between Dukascopy local database and a realtime connector."""
+    """Compare raw prices and volumes between LocalDB and realtime connector."""
     output_dir.mkdir(parents=True, exist_ok=True)
     connector_clean = connector.lower().strip()
 
     logger.info("=" * 70)
-    logger.info(f"   Forex Data Profiling: Dukascopy (LocalDB) vs {connector_clean.capitalize()}")
+    logger.info(
+        "   Forex Data Profiling: Dukascopy (LocalDB) vs "
+        f"{connector_clean.capitalize()}"
+    )
     logger.info("=" * 70)
     logger.info(f"Connector       : {connector_clean}")
     logger.info(f"Ticker          : {ticker}")
@@ -564,7 +587,9 @@ def main(
     )
 
     if is_empty_dataframe(lf_duk):
-        logger.error(f"No Dukascopy data found in {data_path} for {ticker} ({timeframe}).")
+        logger.error(
+            f"No Dukascopy data found in {data_path} for {ticker} ({timeframe})."
+        )
         raise typer.Exit(code=1)
 
     df_duk = lf_duk.collect() if hasattr(lf_duk, "collect") else lf_duk
@@ -600,7 +625,9 @@ def main(
         acc_id_str = os.environ.get("CTRADER_ACCOUNT_ID", "49024232")
 
         if not (c_id and token):
-            logger.warning("cTrader credentials not found. Falling back to --mock data.")
+            logger.warning(
+                "cTrader credentials not found. Falling back to --mock data."
+            )
             df_conn = generate_mock_connector_data(df_duk, connector_clean)
         else:
             logger.info("Fetching cTrader trendbars via CTraderConnector...")
@@ -621,7 +648,9 @@ def main(
     elif connector_clean == "twelvedata":
         effective_key = api_key or os.environ.get("TWELVE_DATA_API_KEY", "")
         if not effective_key:
-            logger.warning("TWELVE_DATA_API_KEY not found. Falling back to --mock data.")
+            logger.warning(
+                "TWELVE_DATA_API_KEY not found. Falling back to --mock data."
+            )
             df_conn = generate_mock_connector_data(df_duk, connector_clean)
         else:
             logger.info("Fetching TwelveData intraday candles...")
@@ -638,7 +667,10 @@ def main(
             )
             df_conn = lf_conn.collect() if hasattr(lf_conn, "collect") else lf_conn
     else:
-        logger.error(f"Unsupported connector: {connector}. Supported: ctrader, tiingo, twelvedata.")
+        logger.error(
+            f"Unsupported connector: {connector}. "
+            "Supported: ctrader, tiingo, twelvedata."
+        )
         raise typer.Exit(code=1)
 
     if is_empty_dataframe(df_conn):
@@ -653,16 +685,36 @@ def main(
         logger.error("No overlapping timestamps found between Dukascopy and connector.")
         raise typer.Exit(code=1)
 
-    logger.info(f"Alignment complete: {align_meta['aligned_bars']} overlapping bars found.")
+    logger.info(
+        f"Alignment complete: {align_meta['aligned_bars']} overlapping bars found."
+    )
 
     # 4. Compute Metrics
     metrics = compute_comparison_metrics(df_aligned, ticker)
 
     # 5. Format & Save Text Report
     v_stats = metrics["volumes"]
+    sp = metrics["spreads"]
+    duk_sp_mean = sp["duk_spread_mean_pips"]
+    duk_sp_std = sp["duk_spread_std_pips"]
+    conn_sp_mean = sp["conn_spread_mean_pips"]
+    conn_sp_std = sp["conn_spread_std_pips"]
+
+    v_ask_bid = v_stats["corr_duk_ask_bid"]
+    v_ask_tot = v_stats["corr_duk_ask_tot"]
+    v_bid_tot = v_stats["corr_duk_bid_tot"]
+    v_ratio = v_stats["mean_ratio_duk_ask_tot"]
+    v_c_d_ask = v_stats["corr_conn_duk_ask"]
+    v_c_d_bid = v_stats["corr_conn_duk_bid"]
+    v_c_d_tot = v_stats["corr_conn_duk_tot"]
+    v_c_d_norm = v_stats["corr_norm_vol"]
+
     report_lines = [
         "=" * 82,
-        f"   COMPARISON REPORT: DUKASCOPY vs {connector_clean.upper()} — {ticker} ({timeframe})",
+        (
+            f"   COMPARISON REPORT: DUKASCOPY vs {connector_clean.upper()} "
+            f"— {ticker} ({timeframe})"
+        ),
         "=" * 82,
         f"Interval            : {start_date} -> {end_date}",
         f"Aligned Bars        : {align_meta['aligned_bars']}",
@@ -670,51 +722,61 @@ def main(
         f"Volume Split Formula: {v_stats['formula_description']}",
         "-" * 82,
         "PRICE COMPARISONS (Difference in Pips = Connector - Dukascopy):",
-        f"{'Feature':<12} | {'Duk Mean':<10} | {'Conn Mean':<10} | {'Mean Diff':<10} | {'MAE (pips)':<10} | {'Corr':<8}",
+        (
+            f"{'Feature':<12} | {'Duk Mean':<10} | {'Conn Mean':<10} | "
+            f"{'Mean Diff':<10} | {'MAE (pips)':<10} | {'Corr':<8}"
+        ),
         "-" * 82,
     ]
 
     for p_col, p_data in metrics["prices"].items():
+        duk_m = p_data["duk_mean"]
+        conn_m = p_data["conn_mean"]
+        diff_p = p_data["mean_diff_pips"]
+        mae_p = p_data["mae_pips"]
+        corr = p_data["correlation"]
         report_lines.append(
-            f"{p_col:<12} | {p_data['duk_mean']:<10.5f} | {p_data['conn_mean']:<10.5f} | "
-            f"{p_data['mean_diff_pips']:<+10.2f} | {p_data['mae_pips']:<10.2f} | {p_data['correlation']:<8.5f}"
+            f"{p_col:<12} | {duk_m:<10.5f} | {conn_m:<10.5f} | "
+            f"{diff_p:<+10.2f} | {mae_p:<10.2f} | {corr:<8.5f}"
         )
 
     report_lines.extend([
         "-" * 82,
         "BID-ASK SPREAD COMPARISON (Pips):",
-        f"  Dukascopy Mean Spread: {metrics['spreads']['duk_spread_mean_pips']:.2f} pips (std: {metrics['spreads']['duk_spread_std_pips']:.2f})",
-        f"  Connector Mean Spread: {metrics['spreads']['conn_spread_mean_pips']:.2f} pips (std: {metrics['spreads']['conn_spread_std_pips']:.2f})",
+        f"  Dukascopy Mean Spread: {duk_sp_mean:.2f} pips (std: {duk_sp_std:.2f})",
+        f"  Connector Mean Spread: {conn_sp_mean:.2f} pips (std: {conn_sp_std:.2f})",
         "-" * 82,
         "VOLUME ANALYSIS & CORRELATION TABLE:",
         f"  Volume Scale Ratio (Connector/Dukascopy) : {v_stats['scale_ratio']:.2f}x",
-        f"  [Dukascopy] Corr(V_ask, V_bid)             : {v_stats['corr_duk_ask_bid']:.4f}",
-        f"  [Dukascopy] Corr(V_ask, V_total)           : {v_stats['corr_duk_ask_tot']:.4f}",
-        f"  [Dukascopy] Corr(V_bid, V_total)           : {v_stats['corr_duk_bid_tot']:.4f}",
-        f"  [Dukascopy] Mean Ratio (V_ask / V_total)   : {v_stats['mean_ratio_duk_ask_tot']:.4f}",
-        f"  -------------------------------------------------------------",
-        f"  Corr(V_connector_ask, V_dukascopy_ask)     : {v_stats['corr_conn_duk_ask']:.4f}",
-        f"  Corr(V_connector_bid, V_dukascopy_bid)     : {v_stats['corr_conn_duk_bid']:.4f}",
-        f"  Corr(V_connector_total, V_dukascopy_total) : {v_stats['corr_conn_duk_tot']:.4f}",
-        f"  Corr(norm_V_connector, norm_V_dukascopy)   : {v_stats['corr_norm_vol']:.4f} (Relative Volume)",
+        f"  [Dukascopy] Corr(V_ask, V_bid)             : {v_ask_bid:.4f}",
+        f"  [Dukascopy] Corr(V_ask, V_total)           : {v_ask_tot:.4f}",
+        f"  [Dukascopy] Corr(V_bid, V_total)           : {v_bid_tot:.4f}",
+        f"  [Dukascopy] Mean Ratio (V_ask / V_total)   : {v_ratio:.4f}",
+        "  -------------------------------------------------------------",
+        f"  Corr(V_connector_ask, V_dukascopy_ask)     : {v_c_d_ask:.4f}",
+        f"  Corr(V_connector_bid, V_dukascopy_bid)     : {v_c_d_bid:.4f}",
+        f"  Corr(V_connector_total, V_dukascopy_total) : {v_c_d_tot:.4f}",
+        f"  Corr(norm_V_connector, norm_V_dukascopy)   : {v_c_d_norm:.4f} (Rel Vol)",
         "=" * 82,
     ])
 
     report_text = "\n".join(report_lines)
     print(report_text)
 
-    summary_file = (
-        output_dir / f"compare_dukascopy_vs_{connector_clean}_{ticker}_{timeframe}_summary.txt"
+    summary_name = (
+        f"compare_dukascopy_vs_{connector_clean}_{ticker}_{timeframe}_summary.txt"
     )
+    summary_file = output_dir / summary_name
     with open(summary_file, "w", encoding="utf-8") as f:
         f.write(report_text)
     logger.info(f"Summary report written to: {summary_file}")
 
     # 6. Generate Plot
     if plot:
-        plot_file = (
-            output_dir / f"compare_dukascopy_vs_{connector_clean}_{ticker}_{timeframe}.png"
+        plot_name = (
+            f"compare_dukascopy_vs_{connector_clean}_{ticker}_{timeframe}.png"
         )
+        plot_file = output_dir / plot_name
         plot_comparison(
             df_aligned,
             metrics,

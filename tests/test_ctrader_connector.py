@@ -7,7 +7,6 @@ trendbar decoding, schema adherence, and 50/50 volume split calculation.
 
 import struct
 import unittest
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -23,7 +22,6 @@ from ctrader_open_api.messages.OpenApiMessages_pb2 import (
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import ProtoOATrendbarPeriod
 
 from forex_data import (
-    COLUMN_NAME,
     POLARS_DTYPE_DICT,
     CTraderConnector,
     cTraderDataConnector,
@@ -124,16 +122,16 @@ class TestCTraderConnector(unittest.TestCase):
         tb_res.period = ProtoOATrendbarPeriod.H1
         tb_res.timestamp = 1705276800000
 
-        # Bar 1: volume = 1000, low = 108000, deltaOpen = 50, deltaHigh = 100, deltaClose = 80
+        # Bar 1: volume=1000, low=108000, deltaOpen=50, deltaHigh=100, deltaClose=80
         b1 = tb_res.trendbar.add()
-        b1.utcTimestampInMinutes = 28421280  # minutes corresponding to a valid UTC timestamp
+        b1.utcTimestampInMinutes = 28421280  # valid UTC timestamp in minutes
         b1.volume = 1000
         b1.low = 108000
         b1.deltaOpen = 50
         b1.deltaHigh = 100
         b1.deltaClose = 80
 
-        # Bar 2: volume = 2400, low = 108050, deltaOpen = 30, deltaHigh = 70, deltaClose = 40
+        # Bar 2: volume=2400, low=108050, deltaOpen=30, deltaHigh=70, deltaClose=40
         b2 = tb_res.trendbar.add()
         b2.utcTimestampInMinutes = 28421340
         b2.volume = 2400
@@ -187,8 +185,8 @@ class TestCTraderConnector(unittest.TestCase):
         tb_res.period = ProtoOATrendbarPeriod.H1
         tb_res.timestamp = 1705276800000
 
-        # Provide 4 consecutive 1-hour bars starting at 00:00 UTC (1705276800 -> 28421280 minutes)
-        # Each with 500 tick volume (ask=250, bid=250)
+        # Provide 4 consecutive 1-hour bars starting at 00:00 UTC
+        # (1705276800 -> 28421280 minutes), each with 500 tick volume (ask=250, bid=250)
         base_min = 28421280
         for i in range(4):
             b = tb_res.trendbar.add()
