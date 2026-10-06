@@ -996,7 +996,8 @@ class HistoricalManagerDB:
                 # if not is on a weekend day (Saturday or Sunday)
                 # set now as previous Friday at 17:00
                 if now_utc.weekday() in [5, 6]:
-                    now_ref = now_utc - timedelta(days=now_utc.weekday() + 1)
+                    days_back = now_utc.weekday() - 4
+                    now_ref = now_utc - timedelta(days=days_back)
                     now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
                 else:
                     now_ref = now_utc
@@ -1355,7 +1356,8 @@ class HistoricalManagerDB:
                 # if not is on a weekend day (Saturday or Sunday)
                 # set now as previous Friday at 17:00
                 if now_utc.weekday() in [5, 6]:
-                    now_ref = now_utc - timedelta(days=now_utc.weekday() + 1)
+                    days_back = now_utc.weekday() - 4
+                    now_ref = now_utc - timedelta(days=days_back)
                     now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
                 else:
                     now_ref = now_utc
