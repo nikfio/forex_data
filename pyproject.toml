@@ -1,11 +1,11 @@
 [project]
 name = "forex_data_aggregator"
-version = "0.2.7"
+version = "0.2.8"
 requires-python = ">=3.13,<3.14"
 
 [tool.poetry]
 name = "forex_data_aggregator"
-version = "0.2.7"
+version = "0.2.8"
 description = "Data aggregation for forex market data"
 authors = ["Nicola Fiorato <fiorato.nicola@gmail.com>"]
 license = "MIT"
