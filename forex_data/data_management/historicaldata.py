@@ -53,10 +53,6 @@ from re import (
     match
 )
 
-from mplfinance import (
-    plot as mpf_plot,
-    show as mpf_show
-)
 
 from numpy import array
 
@@ -118,6 +114,8 @@ class HistoricalManagerDB:
             validate_timedelta_str
         )
     )
+    offline: bool = field(default=False,
+                          validator=validators.instance_of(bool))
 
     # internal
     _db_connector = field(factory=DatabaseConnector)
@@ -982,7 +980,7 @@ class HistoricalManagerDB:
 
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
 
-        if current_year in years_interval_req:
+        if current_year in years_interval_req and not self.offline:
 
             if not ticker_available_last_timestamp:
 
@@ -1132,7 +1130,7 @@ class HistoricalManagerDB:
                     year_tick_missing.append(current_year)
 
                 # ONLY download years not already in the database
-                if year_tick_missing:
+                if year_tick_missing and not self.offline:
                     self._download(
                         ticker,
                         year_tick_missing,
@@ -1141,6 +1139,10 @@ class HistoricalManagerDB:
                         start_year=start.year,
                         end_year=end.year
                     )
+                elif year_tick_missing and self.offline:
+                    logger.bind(
+                        target='histmanager').info(
+                        f"Offline mode: skipping download for {ticker} {year_tick_missing}")
                 else:
                     logger.bind(
                         target='histmanager').info(
@@ -1171,7 +1173,7 @@ class HistoricalManagerDB:
                             completed_ok = False
                             break
 
-                if not completed_ok:
+                if not completed_ok and not self.offline:
 
                     logger.bind(target='histmanager').critical(
                         f'processing year data completion for '
@@ -1342,7 +1344,7 @@ class HistoricalManagerDB:
 
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
 
-        if current_year in years_interval_req:
+        if current_year in years_interval_req and not self.offline:
 
             if not ticker_available_last_timestamp:
 
@@ -1491,7 +1493,7 @@ class HistoricalManagerDB:
                     year_tick_missing.append(current_year)
 
                 # ONLY download years not already in the database
-                if year_tick_missing:
+                if year_tick_missing and not self.offline:
                     self._download(
                         ticker,
                         year_tick_missing,
@@ -1500,6 +1502,10 @@ class HistoricalManagerDB:
                         start_year=start.year,
                         end_year=end.year
                     )
+                elif year_tick_missing and self.offline:
+                    logger.bind(
+                        target='histmanager').info(
+                        f"Offline mode: skipping download for {ticker} {year_tick_missing}")
                 else:
                     logger.bind(
                         target='histmanager').info(
@@ -1530,7 +1536,7 @@ class HistoricalManagerDB:
                             completed_ok = False
                             break
 
-                if not completed_ok:
+                if not completed_ok and not self.offline:
 
                     logger.bind(target='histmanager').critical(
                         f'processing year data completion for '
@@ -1549,75 +1555,6 @@ class HistoricalManagerDB:
             comparison_operator=comparison_operator,
             comparison_aggregation_mode=comparison_aggregation_mode
         )
-
-    def plot(
-        self,
-        ticker,
-        timeframe,
-        start_date,
-        end_date
-    ) -> None:
-        """
-        Plot candlestick chart for the specified ticker and date range.
-
-        Generates an interactive candlestick chart using mplfinance, displaying
-        OHLC (Open, High, Low, Close) data for the specified time period.
-
-        Args:
-            ticker (str): Currency pair symbol (e.g., 'EURUSD', 'GBPUSD')
-            timeframe (str): Candle timeframe (e.g., '1m', '5m', '1h', '1D', '1W')
-            start_date (str): Start date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
-            end_date (str): End date in ISO format 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
-
-        Returns:
-            None: Displays the chart using matplotlib
-
-        Example:
-            >>> manager = HistoricalManagerDB(config='data_config.yaml')
-            >>> manager.plot(
-            ...     ticker='EURUSD',
-            ...     timeframe='1D',
-            ...     start_date='2020-01-01',
-            ...     end_date='2020-12-31'
-            ... )
-
-        Note:
-            The chart will be displayed in a matplotlib window. The data is automatically
-            fetched using get_data() and converted to the appropriate format for plotting.
-        """
-
-        chart_data = self.get_data(ticker=ticker,
-                                   timeframe=timeframe,
-                                   start=start_date,
-                                   end=end_date)
-
-        chart_data = to_pandas_dataframe(chart_data)
-
-        if chart_data.index.name != COLUMN_NAME.TIMESTAMP:
-
-            chart_data.set_index(COLUMN_NAME.TIMESTAMP,
-                                 inplace=True)
-
-            chart_data.index = to_datetime(chart_data.index)
-
-        else:
-            logger.bind(target='histmanager').trace(
-                f'Chart data already has {COLUMN_NAME.TIMESTAMP} as index')
-
-        # candlestick chart type
-        # use mplfinance
-        chart_kwargs = dict(style='charles',
-                            title=ticker,
-                            ylabel='Quotation',
-                            xlabel='Timestamp',
-                            volume=False,
-                            figratio=(12, 8),
-                            figscale=1
-                            )
-
-        mpf_plot(chart_data, type='candle', **chart_kwargs)
-
-        mpf_show()
 
     def close(self):
 

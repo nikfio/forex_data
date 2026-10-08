@@ -3,10 +3,36 @@
 Typer-based command-line interface for the Forex Data Aggregator.
 """
 
+import datetime
+from pathlib import Path
+import time
 from typing import List
 import typer
+import yaml
 
 from forex_data import HistoricalManagerDB
+from forex_data.data_management.charts import DataCharts
+
+
+def _load_default_data_path() -> str:
+    """Load default data path from appconfig/data_config.yaml if available."""
+    candidates = [
+        Path(__file__).resolve().parent.parent / "appconfig" / "data_config.yaml",
+        Path("appconfig/data_config.yaml"),
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            try:
+                with open(candidate, "r") as f:
+                    cfg = yaml.safe_load(f)
+                    if isinstance(cfg, dict) and "DATA_PATH" in cfg:
+                        return str(cfg["DATA_PATH"])
+            except Exception:
+                pass
+    return "~/.database"
+
+
+DEFAULT_DATA_PATH = _load_default_data_path()
 
 # Initialize the Typer app
 app = typer.Typer(
@@ -39,6 +65,18 @@ def generate_database(
             "Can be specified multiple times or comma-separated."
         )
     ),
+    data_path: str = typer.Option(
+        DEFAULT_DATA_PATH,
+        "--data-path",
+        "-d",
+        help="Database root directory path."
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        "--no-download",
+        help="Run in offline mode without attempting remote downloads."
+    ),
     config: str = typer.Option(
         "",
         "--config",
@@ -70,14 +108,20 @@ def generate_database(
     if not normalized_timeframe:
         normalized_timeframe = ["1d"]
 
+    cfg_desc = config if config else f"Default (data_path={data_path})"
     typer.secho(
-        f"Initializing database manager with config: "
-        f"{config if config else 'Default configuration'}",
+        f"Initializing database manager with config: {cfg_desc}",
         fg=typer.colors.BLUE
     )
 
+    init_kwargs = {"config": config}
+    if data_path:
+        init_kwargs["data_path"] = data_path
+    if offline:
+        init_kwargs["offline"] = offline
+
     try:
-        manager = HistoricalManagerDB(config=config)
+        manager = HistoricalManagerDB(**init_kwargs)
         # add requested timeframes
         # with this action we need just one tick download if needed
         manager.add_timeframe(normalized_timeframe)
@@ -139,6 +183,107 @@ def generate_database(
         fg=typer.colors.GREEN,
         bold=True
     )
+
+
+@app.command(name="plot")
+def plot_data(
+    ticker: str = typer.Argument(..., help="Ticker symbol (e.g., EURUSD)."),
+    start_date: str = typer.Argument(..., help="Start date."),
+    end_date: str = typer.Argument(
+        "now", help="End date (YYYY-MM-DD) or 'now' or 'live' for real-time plot."
+    ),
+    timeframe: str = typer.Argument(
+        ..., help="Timeframe interval (e.g., 1D, 1h, 15m)."
+    ),
+    chart_type: str = typer.Option(
+        "ohlc", "--type", help="Type of chart (ohlc, line, scatter)."
+    ),
+    data_path: str = typer.Option(
+        DEFAULT_DATA_PATH,
+        "--data-path",
+        "-d",
+        help="Database root directory path."
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        "--no-download",
+        help="Run in offline mode without attempting remote downloads."
+    ),
+    config: str = typer.Option("", "--config", "-c", help="YAML config file path."),
+    port: int = typer.Option(8050, "--port", help="Port for the Dash realtime server."),
+    update_interval: int = typer.Option(
+        1000, "--interval", help="Realtime refresh interval in ms."
+    )
+):
+    """
+    Launch an interactive plot for historical or live forex data.
+    """
+    typer.secho(f"Initializing DataCharts for {ticker}...", fg=typer.colors.BLUE)
+
+    is_live = end_date.lower() == "live"
+    if end_date.lower() == "now":
+        end_date = datetime.datetime.now(
+            datetime.timezone.utc
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
+    init_kwargs = {"config": config}
+    if data_path:
+        init_kwargs["data_path"] = data_path
+    if offline:
+        init_kwargs["offline"] = offline
+
+    if is_live:
+        try:
+            manager = DataCharts(**init_kwargs)
+            manager.realtime_connector = manager
+
+            typer.secho(
+                f"Starting live plot for {ticker} at port {port}",
+                fg=typer.colors.GREEN
+            )
+            manager.start_realtime_plot(
+                ticker=ticker,
+                timeframe=timeframe,
+                start_date=start_date,
+                update_interval_ms=update_interval,
+                chart_type=chart_type,
+                port=port
+            )
+
+            typer.secho(
+                "Press Ctrl+C to stop the real-time server.",
+                fg=typer.colors.YELLOW
+            )
+            while True:
+                time.sleep(1)
+
+        except KeyboardInterrupt:
+            typer.secho("\nStopping real-time server...", fg=typer.colors.YELLOW)
+        except Exception as e:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        finally:
+            manager.close()
+    else:
+        try:
+            manager = DataCharts(**init_kwargs)
+            typer.secho(
+                f"Plotting {ticker}: {start_date} -> {end_date}...",
+                fg=typer.colors.CYAN
+            )
+            manager.plot_historical(
+                ticker=ticker,
+                timeframe=timeframe,
+                start_date=start_date,
+                end_date=end_date,
+                chart_type=chart_type
+            )
+        except Exception as e:
+            typer.secho(f"Error plotting data: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        finally:
+            manager.close()
 
 
 if __name__ == "__main__":
