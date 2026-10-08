@@ -137,6 +137,60 @@ Here log is dumped in a file called `forexdata.log`, the complete location of th
 
 `~/.database/forexdata.log`
 
+## CLI
+
+The `forex-data-aggregator` package includes a command-line interface tool named `fx-agg` to manage data generation and charting from the terminal.
+
+### `generate-database`
+
+Generate and cache historical forex data in the local database. It downloads missing historical periods and caches them automatically.
+
+**Arguments:**
+* `tickers`: Ticker symbol or a list of symbols separated by comma (e.g., EURUSD, GBPUSD).
+* `start_date`: Start date for data retrieval (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS).
+* `end_date`: End date for data retrieval (default: `now`).
+
+**Options:**
+* `--timeframe`, `-t`: Timeframe interval(s) (e.g., 1m, 5m, 1h, 1D). Can be specified multiple times or as comma-separated. Default is `1D`.
+* `--data-path`, `-d`: Database root directory path. Defaults to `DATA_PATH` configured in `appconfig/data_config.yaml` (e.g. `~/.test_vol_database`).
+* `--offline`, `--no-download`: Run in offline mode without attempting remote downloads.
+* `--config`, `-c`: YAML configuration file path or a YAML formatted string.
+
+**Example:**
+```bash
+uv run fx-agg generate-database EURUSD,GBPUSD 2018-01-01 2018-12-31 -t 1D,1h
+```
+
+### `plot`
+
+Launch an interactive plot for historical or live forex data.
+
+**Arguments:**
+* `ticker`: Ticker symbol (e.g., EURUSD).
+* `start_date`: Start date (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS).
+* `end_date`: End date (format: YYYY-MM-DD). Use `now` for a static plot up to the current time, or `live` to launch a continuous real-time Dash server.
+* `timeframe`: Timeframe interval (e.g., 1D, 1h, 15m).
+
+**Options:**
+* `--type`: Type of chart to display (`ohlc`, `line`, `scatter`). Default is `ohlc`.
+* `--data-path`, `-d`: Database root directory path. Defaults to `DATA_PATH` configured in `appconfig/data_config.yaml` (e.g. `~/.test_vol_database`).
+* `--offline`, `--no-download`: Run in offline mode without attempting remote downloads.
+* `--config`, `-c`: YAML configuration file path.
+* `--port`: Port for the Dash realtime server (when `end_date=live`). Default is `8050`.
+* `--interval`: Realtime refresh interval in milliseconds. Default is `1000`.
+
+**Examples:**
+```bash
+# Static historical plot up to the current time (offline from existing DB)
+uv run fx-agg plot EURUSD 2024-01-01 now 1D --no-download
+
+# Custom data path
+uv run fx-agg plot EURUSD 2024-01-01 2026-06-06 1D -d ~/.test_vol_database
+
+# Live interactive plot starting from a specific date, updating continuously
+uv run fx-agg plot EURUSD 2024-01-01 live 1D --port 8050
+```
+
 ## EXAMPLES
 
 You can find complete working examples in the [examples folder](examples/) showing the various modules and functionalities the package offers.
