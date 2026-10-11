@@ -933,11 +933,9 @@ class HistoricalManagerDB:
         else:
             if start == 'now':
                 raise ValueError("start date cannot be 'now'")
-            if end == 'now':
-                end = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
-            start = any_date_to_datetime64(start)
-            end = any_date_to_datetime64(end)
+            start = normalize_to_naive_utc(start)
+            end = normalize_to_naive_utc(end)
 
         # sanity checks on query dates specific to historical data
         if end < start:
@@ -1291,17 +1289,20 @@ class HistoricalManagerDB:
                 f'timeframe request {timeframe} invalid')
             raise ValueError(f'timeframe request {timeframe} invalid')
 
-        if date == 'now':
-            if direction == 'forward':
-                raise ValueError("start date cannot be 'now'")
-            date = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        if date == 'now' and direction == 'forward':
+            raise ValueError("start date cannot be 'now'")
+
+        dt_val = normalize_to_naive_utc(date)
 
         if direction == 'backward':
-            end = any_date_to_datetime64(date)
+            end = dt_val
             start = estimate_start_date_to_business_days(end, timeframe, periods, FOREX_HOLIDAYS)
         else:
-            start = any_date_to_datetime64(date)
+            start = dt_val
             end = estimate_end_date_to_business_days(start, timeframe, periods, FOREX_HOLIDAYS)
+
+        start = normalize_to_naive_utc(start)
+        end = normalize_to_naive_utc(end)
 
         # sanity checks on query dates specific to historical data
         if end < start:
@@ -1545,7 +1546,7 @@ class HistoricalManagerDB:
 
         return self._db_connector.read_data_window(
             market='forex',
-            date=any_date_to_datetime64(date),
+            date=dt_val,
             ticker=ticker,
             timeframe=timeframe,
             periods=periods,

@@ -766,6 +766,9 @@ class LocalDBConnector(DatabaseConnector):
                   comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
                   ) -> PolarsLazyFrame:
 
+        start = normalize_to_naive_utc(start, to_pydatetime=True)
+        end = normalize_to_naive_utc(end, to_pydatetime=True)
+
         comparisons_len = 0
 
         # Validate and normalize condition parameters if provided
@@ -1022,6 +1025,7 @@ class LocalDBConnector(DatabaseConnector):
         Query the local db to calculate the start date of the window
         if direction is forward, or end date if backward.
         """
+        date = normalize_to_naive_utc(date, to_pydatetime=True)
         if direction == 'backward':
             end_date = date
             start_date = estimate_start_date_to_business_days(
@@ -1424,6 +1428,9 @@ class LocalDBYearConnector(DatabaseConnector):
                   comparison_aggregation_mode: SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None = None
                   ) -> PolarsLazyFrame:
 
+        start = normalize_to_naive_utc(start, to_pydatetime=True)
+        end = normalize_to_naive_utc(end, to_pydatetime=True)
+
         comparisons_len = 0
 
         # Validate and normalize condition parameters if provided
@@ -1663,6 +1670,7 @@ class LocalDBYearConnector(DatabaseConnector):
 
         # based on timeframe and window size (units of timeframe)
         # estimate how many years the query should cover
+        date = normalize_to_naive_utc(date, to_pydatetime=True)
         if direction == 'backward':
             end_date = date
             start_date = estimate_start_date_to_business_days(

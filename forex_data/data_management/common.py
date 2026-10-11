@@ -32,7 +32,8 @@ from bs4 import BeautifulSoup
 from datetime import (
     timedelta,
     datetime,
-    date
+    date,
+    timezone
 )
 
 from pathlib import Path
@@ -171,6 +172,7 @@ __all__ = [
     'get_attrs_names',
     'check_timeframe_str',
     'any_date_to_datetime64',
+    'normalize_to_naive_utc',
     'empty_dataframe',
     'is_empty_dataframe',
     'shape_dataframe',
@@ -708,6 +710,56 @@ def any_date_to_datetime64(any_date,
         raise
 
     return any_date
+
+
+def normalize_to_naive_utc(date_val: Any, to_pydatetime: bool = False) -> Any:
+    """
+    Normalize any date/timestamp representation (str, int/float unix timestamp,
+    datetime, pd.Timestamp, pl.Datetime) into a timezone-naive UTC timestamp.
+
+    - If 'now', resolves to current UTC time stripped of tzinfo.
+    - If already timezone-aware, converts to UTC and strips tzinfo.
+    - If timezone-naive, retains the naive value assuming UTC.
+    - If to_pydatetime=True, returns Python datetime instead of pd.Timestamp.
+    """
+    if date_val is None:
+        return None
+
+    if isinstance(date_val, str):
+        cleaned = date_val.strip()
+        if cleaned.lower() == 'now':
+            dt_now = datetime.now(timezone.utc).replace(tzinfo=None)
+            return dt_now if to_pydatetime else Timestamp(dt_now)
+
+    if isinstance(date_val, (int, float)):
+        sec = date_val / 1000.0 if date_val > 1e11 else float(date_val)
+        dt_val = datetime.fromtimestamp(sec, tz=timezone.utc).replace(tzinfo=None)
+        return dt_val if to_pydatetime else Timestamp(dt_val)
+
+    if isinstance(date_val, date) and not isinstance(date_val, datetime):
+        dt_val = datetime.combine(date_val, datetime.min.time())
+        return dt_val if to_pydatetime else Timestamp(dt_val)
+
+    if not isinstance(date_val, (datetime, Timestamp)):
+        dt_val = any_date_to_datetime64(date_val)
+    else:
+        dt_val = date_val
+
+    if hasattr(dt_val, 'tz') and dt_val.tz is not None:
+        dt_val = dt_val.tz_convert('UTC').tz_localize(None)
+    elif hasattr(dt_val, 'tzinfo') and dt_val.tzinfo is not None:
+        dt_val = dt_val.astimezone(timezone.utc).replace(tzinfo=None)
+
+    if to_pydatetime:
+        if hasattr(dt_val, 'to_pydatetime'):
+            return dt_val.to_pydatetime()
+        elif isinstance(dt_val, datetime):
+            return dt_val
+    else:
+        if not isinstance(dt_val, Timestamp):
+            return Timestamp(dt_val)
+
+    return dt_val
 
 
 def get_date_interval(start=None,
@@ -1929,15 +1981,10 @@ def adjust_start_date_to_business_days(
     with business days. End date remains always unmodified.
     """
     # Convert inputs to datetime objects
-    if isinstance(start, (str, Timestamp)):
-        start = any_date_to_datetime64(start)
-    elif isinstance(start, PolarsDatetime):
-        start = datetime.fromtimestamp(start.timestamp())
-
-    if isinstance(end, (str, Timestamp)):
-        end = any_date_to_datetime64(end)
-    elif isinstance(end, PolarsDatetime):
-        end = datetime.fromtimestamp(end.timestamp())
+    if start is not None:
+        start = normalize_to_naive_utc(start, to_pydatetime=True)
+    if end is not None:
+        end = normalize_to_naive_utc(end, to_pydatetime=True)
 
     # Convert timeframe to timedelta if it's a string
     if isinstance(timeframe, str):
@@ -2053,15 +2100,10 @@ def adjust_end_date_to_business_days(
     with business days. Start date remains always unmodified.
     """
     # Convert inputs to datetime objects
-    if isinstance(start, (str, Timestamp)):
-        start = any_date_to_datetime64(start)
-    elif isinstance(start, PolarsDatetime):
-        start = datetime.fromtimestamp(start.timestamp())
-
-    if isinstance(end, (str, Timestamp)):
-        end = any_date_to_datetime64(end)
-    elif isinstance(end, PolarsDatetime):
-        end = datetime.fromtimestamp(end.timestamp())
+    if start is not None:
+        start = normalize_to_naive_utc(start, to_pydatetime=True)
+    if end is not None:
+        end = normalize_to_naive_utc(end, to_pydatetime=True)
 
     # Convert timeframe to timedelta if it's a string
     if isinstance(timeframe, str):
