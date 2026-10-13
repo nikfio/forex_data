@@ -272,6 +272,11 @@ class TestCTraderLiveConnector(unittest.TestCase):
     retrieval from demo.ctraderapi.com.
     """
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_REALTIME_CONNECTOR_TEST") == "1",
+        "Skipped by default to prevent using API keys in pipeline. "
+        "Run with RUN_REALTIME_CONNECTOR_TEST=1"
+    )
     def setUp(self):
         required_vars = [
             "CTRADER_CLIENT_ID",

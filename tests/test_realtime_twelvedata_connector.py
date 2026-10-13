@@ -36,21 +36,35 @@ class TestTwelveDataConnector(unittest.TestCase):
     """
 
     def setUp(self):
-        if not os.environ.get("TWELVE_DATA_API_KEY"):
-            raise AssertionError(
-                "TWELVE_DATA_API_KEY environment variable is not set or empty.\n"
-                "Realtime Twelve Data tests require an active API key to "
-                "fetch real data.\n"
-                "Remediation:\n"
-                "1. Sign up at https://twelvedata.com/ to obtain your API key.\n"
-                "2. Set the environment variable in your system:\n"
-                "   - Linux / macOS:\n"
-                "       export TWELVE_DATA_API_KEY=\"<your_key>\"\n"
-                "   - Windows (Command Prompt):\n"
-                "       set TWELVE_DATA_API_KEY=<your_key>\n"
-                "   - Windows (PowerShell):\n"
-                "       $env:TWELVE_DATA_API_KEY=\"<your_key>\""
-            )
+        # We allow test_get_data_invalid_start_date, test_weekend_data_filtering,
+        # and test_get_recent_data_weekend_shifting to run without API keys.
+        # Live tests are skipped unless RUN_REALTIME_CONNECTOR_TEST=1.
+        live_tests = {
+            "test_get_realtime_price",
+            "test_get_data_success",
+            "test_get_recent_data"
+        }
+        if self._testMethodName in live_tests:
+            if os.environ.get("RUN_REALTIME_CONNECTOR_TEST") != "1":
+                self.skipTest(
+                    "Skipped by default to prevent using API keys in pipeline. "
+                    "Run with RUN_REALTIME_CONNECTOR_TEST=1"
+                )
+            if not os.environ.get("TWELVE_DATA_API_KEY"):
+                raise AssertionError(
+                    "TWELVE_DATA_API_KEY environment variable is not set or empty.\n"
+                    "Realtime Twelve Data tests require an active API key to "
+                    "fetch real data.\n"
+                    "Remediation:\n"
+                    "1. Sign up at https://twelvedata.com/ to obtain your API key.\n"
+                    "2. Set the environment variable in your system:\n"
+                    "   - Linux / macOS:\n"
+                    "       export TWELVE_DATA_API_KEY=\"<your_key>\"\n"
+                    "   - Windows (Command Prompt):\n"
+                    "       set TWELVE_DATA_API_KEY=<your_key>\n"
+                    "   - Windows (PowerShell):\n"
+                    "       $env:TWELVE_DATA_API_KEY=\"<your_key>\""
+                )
         logger.remove()
         logger.add(
             sys.stdout,
@@ -60,7 +74,11 @@ class TestTwelveDataConnector(unittest.TestCase):
                 "<level>{level:<8}</level> | {message}"
             )
         )
+        # For non-live tests where no TWELVE_DATA_API_KEY is in env,
+        # pass dummy key
+        api_key = os.environ.get("TWELVE_DATA_API_KEY", "dummy_key")
         self.connector = TwelveDataConnector(
+            api_key=api_key,
             plan="free",
             data_path=_data_path
         )
