@@ -1,6 +1,4 @@
 ---
 # yaml document template for data management configuration
 
-DATA_FILETYPE: 'parquet'
-ENGINE: 'polars_lazy'
 DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'

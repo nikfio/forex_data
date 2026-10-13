@@ -26,6 +26,7 @@ from typing import (
 
 import requests
 import random
+import urllib3
 from math import ceil
 from bs4 import BeautifulSoup
 
@@ -1831,7 +1832,6 @@ def get_histdata_tickers(verify: bool = True) -> List[str]:
         List of all available tickers (e.g., ['EURUSD', 'GBPUSD', ...]).
     """
     if not verify:
-        import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     url = "https://www.histdata.com/download-free-forex-data/?/ascii/1-minute-bar-quotes"

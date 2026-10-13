@@ -29,15 +29,14 @@ Create a file ending with ``data_config.yaml``:
 
 .. code-block:: yaml
 
-   ENGINE: polars          # Options: polars, polars_lazy, pyarrow, pandas
-   DATA_FILETYPE: parquet       # Options: parquet, csv
    DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY' # Optional custom path
    
+   # API keys for real-time providers (optional)
    PROVIDERS_KEY:
      TWELVE_DATA_API_KEY: your_api_key_here
 
 .. tip::
-   Use **parquet** for better performance and **polars** for the fastest data processing!
+   The engine automatically defaults to ``polars_lazy`` with binary ``parquet`` storage. You do not need to configure ``ENGINE`` or ``DATA_TYPE``.
 
 Working with Historical Data
 ==============================
@@ -224,48 +223,15 @@ Here's a complete example combining historical and real-time data:
        end_date='2023-12-31'
    )
 
-Data Engine Selection
-=====================
+Default Engine & Storage
+========================
 
-The package supports multiple data processing engines:
+The package standardizes on high-performance columnar processing and storage:
 
-Polars (Recommended)
---------------------
+* **Engine**: ``polars_lazy`` (default and maintained engine). All queries and aggregations leverage Polars LazyFrame query plans for optimal predicate pushdown and parallel execution.
+* **Storage Format**: ``parquet`` (default and maintained format). Binary Snappy-compressed Parquet files provide minimal disk usage and high-speed column scanning.
 
-.. code-block:: yaml
-
-   ENGINE: polars
-
-* ✅ Fastest performance
-* ✅ Modern API
-* ✅ Great for large datasets
-* ✅ Best memory efficiency
-
-PyArrow
--------
-
-.. code-block:: yaml
-
-   ENGINE: pyarrow
-
-* ✅ Very fast
-* ✅ Columnar format
-* ✅ Great for analytics
-
-Pandas
-------
-
-.. code-block:: yaml
-
-   ENGINE: pandas
-
-* ⚠️ Slower performance
-* ✅ Most familiar API
-* ✅ Widest ecosystem
-
-.. warning::
-   Pandas is significantly slower than Polars and PyArrow, especially for large datasets.
-   Use Polars for the best performance.
+Because these are built-in defaults, ``ENGINE`` and ``DATA_TYPE`` are no longer required in configuration files.
 
 Next Steps
 ==========

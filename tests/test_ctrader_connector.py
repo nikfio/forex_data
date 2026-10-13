@@ -5,8 +5,14 @@ Verifies connection, auth handshake, symbol resolution, tick reconstruction,
 trendbar decoding, schema adherence, and 50/50 volume split calculation.
 """
 
+import os
 import struct
 import unittest
+from datetime import (
+    datetime,
+    timedelta,
+    timezone,
+)
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -257,3 +263,88 @@ class TestCTraderConnector(unittest.TestCase):
         self.assertAlmostEqual(df["ask"][0], 1.0813)
         self.assertAlmostEqual(df["bid"][1], 1.0812)
         self.assertAlmostEqual(df["ask"][1], 1.0814)
+
+
+class TestCTraderLiveConnector(unittest.TestCase):
+    """
+    Live real data fetch tests for CTraderConnector.
+    Verifies actual connection, authentication handshake, and trendbar data
+    retrieval from demo.ctraderapi.com.
+    """
+
+    def setUp(self):
+        required_vars = [
+            "CTRADER_CLIENT_ID",
+            "CTRADER_CLIENT_SECRET",
+            "CTRADER_ACCESS_TOKEN",
+            "CTRADER_ACCOUNT_ID"
+        ]
+        missing_vars = [v for v in required_vars if not os.environ.get(v)]
+        if missing_vars:
+            raise AssertionError(
+                f"Missing required cTrader environment variables: {missing_vars}.\n"
+                "Realtime cTrader tests require active API credentials to test live "
+                "data fetch.\n"
+                "Remediation:\n"
+                "1. Register at Spotware Open API: https://openapi.ctrader.com/.\n"
+                "2. Create an Open API Application to obtain Client ID and "
+                "Client Secret.\n"
+                "3. Generate an Access Token and obtain your cTrader Account ID.\n"
+                "4. Export the variables in your system:\n"
+                "   - Linux / macOS:\n"
+                "       export CTRADER_CLIENT_ID=\"<client_id>\"\n"
+                "       export CTRADER_CLIENT_SECRET=\"<client_secret>\"\n"
+                "       export CTRADER_ACCESS_TOKEN=\"<access_token>\"\n"
+                "       export CTRADER_ACCOUNT_ID=\"<account_id>\"\n"
+                "   - Windows (Command Prompt):\n"
+                "       set CTRADER_CLIENT_ID=<client_id>\n"
+                "       set CTRADER_CLIENT_SECRET=<client_secret>\n"
+                "       set CTRADER_ACCESS_TOKEN=<access_token>\n"
+                "       set CTRADER_ACCOUNT_ID=<account_id>\n"
+                "   - Windows (PowerShell):\n"
+                "       $env:CTRADER_CLIENT_ID=\"<client_id>\"\n"
+                "       $env:CTRADER_CLIENT_SECRET=\"<client_secret>\"\n"
+                "       $env:CTRADER_ACCESS_TOKEN=\"<access_token>\"\n"
+                "       $env:CTRADER_ACCOUNT_ID=\"<account_id>\""
+            )
+
+    def test_live_data_fetch(self):
+        """Tests live trendbar fetching from cTrader OpenAPI."""
+        conn = CTraderConnector(
+            client_id=os.environ["CTRADER_CLIENT_ID"],
+            client_secret=os.environ["CTRADER_CLIENT_SECRET"],
+            access_token=os.environ["CTRADER_ACCESS_TOKEN"],
+            broker_account_id=os.environ["CTRADER_ACCOUNT_ID"],
+        )
+        try:
+            conn.connect()
+            end_dt = datetime.now(timezone.utc)
+            start_dt = end_dt - timedelta(days=3)
+            start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
+            end_str = end_dt.strftime("%Y-%m-%d %H:%M:%S")
+            lf = conn.get_data("EURUSD", "1h", start_str, end_str)
+            df = lf.collect()
+            self.assertGreater(
+                df.height,
+                0,
+                "cTrader returned no trendbar data for EURUSD. Verify that the "
+                "market is open or the requested date range contains historical bars."
+            )
+            for col in [
+                "timestamp", "open", "high", "low", "close",
+                "ask_volume", "bid_volume"
+            ]:
+                self.assertIn(col, df.columns)
+        except ConnectionError as e:
+            raise AssertionError(
+                f"Failed to connect or authenticate with cTrader: {e}.\n"
+                "Your cTrader tokens may be expired or invalid. Please refresh your "
+                "Access Token at https://openapi.ctrader.com/ or check your "
+                "Account ID."
+            ) from e
+        finally:
+            conn.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

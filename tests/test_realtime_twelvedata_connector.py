@@ -25,13 +25,7 @@ from forex_data import (
 )
 
 _base_path = Path.home() / ".test_database"
-_data_path = _base_path
-_counter = 1
-while _data_path.exists():
-    _data_path = Path.home() / f".test_database_{_counter}"
-    _counter += 1
-
-_data_path = Path.home() / ".test_database" / "Realtime"
+_data_path = _base_path / "Realtime_TwelveData"
 
 
 class TestTwelveDataConnector(unittest.TestCase):
@@ -43,7 +37,20 @@ class TestTwelveDataConnector(unittest.TestCase):
 
     def setUp(self):
         if not os.environ.get("TWELVE_DATA_API_KEY"):
-            self.skipTest("TWELVE_DATA_API_KEY environment variable not set")
+            raise AssertionError(
+                "TWELVE_DATA_API_KEY environment variable is not set or empty.\n"
+                "Realtime Twelve Data tests require an active API key to "
+                "fetch real data.\n"
+                "Remediation:\n"
+                "1. Sign up at https://twelvedata.com/ to obtain your API key.\n"
+                "2. Set the environment variable in your system:\n"
+                "   - Linux / macOS:\n"
+                "       export TWELVE_DATA_API_KEY=\"<your_key>\"\n"
+                "   - Windows (Command Prompt):\n"
+                "       set TWELVE_DATA_API_KEY=<your_key>\n"
+                "   - Windows (PowerShell):\n"
+                "       $env:TWELVE_DATA_API_KEY=\"<your_key>\""
+            )
         logger.remove()
         logger.add(
             sys.stdout,
@@ -73,7 +80,13 @@ class TestTwelveDataConnector(unittest.TestCase):
 
         df = result_lf.collect()
         logger.info(f"Received DataFrame:\n{df}")
-        self.assertGreater(df.height, 0, "DataFrame should not be empty")
+        self.assertGreater(
+            df.height,
+            0,
+            "Twelve Data returned no real-time price data. Your TWELVE_DATA_API_KEY "
+            "may be invalid, unauthorized, or rate-limited. Verify your key at "
+            "https://twelvedata.com/."
+        )
         self.assertIn("timestamp", df.columns)
         self.assertIn("ticker", df.columns)
         self.assertIn("price", df.columns)
@@ -101,7 +114,13 @@ class TestTwelveDataConnector(unittest.TestCase):
 
         df = result_lf.collect()
         logger.info(f"Received DataFrame:\n{df}")
-        self.assertGreater(df.height, 0, "DataFrame should not be empty")
+        self.assertGreater(
+            df.height,
+            0,
+            "Twelve Data returned no historical data. Your TWELVE_DATA_API_KEY "
+            "may be invalid, unauthorized, or rate-limited. Verify your key at "
+            "https://twelvedata.com/."
+        )
 
         # Verify columns match POLARS_DTYPE_DICT.TIME_TF_DTYPE
         expected_schema = list(POLARS_DTYPE_DICT.TIME_TF_DTYPE.keys())
@@ -159,7 +178,13 @@ class TestTwelveDataConnector(unittest.TestCase):
 
         df = result_lf.collect()
         logger.info(f"Received DataFrame:\n{df}")
-        self.assertGreater(df.height, 0, "DataFrame should not be empty")
+        self.assertGreater(
+            df.height,
+            0,
+            "Twelve Data returned no recent data. Your TWELVE_DATA_API_KEY "
+            "may be invalid, unauthorized, or rate-limited. Verify your key at "
+            "https://twelvedata.com/."
+        )
 
         utc_tz = zoneinfo.ZoneInfo("UTC")
         ny_tz = zoneinfo.ZoneInfo("America/New_York")

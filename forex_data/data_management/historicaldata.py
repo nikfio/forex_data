@@ -1221,30 +1221,13 @@ class HistoricalManagerDB:
                 - ISO format: 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
                 - datetime object
             timeframe (str): Candle timeframe for data aggregation. Supported frames:
-                1s (1 second)
-                1m (1 minute)
-                1h (1 hour)
-                1d (1 calendar day)
-                1w (1 calendar week)
-                1mo (1 calendar month)
-                1q (1 calendar quarter)
-                1y (1 calendar year)
-                periods (int): Number of timeframe units to look back or forward.
-            direction (Literal['backward', 'forward']): Direction to look back
-                ('backward' or 'forward').
-            comparison_column_name (List[str] | str | None): List of column names
-                to compare.
-                If None, no comparison is performed.
-            check_level (List[int | float] | int | float | None): List of values
-                to compare against.
-                If None, no comparison is performed.
-            comparison_operator (List[SUPPORTED_SQL_COMPARISON_OPERATORS] |
-                SUPPORTED_SQL_COMPARISON_OPERATORS | None): List of comparison
-                operators to use for comparison.
-                If None, no comparison is performed.
-            comparison_aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES
-                | None): Aggregation mode to use for comparison.
-                If None, no comparison is performed.
+                1s, 1m, 1h, 1d, 1w, 1mo, 1q, 1y.
+            periods (int): Number of timeframe units to look back or forward.
+            direction (Literal['backward', 'forward']): Direction to look back ('backward' or 'forward').
+            comparison_column_name (List[str] | str | None, optional): List of column names to compare.
+            check_level (List[int | float] | int | float | None, optional): List of values to compare against.
+            comparison_operator (List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None, optional): Comparison operators.
+            comparison_aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None, optional): Aggregation mode.
 
         Returns:
             Union[PolarsDataFrame, PolarsLazyFrame]: DataFrame with the historical

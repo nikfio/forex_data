@@ -66,8 +66,13 @@ from .common import *
 @define(kw_only=True, slots=True)
 class DatabaseConnector:
 
-    data_path: Union[str, Path] = field(default='', validator=validators.or_(
-        validators.instance_of(str), validators.instance_of(Path)))
+    data_path: Union[str, Path] = field(
+        default=str(DEFAULT_PATHS.BASE_PATH),
+        validator=validators.or_(
+            validators.instance_of(str),
+            validators.instance_of(Path)
+        )
+    )
     data_type: str = field(default='parquet',
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
@@ -87,7 +92,11 @@ class DatabaseConnector:
 
         self._last_timestamp_cache = {}
         # create data folder if not exists
-        self.data_path = Path(self.data_path).expanduser().resolve()
+        if not self.data_path or str(self.data_path).strip() in ('', '.'):
+            self.data_path = Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        else:
+            self.data_path = Path(self.data_path).expanduser().resolve()
+
         if (
             not self.data_path.exists() or
             not self.data_path.is_dir()
@@ -391,6 +400,7 @@ class DatabaseConnector:
         If filter is specified, it has to be a ticker value and so
         only the tickers years info related to the filter are cleared.
         If filter is not specified, the entire file is cleared.
+
         Parameters
         ----------
         filter : Optional[str], optional
@@ -412,6 +422,10 @@ class DatabaseConnector:
         If filter is provided and is a ticker present in database (files present)
         delete only files related to that ticker
         """
+
+        self._local_files_cache = None
+        if self._last_timestamp_cache is not None:
+            self._last_timestamp_cache = {}
 
         # create a list of data files
         # with extension matching either one of the supported data types
@@ -1650,19 +1664,10 @@ class LocalDBYearConnector(DatabaseConnector):
             date (datetime | str | Timestamp | PolarsDatetime): Start or end date for the window.
             periods (int): Number of timeframe units to look back or forward.
             direction (str): Direction to look back ('backward' or 'forward').
-            comparison_column_name (List[str] | str | None): List of column names
-                to compare.
-                If None, no comparison is performed.
-            check_level (List[int | float] | int | float | None): List of values
-                to compare against.
-                If None, no comparison is performed.
-            comparison_operator (List[SUPPORTED_SQL_COMPARISON_OPERATORS] |
-                SUPPORTED_SQL_COMPARISON_OPERATORS | None): List of comparison
-                operators to use for comparison.
-                If None, no comparison is performed.
-            comparison_aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES
-                | None): Aggregation mode to use for comparison.
-                If None, no comparison is performed.
+            comparison_column_name (List[str] | str | None, optional): List of column names to compare.
+            check_level (List[int | float] | int | float | None, optional): List of values to compare against.
+            comparison_operator (List[SUPPORTED_SQL_COMPARISON_OPERATORS] | SUPPORTED_SQL_COMPARISON_OPERATORS | None, optional): Comparison operators.
+            comparison_aggregation_mode (SUPPORTED_SQL_CONDITION_AGGREGATION_MODES | None, optional): Aggregation mode.
 
         Returns:
             PolarsDataFrame: DataFrame with data for the window.

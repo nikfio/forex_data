@@ -208,103 +208,104 @@ Filter data based on price conditions directly during retrieval:
 Real-time Data Examples
 =======================
 
-Example 5: Get Latest Market Price
------------------------------------
+Example 5: Get Latest Market Price (Twelve Data)
+------------------------------------------------
 
-Retrieve the most recent closing price:
+Retrieve the live top-of-book market quote:
 
 .. code-block:: python
 
-   from forex_data import RealtimeManager
-   
-   rt_manager = RealtimeManager(
-       config='appconfig.yaml'
-   )
-   
-   # Get the latest daily close
-   latest_close = rt_manager.get_daily_close(ticker='NZDUSD', last_close=True)
-   
-   print("Latest close:")
-   print(latest_close)
+   from forex_data import TwelveDataConnector
+
+   connector = TwelveDataConnector(plan="free")
+   latest_price_lf = connector.get_realtime_price(symbol="EUR/USD")
+   print(latest_price_lf.collect())
 
 **Expected Output**:
 
 .. code-block:: text
 
-   Latest close:
-   ┌─────────────────────┬─────────┬─────────┬─────────┬────────┐
-   │ timestamp           ┆ open    ┆ high    ┆ low     ┆ close  │
-   │ ---                 ┆ ---     ┆ ---     ┆ ---     ┆ ---    │
-   │ datetime[ms]        ┆ f32     ┆ f32     ┆ f32     ┆ f32    │
-   ╞═════════════════════╪═════════╪═════════╪═════════╪════════╡
-   │ 2024-04-19 00:00:00 ┆ 0.59022 ┆ 0.59062 ┆ 0.58516 ┆ 0.5886 │
-   └─────────────────────┴─────────┴─────────┴─────────┴────────┘
+   ┌────────────────────────────┬─────────┬─────────┬──────────┐
+   │ timestamp                  ┆ ticker  ┆ price   ┆ timezone │
+   │ ---                        ┆ ---     ┆ ---     ┆ ---      │
+   │ datetime[μs]               ┆ str     ┆ f64     ┆ str      │
+   ╞════════════════════════════╪═════════╪═════════╪══════════╡
+   │ 2026-10-12 16:11:47.711957 ┆ EUR/USD ┆ 1.11762 ┆ UTC      │
+   └────────────────────────────┴─────────┴─────────┴──────────┘
 
-Example 6: Recent Price History
---------------------------------
+Example 6: Top-of-Book Quotes (Tiingo)
+--------------------------------------
 
-Get the last N days of market data:
-
-.. code-block:: python
-
-   from forex_data import RealtimeManager
-   
-   rt_manager = RealtimeManager(
-       config='appconfig.yaml'
-   )
-   
-   # Get last 10 days
-   recent_data = rt_manager.get_daily_close(ticker='EURUSD', recent_days_window=10)
-   
-   print("Last 10 days of trading:")
-   print(recent_data)
-
-Example 7: Specific Date Range (Real-time)
--------------------------------------------
-
-Query real-time data for a specific date range:
+Retrieve bid/ask spreads from Tiingo FX:
 
 .. code-block:: python
 
-   from forex_data import RealtimeManager
-   
-   rt_manager = RealtimeManager(
-       config='appconfig.yaml'
-   )
-   
-   # Get daily closes for March 2024
-   march_data = rt_manager.get_daily_close(
-       ticker='GBPUSD',
-       day_start='2024-03-01',
-       day_end='2024-03-31'
-   )
-   
-   print(f"Retrieved {len(march_data)} trading days")
-   print(march_data)
+   from forex_data import TiingoConnector
 
-Example 8: Intraday Real-time Data
------------------------------------
+   connector = TiingoConnector(plan="free")
+   quote_lf = connector.get_realtime_price(symbol="EUR/USD")
+   print(quote_lf.collect())
 
-Get intraday data with specific timeframes:
+Example 7: Institutional Trendbars (cTrader)
+--------------------------------------------
+
+Retrieve broker trendbars via Spotware Open API:
 
 .. code-block:: python
 
-   from forex_data import RealtimeManager
-   
-   rt_manager = RealtimeManager(
-       config='appconfig.yaml'
+   import os
+   from forex_data import CTraderConnector
+
+   connector = CTraderConnector(
+       client_id=os.environ["CTRADER_CLIENT_ID"],
+       client_secret=os.environ["CTRADER_CLIENT_SECRET"],
+       access_token=os.environ["CTRADER_ACCESS_TOKEN"],
+       broker_account_id=os.environ["CTRADER_ACCOUNT_ID"],
    )
-   
-   # Get hourly data for a week
-   hourly_data = rt_manager.get_data(
-       ticker='USDJPY',
-       timeframe='1h',
-       start='2024-04-10',
-       end='2024-04-15'
+   connector.connect()
+   bars_lf = connector.get_data("EURUSD", "1h", "2026-10-01 00:00:00", "2026-10-05 00:00:00")
+   print(bars_lf.collect())
+   connector.close()
+
+Plotting Examples
+=================
+
+Example 8: Interactive Historical Candlestick Chart
+---------------------------------------------------
+
+Render interactive candlestick charts with volume bars:
+
+.. code-block:: python
+
+   from forex_data import DataCharts
+
+   charts = DataCharts(data_path="~/.test_database", offline=True)
+   charts.plot_historical(
+       ticker="EURUSD",
+       timeframe="1D",
+       start_date="2024-01-01",
+       end_date="2024-06-01",
+       chart_type="ohlc"
    )
-   
-   print(f"Hourly candles: {len(hourly_data)}")
-   print(hourly_data.head())
+
+Example 9: Hourly Line Chart with VWMP
+--------------------------------------
+
+Plot closing prices alongside Volume-Weighted Mid-Price:
+
+.. code-block:: python
+
+   from forex_data import DataCharts
+
+   charts = DataCharts(data_path="~/.test_database", offline=True)
+   charts.plot_historical(
+       ticker="EURUSD",
+       timeframe="1h",
+       start_date="2024-03-01",
+       end_date="2024-03-15",
+       chart_type="line"
+   )
+
 
 Combined Examples
 =================
@@ -479,11 +480,9 @@ Optimize for large datasets:
 
    from forex_data import HistoricalManagerDB
    
-   # Use Polars for best performance
+   # Defaults to polars_lazy engine and parquet storage automatically
    manager = HistoricalManagerDB(
-       config='appconfig.yaml',
-       engine='polars',  # Explicitly use Polars
-       filetype='parquet'  # Use Parquet for speed
+       config='appconfig.yaml'
    )
    
    # Get large dataset
@@ -563,12 +562,9 @@ Run with verbose output:
 Tips and Best Practices
 ========================
 
-1. **Use Polars for Performance**
+1. **Built-in Polars Lazy Performance**
    
-   .. code-block:: python
-   
-      # In your appconfig.yaml
-      ENGINE: polars
+   The engine automatically defaults to ``polars_lazy`` with Parquet storage for optimal memory usage and query pushdown. You do not need to configure ``ENGINE`` or ``DATA_TYPE``.
 
 2. **Cache Timeframes**
    

@@ -10,6 +10,7 @@ import yaml
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+from numpy import array
 from loguru import logger
 
 
@@ -187,7 +188,6 @@ def _apply_config(
         # are manually assigned to default value derived
         # from __attrs_attrs__
 
-        from numpy import array
         for attr_key in array(_class_attributes_name)[
                 _not_assigned_attrs_index_mask
         ]:
