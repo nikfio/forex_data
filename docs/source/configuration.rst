@@ -15,150 +15,116 @@ Furthermore, any parameter value can be overridden by explicit assignment in obj
 Basic Configuration File
 ------------------------
 
-Create a YAML configuration file ending with ``data_config.yaml`` file with the following structure:
+Create a YAML configuration file named ``data_config.yaml`` with the following structure:
 
 .. code-block:: yaml
 
-   # Data processing engine
-   ENGINE: polars
-   
-   # File format for cached data
-   DATA_FILETYPE: parquet
-   
    # Path to data directory
    DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'
-   
-   # API keys for real-time data providers
-   PROVIDERS_KEY:
-     TWELVE_DATA_API_KEY: your_twelvedata_key
+
+   # Optional GPU acceleration
+   DEVICE: auto
+   POLARS_GPU_ENGINE: false
 
 Configuration Options
 =====================
 
-ENGINE
-------
+Default Engine & File Storage Format
+------------------------------------
 
-Specifies which data processing engine to use.
+The package internally standardizes on high-performance columnar processing and storage:
 
-**Type**: String
+* **Engine**: ``polars_lazy`` (default and maintained engine). All queries and aggregations leverage Polars LazyFrame query plans for optimal predicate pushdown and parallel execution.
+* **Storage Format**: ``parquet`` (default and maintained format). Binary Snappy-compressed Parquet files provide minimal disk usage and high-speed column scanning.
 
-**Options**: 
-  * ``polars`` (Recommended) - Fastest, most efficient
-  * ``polars_lazy`` - Polars LazyFrame interface
-  * ``pyarrow`` - Very fast, columnar format
-  * ``pandas`` - Slower but most compatible
-
-**Default**: No default, must be specified
-
-**Example**:
-
-.. code-block:: yaml
-
-   ENGINE: polars
-
-**Performance Comparison**:
-
-.. note::
-   Polars is typically 5-10x faster than Pandas for operations like groupby and aggregations.
-   PyArrow offers similar performance to Polars with a different API.
-
-**When to use each**:
-
-* **Polars**: Best choice for most use cases. Modern, fast, and memory-efficient.
-* **PyArrow**: Use if you need Apache Arrow ecosystem integration.
-* **Pandas**: Only if you need compatibility with existing Pandas-based code.
-
-DATA_FILETYPE
--------------
-
-Defines the file format for caching downloaded data.
-
-**Type**: String
-
-**Options**:
-  * ``parquet`` (Recommended) - Compressed, fast I/O
-  * ``csv`` - Human-readable, widely compatible
-
-**Default**: No default, must be specified
-
-**Example**:
-
-.. code-block:: yaml
-
-   DATA_FILETYPE: parquet
-
-**Comparison**:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 40 40
-
-   * - Feature
-     - Parquet
-     - CSV
-   * - Read Speed
-     - ⚡ Very Fast
-     - 🐌 Slow
-   * - Write Speed
-     - ⚡ Very Fast
-     - 🐌 Slow
-   * - File Size
-     - 📉 Small (compressed)
-     - 📈 Large
-   * - Compatibility
-     - Modern tools
-     - Universal
-   * - Human Readable
-     - ❌ No
-     - ✅ Yes
-
-**Recommendation**: Use ``parquet`` unless you specifically need CSV compatibility.
+Because these are built-in defaults, ``ENGINE`` and ``DATA_TYPE`` are no longer required in configuration files.
 
 DATA_PATH
 ---------
 
-Specifies the absolute directory path where the downloaded data files will be stored.
+Specifies the absolute or relative directory path where the downloaded data files and local databases will be stored.
 
 **Type**: String
 
-**Default**: ``~/.database/``
+**Default**: ``~/.database/`` (or ``~/.test_database`` in test environments)
 
 **Example**:
 
 .. code-block:: yaml
 
-   DATA_PATH: '/my/custom/data/path'
+   DATA_PATH: '~/.test_database'
 
-PROVIDERS_KEY
--------------
+Real-Time Provider API Keys & Credentials
+-----------------------------------------
 
-Contains API keys for real-time data providers.
+To keep your credentials secure and prevent accidentally committing secrets to version control, **API keys should be saved as system or user environment variables**.
 
-**Type**: Dictionary
+The connectors will automatically detect and load credentials from your environment variables if not provided directly.
 
-**Supported Providers**:
-  * ``TWELVE_DATA_API_KEY`` - Twelve Data API key
+Supported Environment Variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Example**:
+* ``TWELVE_DATA_API_KEY`` - Twelve Data API key
+* ``TIINGO_API_KEY`` - Tiingo API token
+* ``CTRADER_CLIENT_ID`` - Spotware cTrader Open API Client ID
+* ``CTRADER_CLIENT_SECRET`` - Spotware cTrader Open API Client Secret
+* ``CTRADER_ACCESS_TOKEN`` - Spotware cTrader Open API Access Token
+* ``CTRADER_ACCOUNT_ID`` - Spotware cTrader Account ID (cTID)
 
-.. code-block:: yaml
+Setting Environment Variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-   PROVIDERS_KEY:
-     TWELVE_DATA_API_KEY: YOUR_API_KEY_HERE
+**Linux & macOS**:
+
+.. code-block:: bash
+
+   # Current shell session
+   export TWELVE_DATA_API_KEY="your_api_key_here"
+   export TIINGO_API_KEY="your_token_here"
+
+   # Persistent across sessions (append to ~/.bashrc or ~/.zshrc)
+   echo 'export TWELVE_DATA_API_KEY="your_api_key_here"' >> ~/.zshrc
+   source ~/.zshrc
+
+**Windows**:
+
+.. code-block:: bat
+
+   :: Command Prompt (persistent user variable)
+   setx TWELVE_DATA_API_KEY "your_api_key_here"
+   setx TIINGO_API_KEY "your_token_here"
+
+   :: Command Prompt (current session)
+   set TWELVE_DATA_API_KEY=your_api_key_here
+
+.. code-block:: powershell
+
+   # PowerShell (persistent user variable)
+   [System.Environment]::SetEnvironmentVariable('TWELVE_DATA_API_KEY', 'your_api_key_here', 'User')
+
+   # PowerShell (current session)
+   $env:TWELVE_DATA_API_KEY="your_api_key_here"
 
 Getting API Keys
 ^^^^^^^^^^^^^^^^
 
-**Twelve Data**
+**1. Twelve Data**
+  * Sign up at `Twelve Data <https://twelvedata.com/>`_
+  * Get your API key from the developer dashboard
+  * Free tier: 8 requests/minute, 800 credits/day
 
-1. Visit `Twelve Data <https://twelvedata.com/>`_
-2. Sign up for a free account
-3. Navigate to your dashboard to get your API key
-4. Free tier: 8 requests per minute
+**2. Tiingo**
+  * Sign up at `Tiingo <https://www.tiingo.com/>`_
+  * Get your API token at `Tiingo Token <https://www.tiingo.com/account/api/token>`_
+  * Free tier: 500 unique symbols/month, 20,000 requests/hour
+
+**3. Spotware cTrader Open API**
+  * Register at `cTrader Open API <https://openapi.ctrader.com/>`_
+  * Create an Open API application to receive Client ID and Client Secret
+  * Obtain Access Token and Trader Account ID from broker / demo account
 
 .. important::
-   Keep your API keys secure! Don't commit them to version control.
-   Consider using environment variables for production deployments.
+   Keep your API keys secure! Never commit plain API keys to version control. Always prefer system or user environment variables.
 
 Using Configuration in Code
 ============================
@@ -197,7 +163,7 @@ You can override any configuration parameter in code:
 
    manager = HistoricalManagerDB(
        config='path/to/data_config.yaml',
-       engine='polars'  # Overrides ENGINE from config file
+       data_path='/custom/data/path'
    )
 
 .. note::
@@ -224,28 +190,24 @@ You can copy this template and customize it:
 Environment Variables
 ---------------------
 
-For sensitive data like API keys, consider using environment variables:
+For sensitive credentials like API keys, always use environment variables rather than hardcoding them into configuration files:
 
 .. code-block:: python
 
    import os
-   import yaml
-   
-   # Load config
-   with open('appconfig.yaml', 'r') as f:
-       config = yaml.safe_load(f)
-   
-   # Override with environment variables
-   if 'TWELVE_DATA_API_KEY' in os.environ:
-       config['PROVIDERS_KEY']['TWELVE_DATA_API_KEY'] = os.environ['TWELVE_DATA_API_KEY']
+   from forex_data import TwelveDataConnector
+
+   # TwelveDataConnector automatically detects TWELVE_DATA_API_KEY from environment:
+   connector = TwelveDataConnector(
+       api_key=os.environ.get("TWELVE_DATA_API_KEY")
+   )
 
 Configuration Best Practices
 =============================
 
-1. **Use Parquet files** for better performance and storage efficiency
-2. **Use Polars engine** for fastest processing
-3. **Keep API keys secure** - don't commit them to version control
-4. **Document custom configurations** for team members
+1. **Parquet & Polars Defaults** are automatically used for optimal speed and memory efficiency
+2. **Keep API keys secure** - don't commit them to version control; save them as user/system environment variables
+3. **Document custom configurations** for team members
 
 Example: Production Configuration
 ==================================
@@ -256,15 +218,11 @@ Here's a recommended production configuration:
 
    # Production configuration for forex_data
    
-   # Use Polars for best performance
-   ENGINE: polars
-   
-   # Use Parquet for efficient storage
-   DATA_FILETYPE: parquet
-   
-   # API keys (use environment variables in real production!)
-   PROVIDERS_KEY:
-     TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY}
+   # Path to data directory
+   DATA_PATH: '/var/data/forex'
+
+   # Optional GPU acceleration
+   POLARS_GPU_ENGINE: false
 
 Troubleshooting
 ===============

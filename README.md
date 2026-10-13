@@ -97,36 +97,42 @@ In the second case, it will look for the configuration file ending with `data_co
 Furthermore, any parameter value can be overridden by explicit assignment in object instantion.
 The feature will be more clear following the [examples section](#examples).
 
-#### ENGINE
+#### Default Engine & Storage Format
 
-Available options:
+`forex-data` standardizes on high-performance columnar processing and storage:
+* **Engine**: `polars_lazy` (default and only maintained processing engine). Query graphs and aggregations run via lazy evaluation for optimal predicate pushdown and execution speed.
+* **Storage Type**: `parquet` (default and only maintained cache file format). Snappy-compressed columnar Parquet files provide minimal disk usage and blazing fast parallel reads.
 
-* pandas
-* pyarrow
-* polars
-* polars_lazy
+Because these are built-in defaults, you **do not need** to specify `ENGINE` or `DATA_TYPE` in configuration files.
 
-#### DATA_FILETYPE
+#### Configuration Parameters
 
-Available options:
+* **`DATA_PATH`**: Absolute or relative directory path where downloaded market data files and local databases will be stored. Defaults to `~/.database/` (or `~/.test_database` for test suites).
+* **`DEVICE`** *(Optional)*: Compute device selection (`auto`, `cpu`, `cuda`). Default is `auto`.
+* **`POLARS_GPU_ENGINE`** *(Optional)*: Boolean flag to enable Polars GPU engine acceleration (`True` or `False`). Default is `False`.
+* **`PROVIDERS_KEY`** *(Optional)*: Dictionary of API keys and credentials for real-time market data providers. Alternatively, credentials can be set via system environment variables.
 
-* csv
-* parquet
+#### Minimal Configuration Template (`data_config.yaml`)
 
-*parquet* filetype is strongly suggested for read/write speed and disk space occupation.
-Meanwhile, if you have any analysis application outside the Python environment, it would more likely accept csv files over parquet: so *csv* filetype could be a better choice for its broader acceptance.
+```yaml
+---
+# yaml document for data management configuration
 
-#### DATA_PATH
+DATA_PATH: '~/.test_database'
 
-Specifies the absolute directory path where the downloaded data files will be stored.
-If not provided, a default location is used (`~/.database/`).
+# Optional GPU acceleration
+DEVICE: 'auto'
+POLARS_GPU_ENGINE: False
 
-#### PROVIDERS_KEY
-
-To use real-time sources you need to provide an API key.
-
-Look here to register and create a key from Twelve Data provider
-[Twelve Data API registration](https://twelvedata.com/)
+# Optional provider keys (can also be set as environment variables)
+PROVIDERS_KEY:
+  TWELVE_DATA_API_KEY: 'your_twelvedata_key'
+  TIINGO_API_KEY: 'your_tiingo_token'
+  CTRADER_CLIENT_ID: 'your_ctrader_client_id'
+  CTRADER_CLIENT_SECRET: 'your_ctrader_client_secret'
+  CTRADER_ACCESS_TOKEN: 'your_ctrader_access_token'
+  CTRADER_ACCOUNT_ID: 'your_ctrader_account_id'
+```
 
 ## LOGGING
 
@@ -152,7 +158,7 @@ Generate and cache historical forex data in the local database. It downloads mis
 
 **Options:**
 * `--timeframe`, `-t`: Timeframe interval(s) (e.g., 1m, 5m, 1h, 1D). Can be specified multiple times or as comma-separated. Default is `1D`.
-* `--data-path`, `-d`: Database root directory path. Defaults to `DATA_PATH` configured in `appconfig/data_config.yaml` (e.g. `~/.test_vol_database`).
+* `--data-path`, `-d`: Database root directory path. Defaults to `DATA_PATH` configured in `appconfig/data_config.yaml` (e.g. `~/.test_database`).
 * `--offline`, `--no-download`: Run in offline mode without attempting remote downloads.
 * `--config`, `-c`: YAML configuration file path or a YAML formatted string.
 
@@ -173,7 +179,7 @@ Launch an interactive plot for historical or live forex data.
 
 **Options:**
 * `--type`: Type of chart to display (`ohlc`, `line`, `scatter`). Default is `ohlc`.
-* `--data-path`, `-d`: Database root directory path. Defaults to `DATA_PATH` configured in `appconfig/data_config.yaml` (e.g. `~/.test_vol_database`).
+* `--data-path`, `-d`: Database root directory path. Defaults to `DATA_PATH` configured in `appconfig/data_config.yaml` (e.g. `~/.test_database`).
 * `--offline`, `--no-download`: Run in offline mode without attempting remote downloads.
 * `--config`, `-c`: YAML configuration file path.
 * `--port`: Port for the Dash realtime server (when `end_date=live`). Default is `8050`.
@@ -185,7 +191,7 @@ Launch an interactive plot for historical or live forex data.
 uv run fx-agg plot EURUSD 2024-01-01 now 1D --no-download
 
 # Custom data path
-uv run fx-agg plot EURUSD 2024-01-01 2026-06-06 1D -d ~/.test_vol_database
+uv run fx-agg plot EURUSD 2024-01-01 2026-06-06 1D -d ~/.test_database
 
 # Live interactive plot starting from a specific date, updating continuously
 uv run fx-agg plot EURUSD 2024-01-01 live 1D --port 8050
@@ -212,12 +218,8 @@ Let's walk through the [example for historical data source](examples/histdata_db
 
 1. **Configuration setup**
     ```python
-    # Use a runtime defined config yaml file
+    # Use a runtime defined config yaml file (defaults to parquet and polars_lazy)
     test_config_yaml = '''
-    DATA_FILETYPE: 'parquet'
-    
-    ENGINE: 'polars_lazy'
-    
     DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'
     '''
     ```
@@ -275,19 +277,23 @@ Let's walk through the [example for historical data source](examples/histdata_db
 <br>
 
 5. **Plot data**
+    Using `DataCharts` (which extends `HistoricalManagerDB` with interactive Plotly and Dash visualization capabilities):
     ```python
-    histmanager.plot(
-        ticker=ex_ticker,
-        timeframe='1D',
-        start_date='2016-02-02 18:00:00',
-        end_date='2016-06-23 23:00:00'
+    from forex_data import DataCharts
+
+    charts = DataCharts(data_path="~/.test_database", offline=True)
+    charts.plot_historical(
+        ticker="EURUSD",
+        timeframe="1D",
+        start_date="2024-01-01",
+        end_date="2024-06-01"
     )
     ```
-    Generate a candlestick chart for the specified ticker and date range.
+    This renders an interactive candlestick chart complete with volume histograms and toolbar controls:
 
 <br>
 
-![output chart](doc/imgs/histdata_test_nzdusd.png)
+![Historical Candlestick Chart](docs/imgs/historical_ohlc_plot.png)
 
 <br>
 
@@ -336,148 +342,333 @@ Let's walk through the [example for historical data source](examples/histdata_db
 
 <br>
 
-#### Real-Time data
+## REALTIME CONNECTORS SETUP & USAGE
 
-Let's walk through the [example for real-time data source](examples/realtime/realtime_twelvedata_connector.py):
+`forex-data` integrates real-time forex market data providers defined in `SUPPORTED_REALTIME_DATA_PROVIDERS`:
+* **`twelvedata`**: [Twelve Data](https://twelvedata.com/) REST API for quotes and intraday aggregates.
+* **`tiingo`**: [Tiingo](https://www.tiingo.com/) FX API for top-of-book prices and resampled candles.
+* **`ctrader`**: [Spotware cTrader Open API](https://openapi.ctrader.com/) for institutional broker tick feeds and trendbars.
 
-**Important:** This example requires Twelve Data API key set as an environment variable:
-```bash
-export TWELVE_DATA_API_KEY="your_twelvedata_key"
+---
+
+### 1. Twelve Data (`twelvedata`)
+
+#### Sign Up & API Key Generation
+1. Go to [Twelve Data Registration](https://twelvedata.com/) and create a free account.
+2. Log in and navigate to the developer **Dashboard -> API Keys**.
+3. Copy your API key (the free tier includes 800 API credits/day with 8 requests/minute).
+
+#### Credential Storage
+You can provide your API key via environment variables or in `data_config.yaml`:
+
+* **Linux & macOS**:
+  ```bash
+  # Current shell session
+  export TWELVE_DATA_API_KEY="your_twelvedata_api_key"
+
+  # Persistent across sessions (append to ~/.zshrc or ~/.bashrc)
+  echo 'export TWELVE_DATA_API_KEY="your_twelvedata_api_key"' >> ~/.zshrc
+  source ~/.zshrc
+  ```
+
+* **Windows**:
+  ```cmd
+  :: Command Prompt (persistent user variable)
+  setx TWELVE_DATA_API_KEY "your_twelvedata_api_key"
+  :: Command Prompt (current session)
+  set TWELVE_DATA_API_KEY=your_twelvedata_api_key
+  ```
+  ```powershell
+  # PowerShell (persistent user variable)
+  [System.Environment]::SetEnvironmentVariable('TWELVE_DATA_API_KEY', 'your_twelvedata_api_key', 'User')
+  # PowerShell (current session)
+  $env:TWELVE_DATA_API_KEY="your_twelvedata_api_key"
+  ```
+
+* **YAML Configuration (`data_config.yaml`)**:
+  ```yaml
+  PROVIDERS_KEY:
+    TWELVE_DATA_API_KEY: "your_twelvedata_api_key"
+  ```
+
+#### Python Usage Example
+```python
+from forex_data import TwelveDataConnector
+
+connector = TwelveDataConnector(plan="free")
+
+# Fetch live real-time price snapshot
+price_lf = connector.get_realtime_price(symbol="EUR/USD")
+print(price_lf.collect())
+
+# Fetch recent intraday candles (1h timeframe)
+data_lf = connector.get_data(
+    symbol="EUR/USD",
+    timeframe="1h",
+    start_date="2026-01-05 10:00:00",
+    end_date="2026-01-05 18:00:00"
+)
+print(data_lf.collect())
 ```
 
-1. **Configuration with API keys**
-    ```python
-    from os import getenv
-    
-    twelve_data_key = getenv('TWELVE_DATA_API_KEY')
-    
-    test_config_yaml = f'''
-    DATA_FILETYPE: 'parquet'
-    
-    ENGINE: 'polars_lazy'
-    
-    DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY'
-    
-    PROVIDERS_KEY:
-        TWELVE_DATA_API_KEY : {twelve_data_key}
-    '''
-    ```
-    Configuration includes API keys for real-time data providers.
-<br>
+#### Running Tests & Verification
+Run the test suite with flake8 linting:
+```bash
+uv run pytest tests/test_realtime_twelvedata_connector.py --flake8 -v
+```
+> **Note**: If `TWELVE_DATA_API_KEY` is missing or rejected, the test suite raises an actionable error with remediation hints directing you to https://twelvedata.com/.
 
-2. **Data manager instance**
-    ```python
-    from forex_data import RealtimeManager
-    
-    realtimedata_manager = RealtimeManager(
-        config=test_config_yaml
-    )
-    ```
-<br>
+---
 
-3. **Get last daily close**
-    ```python
-    ex_ticker = 'EURCAD'
-    
-    dayclose_quote = realtimedata_manager.get_daily_close(
-        ticker=ex_ticker,
-        last_close=True
-    )
-    ```
-    
-    Output:
-    ```
-    ┌─────────────────────┬─────────┬─────────┬─────────┬────────┐
-    │ timestamp           ┆ open    ┆ high    ┆ low     ┆ close  │
-    │ ---                 ┆ ---     ┆ ---     ┆ ---     ┆ ---    │
-    │ datetime[ms]        ┆ f32     ┆ f32     ┆ f32     ┆ f32    │
-    ╞═════════════════════╪═════════╪═════════╪═════════╪════════╡
-    │ 2025-01-23 00:00:00 ┆ 1.4123  ┆ 1.4156  ┆ 1.4098  ┆ 1.4125 │
-    └─────────────────────┴─────────┴─────────┴─────────┴────────┘
-    ```
+### 2. Tiingo (`tiingo`)
 
-4. **Get daily close for last N days**
-    ```python
-    ex_n_days = 13
-    
-    window_daily_ohlc = realtimedata_manager.get_daily_close(
-        ticker=ex_ticker,
-        recent_days_window=ex_n_days
-    )
-    ```
-    Returns the last 13 days of daily OHLC data.
+#### Sign Up & API Key Generation
+1. Go to [Tiingo Registration](https://www.tiingo.com/) and create an account.
+2. Visit [Tiingo Account Token](https://www.tiingo.com/account/api/token) to copy your personal API token (the free tier provides access to 500 unique symbols/month and up to 20,000 requests/hour).
 
-5. **Get daily close for specific date range**
-    ```python
-    ex_start_date = '2025-01-15'
-    ex_end_date = '2025-01-23'
-    
-    window_limits_daily_ohlc = realtimedata_manager.get_daily_close(
-        ticker=ex_ticker,
-        day_start=ex_start_date,
-        day_end=ex_end_date
-    )
-    ```
-    
-    Output:
-    ```
-    ┌─────────────────────┬────────┬────────┬────────┬────────┐
-    │ timestamp           ┆ open   ┆ high   ┆ low    ┆ close  │
-    │ ---                 ┆ ---    ┆ ---    ┆ ---    ┆ ---    │
-    │ datetime[ms]        ┆ f32    ┆ f32    ┆ f32    ┆ f32    │
-    ╞═════════════════════╪════════╪════════╪════════╪════════╡
-    │ 2025-01-23 00:00:00 ┆ 1.4125 ┆ 1.4156 ┆ 1.4098 ┆ 1.4132 │
-    │ 2025-01-22 00:00:00 ┆ 1.4089 ┆ 1.4147 ┆ 1.4072 ┆ 1.4125 │
-    │ 2025-01-21 00:00:00 ┆ 1.4112 ┆ 1.4134 ┆ 1.4063 ┆ 1.4089 │
-    │ ...                 ┆ ...    ┆ ...    ┆ ...    ┆ ...    │
-    └─────────────────────┴────────┴────────┴────────┴────────┘
-    ```
+#### Credential Storage
 
-6. **Get OHLC data with custom timeframe**
-    ```python
-    ex_start_date = '2024-04-10'
-    ex_end_date = '2024-04-15'
-    ex_timeframe = '1h'
-    
-    window_data_ohlc = realtimedata_manager.get_data(
-        ticker=ex_ticker,
-        start=ex_start_date,
-        end=ex_end_date,
-        timeframe=ex_timeframe
-    )
-    ```
-    
-    Output:
-    ```
-    Real time 1h window data: shape: (72, 5)
-    ┌─────────────────────┬─────────┬─────────┬─────────┬─────────┐
-    │ timestamp           ┆ open    ┆ high    ┆ low     ┆ close   │
-    │ ---                 ┆ ---     ┆ ---     ┆ ---     ┆ ---     │
-    │ datetime[ms]        ┆ f32     ┆ f32     ┆ f32     ┆ f32     │
-    ╞═════════════════════╪═════════╪═════════╪═════════╪═════════╡
-    │ 2024-04-10 00:00:00 ┆ 1.4765  ┆ 1.4768  ┆ 1.4752  ┆ 1.4761  │
-    │ 2024-04-10 01:00:00 ┆ 1.4761  ┆ 1.4768  ┆ 1.4755  ┆ 1.4762  │
-    │ 2024-04-10 02:00:00 ┆ 1.4762  ┆ 1.4778  ┆ 1.4751  ┆ 1.4771  │
-    │ ...                 ┆ ...     ┆ ...     ┆ ...     ┆ ...     │
-    └─────────────────────┴─────────┴─────────┴─────────┴─────────┘
-    ```
+* **Linux & macOS**:
+  ```bash
+  # Current shell session
+  export TIINGO_API_KEY="your_tiingo_api_token"
 
-7. **Intraday data with dynamic dates**
-    ```python
-    from pandas import Timestamp, Timedelta
-    
-    ex_start_date = Timestamp.now() - Timedelta('10D')
-    ex_end_date = Timestamp.now() - Timedelta('8D')
-    ex_timeframe = '5m'
-    
-    window_data_ohlc = realtimedata_manager.get_data(
-        ticker='EURUSD',
-        start=ex_start_date,
-        end=ex_end_date,
-        timeframe=ex_timeframe
-    )
-    ```
-    Get 5-minute data for recent days using dynamic date calculations.
+  # Persistent across sessions
+  echo 'export TIINGO_API_KEY="your_tiingo_api_token"' >> ~/.zshrc
+  source ~/.zshrc
+  ```
+
+* **Windows**:
+  ```cmd
+  :: Command Prompt
+  setx TIINGO_API_KEY "your_tiingo_api_token"
+  set TIINGO_API_KEY=your_tiingo_api_token
+  ```
+  ```powershell
+  # PowerShell
+  [System.Environment]::SetEnvironmentVariable('TIINGO_API_KEY', 'your_tiingo_api_token', 'User')
+  $env:TIINGO_API_KEY="your_tiingo_api_token"
+  ```
+
+* **YAML Configuration (`data_config.yaml`)**:
+  ```yaml
+  PROVIDERS_KEY:
+    TIINGO_API_KEY: "your_tiingo_api_token"
+  ```
+
+#### Python Usage Example
+```python
+from forex_data import TiingoConnector
+
+connector = TiingoConnector(plan="free")
+
+# Fetch top-of-book bid/ask quote
+price_lf = connector.get_realtime_price(symbol="EUR/USD")
+print(price_lf.collect())
+
+# Fetch resampled 5m candles
+data_lf = connector.get_data(
+    symbol="EUR/USD",
+    timeframe="5m",
+    start_date="2026-10-01",
+    end_date="2026-10-02"
+)
+print(data_lf.collect())
+```
+
+#### Running Tests & Verification
+Run the test suite with flake8 linting:
+```bash
+uv run pytest tests/test_realtime_tiingo_connector.py --flake8 -v
+```
+> **Note**: If `TIINGO_API_KEY` is missing or invalid, the test suite fails immediately with detailed remediation hints directing you to generate and export your token.
+
+---
+
+### 3. Spotware cTrader Open API (`ctrader`)
+
+#### Sign Up & Credentials Generation
+cTrader Open API provides direct, high-frequency access to broker market feeds via protocol buffers over TLS:
+1. Register at [Spotware Open API Portal](https://openapi.ctrader.com/).
+2. Create an **Open API Application** (set application type to *Desktop/Other* and redirect URI to `http://localhost:8080/redirect`).
+3. Note your **Client ID** and **Client Secret**.
+4. Use the Open API playground or OAuth flow to authorize an account and obtain an **Access Token**.
+5. Obtain your broker **Account ID** (cTID Trader Account ID, e.g. from your cTrader desktop/mobile client).
+
+#### Credential Storage
+
+* **Linux & macOS**:
+  ```bash
+  # Current shell session
+  export CTRADER_CLIENT_ID="your_client_id"
+  export CTRADER_CLIENT_SECRET="your_client_secret"
+  export CTRADER_ACCESS_TOKEN="your_access_token"
+  export CTRADER_ACCOUNT_ID="your_account_id"
+
+  # Persistent across sessions (append to ~/.zshrc or ~/.bashrc)
+  cat << 'EOF' >> ~/.zshrc
+  export CTRADER_CLIENT_ID="your_client_id"
+  export CTRADER_CLIENT_SECRET="your_client_secret"
+  export CTRADER_ACCESS_TOKEN="your_access_token"
+  export CTRADER_ACCOUNT_ID="your_account_id"
+  EOF
+  source ~/.zshrc
+  ```
+
+* **Windows**:
+  ```cmd
+  :: Command Prompt
+  setx CTRADER_CLIENT_ID "your_client_id"
+  setx CTRADER_CLIENT_SECRET "your_client_secret"
+  setx CTRADER_ACCESS_TOKEN "your_access_token"
+  setx CTRADER_ACCOUNT_ID "your_account_id"
+  ```
+  ```powershell
+  # PowerShell
+  $env:CTRADER_CLIENT_ID="your_client_id"
+  $env:CTRADER_CLIENT_SECRET="your_client_secret"
+  $env:CTRADER_ACCESS_TOKEN="your_access_token"
+  $env:CTRADER_ACCOUNT_ID="your_account_id"
+  ```
+
+* **YAML Configuration (`data_config.yaml`)**:
+  ```yaml
+  PROVIDERS_KEY:
+    CTRADER_CLIENT_ID: "your_client_id"
+    CTRADER_CLIENT_SECRET: "your_client_secret"
+    CTRADER_ACCESS_TOKEN: "your_access_token"
+    CTRADER_ACCOUNT_ID: "your_account_id"
+  ```
+
+#### Python Usage Example
+```python
+import os
+from forex_data import CTraderConnector
+
+connector = CTraderConnector(
+    client_id=os.environ["CTRADER_CLIENT_ID"],
+    client_secret=os.environ["CTRADER_CLIENT_SECRET"],
+    access_token=os.environ["CTRADER_ACCESS_TOKEN"],
+    broker_account_id=os.environ["CTRADER_ACCOUNT_ID"],
+)
+
+connector.connect()
+
+# Fetch 1-hour trendbars
+lf = connector.get_data(
+    symbol="EURUSD",
+    timeframe="1h",
+    start_date="2026-10-01 00:00:00",
+    end_date="2026-10-05 00:00:00"
+)
+df = lf.collect()
+print(df)
+
+connector.close()
+```
+
+#### Running Tests & Verification
+Run the unit and live integration tests:
+```bash
+uv run pytest tests/test_ctrader_connector.py --flake8 -v
+```
+> **Note**: Both mock-based protocol tests and live connection tests against `demo.ctraderapi.com:5035` are verified. If credentials are missing or expired, clear error messages with renewal steps are displayed.
+
+---
+
+## PLOTTING & VISUALIZATION
+
+`forex-data` provides built-in plotting interfaces for rendering interactive historical candlestick and line charts, as well as launching real-time streaming Dash dashboards.
+
+### `DataCharts` Class
+
+`DataCharts` extends `HistoricalManagerDB`, adding high-level charting methods powered by Plotly and Dash:
+
+```python
+from forex_data import DataCharts
+
+charts = DataCharts(
+    data_path="~/.test_database",
+    offline=True  # Offline mode prevents remote downloading
+)
+```
+
+#### Methods
+
+* **`plot_historical(ticker, timeframe, start_date, end_date, chart_type='ohlc')`**:
+  Retrieves data from the database and renders an interactive Plotly chart in your default browser.
+  - `ticker`: Currency pair (e.g. `'EURUSD'`).
+  - `timeframe`: Candle resolution (e.g. `'1D'`, `'1h'`, `'15m'`).
+  - `start_date`: Start timestamp string (e.g. `'2024-01-01'`).
+  - `end_date`: End timestamp string (e.g. `'2024-06-01'`).
+  - `chart_type`: `'ohlc'` (candlestick), `'line'` (close price line), or `'scatter'` (points/spread). Default is `'ohlc'`.
+
+* **`start_realtime_plot(ticker, timeframe, start_date, update_interval_ms=1000, chart_type='ohlc', port=8050)`**:
+  Spawns a local Dash server running in a daemon thread that continuously queries `realtime_connector` and updates the chart.
+
+### `create_historical_figure` Function
+
+If you need programmatic access to the underlying Plotly `Figure`:
+
+```python
+from forex_data import create_historical_figure, HistoricalManagerDB
+
+manager = HistoricalManagerDB(data_path="~/.test_database", offline=True)
+lf = manager.get_data("EURUSD", "1D", "2024-01-01", "2024-06-01")
+
+fig = create_historical_figure(lf, ticker="EURUSD", chart_type="ohlc")
+fig.show()
+```
+
+### Visual Examples
+
+#### Example 1: Daily Candlestick (OHLC) Chart
+```python
+from forex_data import DataCharts
+
+charts = DataCharts(data_path="~/.test_database", offline=True)
+charts.plot_historical(
+    ticker="EURUSD",
+    timeframe="1D",
+    start_date="2024-01-01",
+    end_date="2024-06-01",
+    chart_type="ohlc"
+)
+```
+
+![EURUSD Daily Candlestick Chart](docs/imgs/historical_ohlc_plot.png)
+
+#### Example 2: Hourly Line Chart with VWMP
+```python
+from forex_data import DataCharts
+
+charts = DataCharts(data_path="~/.test_database", offline=True)
+charts.plot_historical(
+    ticker="EURUSD",
+    timeframe="1h",
+    start_date="2024-03-01",
+    end_date="2024-03-15",
+    chart_type="line"
+)
+```
+
+![EURUSD Hourly Line Chart with VWMP](docs/imgs/historical_line_plot.png)
+
+### CLI Plotting with `fx-agg plot`
+
+You can also launch plots directly from your terminal:
+
+```bash
+# Static OHLC plot up to current date (offline mode)
+uv run fx-agg plot EURUSD 2024-01-01 now 1D --no-download
+
+# Custom database directory and line chart
+uv run fx-agg plot EURUSD 2024-01-01 2024-06-01 1h -d ~/.test_database --type line
+
+# Live interactive plot starting from a specific date, updating continuously
+uv run fx-agg plot EURUSD 2024-01-01 live 1D --port 8050
+```
+
 
 
 ## PYTEST and pipeline implementation

@@ -84,7 +84,7 @@ Quick Example
 📥 **Getting Started**
    * :doc:`installation` - Install forex_data and dependencies
    * :doc:`quickstart` - Learn the basics with hands-on examples
-   * :doc:`configuration` - Configure engines, file types, and API keys
+   * :doc:`configuration` - Configure data paths and provider API keys
 
 💡 **Learn More**
    * :doc:`examples` - 15+ comprehensive code examples

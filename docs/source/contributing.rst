@@ -112,14 +112,11 @@ Run with coverage:
 
    uv run pytest --cov=forex_data --cov-report=html
 
-Test with different engines:
+Run unit tests with pytest and flake8:
 
-.. code-block:: python
+.. code-block:: bash
 
-   # Configure in appconfig.yaml
-   ENGINE: polars  # Test with Polars
-   ENGINE: pandas  # Test with Pandas
-   ENGINE: pyarrow # Test with PyArrow
+   uv run pytest --flake8 -v
 
 Continuous Integration
 ----------------------
@@ -324,8 +321,7 @@ When reviewing your PR, maintainers will check:
 * ✅ **Tests**: Adequate test coverage, tests pass
 * ✅ **Documentation**: Changes are documented
 * ✅ **Type hints**: Proper type annotations
-* ✅ **Performance**: No performance regressions
-* ✅ **Compatibility**: Works with all engines (Polars, Pandas, PyArrow)
+* ✅ **Performance**: High performance leveraging Polars lazy execution and Parquet storage
 
 Getting Help
 ============

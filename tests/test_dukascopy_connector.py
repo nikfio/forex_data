@@ -16,6 +16,7 @@ from forex_data import DukascopyConnector
 from forex_data.data_management.common import (
     DEFAULT_PATHS
 )
+from tick_vault.config import CONFIG
 
 from pathlib import Path
 
@@ -222,9 +223,6 @@ class TestDukascopyConnector(unittest.TestCase):
         self.assertGreaterEqual(df_timespan.total_seconds() + 60, timedelta(hours=10).total_seconds())
 
     def test_fail_safe_configurations(self):
-        # Arrange & Act
-        from tick_vault.config import CONFIG
-
         # Assert session user-agent is browser-like
         user_agent = self.connector._session.headers.get("User-Agent")
         self.assertIsNotNone(user_agent)

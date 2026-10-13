@@ -221,16 +221,39 @@ class TestTiingoConnector(unittest.TestCase):
                 self.assertEqual(timestamps[1], datetime(2026, 6, 7, 21, 5))
                 self.assertEqual(timestamps[2], datetime(2026, 6, 8, 9, 0))
 
-    def test_live_if_api_key_set(self):
-        """Optional live test if TIINGO_API_KEY is available in the environment."""
+    def test_live_data_fetch(self):
+        """Live test for Tiingo real data fetch."""
         if not os.environ.get("TIINGO_API_KEY"):
-            self.skipTest("TIINGO_API_KEY environment variable not set")
+            raise AssertionError(
+                "TIINGO_API_KEY environment variable is not set or empty.\n"
+                "Realtime Tiingo tests require an active API key to "
+                "fetch real data.\n"
+                "Remediation:\n"
+                "1. Sign up for a free account at https://www.tiingo.com/ and obtain "
+                "your token at https://www.tiingo.com/account/api/token.\n"
+                "2. Set the environment variable in your system:\n"
+                "   - Linux / macOS:\n"
+                "       export TIINGO_API_KEY=\"<your_key>\"\n"
+                "   - Windows (Command Prompt):\n"
+                "       set TIINGO_API_KEY=<your_key>\n"
+                "   - Windows (PowerShell):\n"
+                "       $env:TIINGO_API_KEY=\"<your_key>\""
+            )
 
         live_connector = TiingoConnector(plan="free", data_path=_data_path)
-        result_lf = live_connector.get_realtime_price("EUR/USD")
-        df = result_lf.collect()
-        self.assertGreater(df.height, 0)
-        logger.info(f"Live Tiingo Top-of-Book:\n{df}")
+        try:
+            result_lf = live_connector.get_realtime_price("EUR/USD")
+            df = result_lf.collect()
+            self.assertGreater(
+                df.height,
+                0,
+                "Tiingo returned empty top-of-book data. Your TIINGO_API_KEY may be "
+                "invalid, unauthorized, or rate-limited. Verify your token at "
+                "https://www.tiingo.com/account/api/token."
+            )
+            logger.info(f"Live Tiingo Top-of-Book:\n{df}")
+        finally:
+            live_connector.clear_temporary_folder()
 
 
 if __name__ == "__main__":

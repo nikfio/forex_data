@@ -65,7 +65,12 @@ __all__ = [
     'cTraderDataConnector',
     'CTRADER_PROVIDER',
     'CTRADER_CHUNK_SIZE',
-    'CTRADER_TIMEFRAMES'
+    'CTRADER_TIMEFRAMES',
+    'DataCharts',
+    'create_historical_figure',
+    'RealtimeDashApp',
+    'SupportedChartType',
+    'SUPPORTED_CHARTS_TYPE'
 ]
 
 from . import common
@@ -138,3 +143,11 @@ from .remoteconnector import (
 )
 
 from .historicaldata import HistoricalManagerDB
+
+from .charts import (
+    DataCharts,
+    create_historical_figure,
+    RealtimeDashApp,
+    SupportedChartType,
+    SUPPORTED_CHARTS_TYPE
+)

@@ -17,26 +17,56 @@ Created on Sun Feb 23 00:02:36 2025
 #         OSS versions for windows required
 #
 
+import asyncio
+import logging
 import os
+import re
+from re import search
 import shutil
-import time
 import socket
 import ssl
 import struct
-from uuid import uuid4
-import requests
-from requests import Session
+import time
+import urllib3
+import zoneinfo
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
-from zipfile import ZipFile, ZipExtFile, BadZipFile
+from pathlib import Path
 from textwrap import dedent
+from typing import Any, Dict, List, Union
+from uuid import uuid4
+from zipfile import BadZipFile, ZipExtFile, ZipFile
+
 from bs4 import BeautifulSoup
 import pandas as pd
 import polars as pl
-from attrs import define, field, validators, validate
-from typing import Any, Dict, List, Union
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
-from re import search
+from polars import (
+    String as polars_string,
+    col,
+)
+from polars.exceptions import ComputeError
+import requests
+from requests import Session
+from attrs import define, field, validate, validators
+from loguru import logger
+
+try:
+    import tick_vault
+    from tick_vault import (
+        download_range,
+        read_tick_data,
+        reload_config,
+    )
+    from tick_vault.constants import PIPET_SIZE_REGISTRY
+    from tick_vault.metadata import MetadataDB
+    HAS_TICK_VAULT = True
+except ImportError:
+    HAS_TICK_VAULT = False
+    reload_config = None  # type: ignore[assignment]
+    download_range = None  # type: ignore[assignment]
+    read_tick_data = None  # type: ignore[assignment]
+    PIPET_SIZE_REGISTRY = {}  # type: ignore[assignment]
+    MetadataDB = None  # type: ignore[assignment]
 
 from pyarrow import (
     int64 as pyarrow_int64,
@@ -51,9 +81,8 @@ from pyarrow import (
     timestamp as pyarrow_timestamp
 )
 
-from loguru import logger
-
 from .common import (
+    DEFAULT_PATHS,
     PolarsDataFrame,
     PolarsLazyFrame,
     PolarsFloat32,
@@ -121,8 +150,13 @@ from ..config import _apply_config
 class RemoteConnector:
 
     # interface parameters
-    data_path: Union[str, Path] = field(default='', validator=validators.or_(
-        validators.instance_of(str), validators.instance_of(Path)))
+    data_path: Union[str, Path] = field(
+        default=str(DEFAULT_PATHS.BASE_PATH),
+        validator=validators.or_(
+            validators.instance_of(str),
+            validators.instance_of(Path)
+        )
+    )
     data_type: str = field(default='parquet',
                            validator=validators.in_(SUPPORTED_DATA_FILES))
     engine: str = field(default='polars_lazy',
@@ -145,7 +179,11 @@ class RemoteConnector:
             return
 
         # create data folder if not exists
-        self.data_path = Path(self.data_path).expanduser().resolve()
+        if not self.data_path or str(self.data_path).strip() in ('', '.'):
+            self.data_path = Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        else:
+            self.data_path = Path(self.data_path).expanduser().resolve()
+
         if (
             not self.data_path.exists() or
             not self.data_path.is_dir()
@@ -175,7 +213,6 @@ class RemoteConnector:
 
     def clear_temporary_folder(self) -> None:
         try:
-            import logging
             tv_logger = logging.getLogger("tick_vault")
             for handler in list(tv_logger.handlers):
                 if isinstance(handler, logging.FileHandler):
@@ -196,7 +233,6 @@ class RemoteConnector:
         # that are older than 15 minutes.
         temp_root = self.data_path / TEMP_FOLDER
         if temp_root.exists() and temp_root.is_dir():
-            import time
             now = time.time()
             for p in temp_root.iterdir():
                 if p.is_dir() and p != self._temporary_data_path:
@@ -304,11 +340,22 @@ class HistDataConnector(RemoteConnector):
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
+        base_path = (
+            Path(self.data_path).expanduser().resolve()
+            if self.data_path
+            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        )
+        if "historicaldata" not in [p.lower() for p in base_path.parts] and base_path.name.lower() != "histdata":
+            self.data_path = base_path / DEFAULT_PATHS.HIST_DATA_FOLDER / "histdata"
+        else:
+            self.data_path = base_path
 
         super().__attrs_post_init__()
 
         # set up log sink for histdata connector
-        log_path = self.data_path / 'log' / 'histdata.log'
+        log_dir = self.data_path / 'log'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / 'histdata.log'
 
         handlers_to_remove = []
         for handler_id, handler in logger._core.handlers.items():
@@ -336,7 +383,6 @@ class HistDataConnector(RemoteConnector):
         self._session = Session()
         self._session.verify = self.ssl_verify
         if not self.ssl_verify:
-            import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     def check_connection(self) -> bool:
@@ -565,12 +611,6 @@ class HistDataConnector(RemoteConnector):
         Union[PolarsDataFrame, PolarsLazyFrame]
             Parsed tick data DataFrame.
         """
-        from polars import (
-            String as polars_string,
-            col
-        )
-        from polars.exceptions import ComputeError
-
         if engine == 'pandas':
 
             # pandas with python engine can read a runtime opened
@@ -946,11 +986,22 @@ class DukascopyConnector(RemoteConnector):
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
+        base_path = (
+            Path(self.data_path).expanduser().resolve()
+            if self.data_path
+            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        )
+        if "historicaldata" not in [p.lower() for p in base_path.parts] and base_path.name.lower() != "dukascopy":
+            self.data_path = base_path / DEFAULT_PATHS.HIST_DATA_FOLDER / "dukascopy"
+        else:
+            self.data_path = base_path
 
         super().__attrs_post_init__()
 
         # set up log sink for dukascopy connector
-        log_path = self.data_path / 'log' / 'dukascopy.log'
+        log_dir = self.data_path / 'log'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / 'dukascopy.log'
 
         handlers_to_remove = []
         for handler_id, handler in logger._core.handlers.items():
@@ -984,18 +1035,16 @@ class DukascopyConnector(RemoteConnector):
             )
         })
         if not self.ssl_verify:
-            import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         # Configure tick_vault if it's imported
-        try:
-            from tick_vault import reload_config
+        if HAS_TICK_VAULT and reload_config is not None:
             reload_config(
                 base_directory=str(self._temporary_data_path),
                 worker_per_proxy=3,
                 fetch_max_retry_attempts=3,
             )
-        except ImportError:
+        else:
             logger.bind(target='dukascopy').warning("tick_vault is not installed. Please install it to use DukascopyConnector.")
 
     def check_connection(self) -> bool:
@@ -1032,18 +1081,15 @@ class DukascopyConnector(RemoteConnector):
         tickers_set = set()
 
         # 1. Add tickers from local tick_vault constants if available
-        try:
-            from tick_vault.constants import PIPET_SIZE_REGISTRY
+        if HAS_TICK_VAULT and PIPET_SIZE_REGISTRY:
             for k in PIPET_SIZE_REGISTRY.keys():
                 tickers_set.add(k.upper())
-        except ImportError:
+        else:
             logger.bind(target='dukascopy').warning("Failed to import pipet size registry from tick_vault.")
 
         # 2. Scrape tickers from Dukascopy tools page
         scrape_url = "https://www.dukascopy.com/swiss/english/marketwatch/historical/"
         try:
-            from bs4 import BeautifulSoup
-            import re
             response = self._session.get(scrape_url, timeout=30)
 
             if response.status_code == 200:
@@ -1073,7 +1119,7 @@ class DukascopyConnector(RemoteConnector):
         Downloads tick data for a specific year and month from Dukascopy using tick_vault.
 
         Parameters
-        -------
+        ----------
         ticker: str
             The currency pair (e.g., 'EURUSD').
         year: int
@@ -1102,24 +1148,18 @@ class DukascopyConnector(RemoteConnector):
         if engine not in ('polars', 'polars_lazy'):
             raise ValueError(f"Unsupported engine: {engine}. Only 'polars' and 'polars_lazy' are supported.")
 
-        try:
-            import asyncio
-            from tick_vault import download_range, read_tick_data
-        except ImportError:
+        if not HAS_TICK_VAULT or download_range is None or read_tick_data is None:
             logger.bind(target='dukascopy').error("tick_vault is not installed. Cannot download data.")
             raise RuntimeError("tick_vault is not installed.")
 
         # Ensure temporary data path exists and reconfigure tick_vault to use it
         self._temporary_data_path.mkdir(parents=True, exist_ok=True)
-        try:
-            from tick_vault import reload_config
+        if reload_config is not None:
             reload_config(
                 base_directory=str(self._temporary_data_path),
                 worker_per_proxy=3,
                 fetch_max_retry_attempts=3,
             )
-        except ImportError:
-            pass
 
         try:
             # Determine start and end date for the month
@@ -1186,7 +1226,7 @@ class DukascopyConnector(RemoteConnector):
         Fetches recent data relative to the current time minus the interval_window.
 
         Parameters
-        -------
+        ----------
         symbol: str
             The currency pair (e.g. 'EURUSD').
         timeframe: str
@@ -1208,27 +1248,20 @@ class DukascopyConnector(RemoteConnector):
         if engine not in ('polars', 'polars_lazy'):
             raise ValueError(f"Unsupported engine: {engine}. Only 'polars' and 'polars_lazy' are supported.")
 
-        try:
-            import asyncio
-            from tick_vault import download_range, read_tick_data
-        except ImportError:
+        if not HAS_TICK_VAULT or download_range is None or read_tick_data is None:
             logger.bind(target='dukascopy').error("tick_vault is not installed. Cannot fetch recent data.")
             raise RuntimeError("tick_vault is not installed.")
 
         # Ensure temporary data path exists and reconfigure tick_vault to use it
         self._temporary_data_path.mkdir(parents=True, exist_ok=True)
-        try:
-            from tick_vault import reload_config
+        if reload_config is not None:
             reload_config(
                 base_directory=str(self._temporary_data_path),
                 worker_per_proxy=3,
                 fetch_max_retry_attempts=3,
             )
-        except ImportError:
-            pass
 
         try:
-            from datetime import timezone
             # Subtract 2 hours from current UTC time because Dukascopy CDN historical files
             # are uploaded with some latency (usually up to 1-2 hours).
             end = datetime.now(timezone.utc) - timedelta(hours=2)
@@ -1244,24 +1277,24 @@ class DukascopyConnector(RemoteConnector):
 
                 # In case the input end date is greater than the available range in the metadata DB,
                 # use the last available date in the DB if one exists.
-                try:
-                    from tick_vault.metadata import MetadataDB
-                    with MetadataDB() as db:
-                        db._ensure_table_exists(symbol_upper)
-                        table_name = db._get_table_name(symbol_upper)
-                        cursor = db.conn.execute(
-                            f"SELECT MAX(timestamp) FROM {table_name} WHERE has_data = 1"
+                if MetadataDB is not None:
+                    try:
+                        with MetadataDB() as db:
+                            db._ensure_table_exists(symbol_upper)
+                            table_name = db._get_table_name(symbol_upper)
+                            cursor = db.conn.execute(
+                                f"SELECT MAX(timestamp) FROM {table_name} WHERE has_data = 1"
+                            )
+                            row = cursor.fetchone()
+                            if row and row[0] is not None:
+                                last_available = datetime.fromtimestamp(row[0], tz=timezone.utc)
+                                last_available_end = last_available
+                                if end > last_available_end:
+                                    end = last_available_end
+                    except Exception as e:
+                        logger.bind(target='dukascopy').debug(
+                            f"Could not check metadata database for last available range: {e}"
                         )
-                        row = cursor.fetchone()
-                        if row and row[0] is not None:
-                            last_available = datetime.fromtimestamp(row[0], tz=timezone.utc)
-                            last_available_end = last_available
-                            if end > last_available_end:
-                                end = last_available_end
-                except Exception as e:
-                    logger.bind(target='dukascopy').debug(
-                        f"Could not check metadata database for last available range: {e}"
-                    )
 
             start = end - interval_window
 
@@ -1365,18 +1398,31 @@ class TwelveDataConnector(RemoteConnector):
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
-
-        super().__attrs_post_init__()
-
-        # set up log sink for twelvedata connector
-        log_path = Path(self.data_path) / 'log' / 'twelvedata.log'
-
-        # apy key if not defined get it from env variable TWELVEDATA_API_KEY
+        # api key if not defined get it from env variable TWELVE_DATA_API_KEY
         if not self.api_key:
             self.api_key = os.environ.get("TWELVE_DATA_API_KEY", "")
 
         if not self.api_key:
             raise ValueError("API key is required for TwelveDataConnector")
+
+        base_path = (
+            Path(self.data_path).expanduser().resolve()
+            if self.data_path
+            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        )
+        if base_path.name.lower() == "realtime_twelvedata":
+            self.data_path = base_path
+        elif base_path.name.lower() == "realtime":
+            self.data_path = base_path.parent / "Realtime_TwelveData"
+        else:
+            self.data_path = base_path / "Realtime_TwelveData"
+
+        super().__attrs_post_init__()
+
+        # set up log sink for twelvedata connector
+        log_dir = self.data_path / 'log'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / 'twelvedata.log'
 
         # set default twelve data chunk size
         self._chunk_size = TWELVE_DATA_CHUNK_SIZE
@@ -1386,6 +1432,18 @@ class TwelveDataConnector(RemoteConnector):
             self._max_requests_per_minute = TWELVE_DATA_FREE_TIER_MINUTE_RATE_LIMIT
         else:  # 'paid' / 'grow' plan specifications
             self._max_requests_per_minute = TWELVE_DATA_PRO_MINUTE_RATE_LIMIT
+
+        handlers_to_remove = []
+        for handler_id, handler in logger._core.handlers.items():
+            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
+                if str(handler._sink._path) == str(log_path):
+                    handlers_to_remove.append(handler_id)
+
+        for handler_id in handlers_to_remove:
+            try:
+                logger.remove(handler_id)
+            except ValueError:
+                pass
 
         logger.add(log_path,
                    level="TRACE",
@@ -1544,7 +1602,6 @@ class TwelveDataConnector(RemoteConnector):
             return PolarsLazyFrame({})
 
         # Check if now is weekend in New York timezone
-        import zoneinfo
         ny_tz = zoneinfo.ZoneInfo("America/New_York")
         now_ny = datetime.now(ny_tz)
         wkday = now_ny.weekday()  # Mon=0, ..., Sun=6
@@ -1690,10 +1747,24 @@ class TiingoConnector(RemoteConnector):
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
+        base_path = (
+            Path(self.data_path).expanduser().resolve()
+            if self.data_path
+            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        )
+        if base_path.name.lower() == "realtime_tiingo":
+            self.data_path = base_path
+        elif base_path.name.lower() == "realtime":
+            self.data_path = base_path.parent / "Realtime_Tiingo"
+        else:
+            self.data_path = base_path / "Realtime_Tiingo"
+
         super().__attrs_post_init__()
 
         # set up log sink for tiingo connector
-        log_path = Path(self.data_path) / 'log' / 'tiingo.log'
+        log_dir = self.data_path / 'log'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / 'tiingo.log'
 
         if not self.api_key:
             self.api_key = os.environ.get("TIINGO_API_KEY", "")
@@ -1923,7 +1994,42 @@ class CTraderConnector(RemoteConnector):
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
+        base_path = (
+            Path(self.data_path).expanduser().resolve()
+            if self.data_path
+            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        )
+        if base_path.name.lower() == "realtime_ctrader":
+            self.data_path = base_path
+        elif base_path.name.lower() == "realtime":
+            self.data_path = base_path.parent / "Realtime_cTrader"
+        else:
+            self.data_path = base_path / "Realtime_cTrader"
+
         super().__attrs_post_init__()
+
+        # set up log sink for ctrader connector
+        log_dir = self.data_path / 'log'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / 'ctrader.log'
+
+        handlers_to_remove = []
+        for handler_id, handler in logger._core.handlers.items():
+            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
+                if str(handler._sink._path) == str(log_path):
+                    handlers_to_remove.append(handler_id)
+
+        for handler_id in handlers_to_remove:
+            try:
+                logger.remove(handler_id)
+            except ValueError:
+                pass
+
+        logger.add(log_path,
+                   level="TRACE",
+                   rotation="5 MB",
+                   filter=lambda record: ('ctrader' == record['extra'].get('target') and
+                                          bool(record["extra"].get('target'))))
 
         # Fallbacks to env
         if not self.client_id:

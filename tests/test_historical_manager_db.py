@@ -11,9 +11,11 @@ the functionality of the historical data manager including:
 """
 
 import unittest
+from unittest.mock import patch
 import os
 import shutil
 import random
+import polars as pl
 from loguru import logger
 
 from datetime import (
@@ -27,6 +29,10 @@ from polars import (
     col
 )
 
+from forex_data.data_management import (
+    HistDataConnector,
+    DukascopyConnector,
+)
 from forex_data import (
     HistoricalManagerDB,
     TickerNotFoundError,
@@ -59,8 +65,6 @@ else:
 
 test_config_yaml = f'''
 DATA_PATH: '{_data_path}'
-DATA_FILETYPE: 'parquet'
-ENGINE: 'polars_lazy'
 DB_FILES_YEAR_PARTITIONING: True
 SSL_VERIFY: True
 VOLUME_DATA: False
@@ -416,7 +420,9 @@ class TestHistoricalManagerDB(unittest.TestCase):
         Test that clear_database wipes data for a specific ticker
         and verify that data can be correctly re-downloaded.
         """
-        ticker = random.choice(get_histdata_tickers(verify=False))
+        ticker = random.choice(
+            [t for t in get_histdata_tickers(verify=False) if t.upper() != 'EURUSD']
+        )
         timeframe = '1W'
 
         # 1. Ensure GBPUSD data is present (pull some data)
@@ -983,8 +989,6 @@ class TestHistoricalManagerDB(unittest.TestCase):
         The connector should catch it and use the correction formula fallback
         to strip whitespace, succeeding without falling back to Dukascopy.
         """
-        from unittest.mock import patch
-
         with patch(
             'forex_data.data_management.historicaldata'
             '.DukascopyConnector.download_month_raw'
@@ -1114,9 +1118,6 @@ class TestHistoricalManagerDB(unittest.TestCase):
         Verify that HistData and Dukascopy connectors align on UTC (offset +0h)
         after timezone correction is implemented.
         """
-        import polars as pl
-        from forex_data.data_management import HistDataConnector, DukascopyConnector
-
         # Test on 2 days of EURUSD July 2024
         ticker = 'EURUSD'
         year = 2024

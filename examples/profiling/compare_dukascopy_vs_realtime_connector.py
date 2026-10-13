@@ -526,7 +526,7 @@ def main(
         help="End date and time (YYYY-MM-DD HH:MM:SS).",
     ),
     data_path: Path = typer.Option(
-        Path.home() / ".test_vol_database",
+        Path.home() / ".test_database",
         "--data-path",
         "-d",
         help="Path to local database containing Dukascopy historical parquets.",

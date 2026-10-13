@@ -28,13 +28,23 @@ forex\_data.data\_management.historicaldata module
    :show-inheritance:
    :undoc-members:
 
-forex\_data.data\_management.realtimedata module
-------------------------------------------------
+forex\_data.data\_management.remoteconnector module
+----------------------------------------------------
 
-.. automodule:: forex_data.data_management.realtimedata
+.. automodule:: forex_data.data_management.remoteconnector
    :members:
    :show-inheritance:
    :undoc-members:
+
+forex\_data.data\_management.charts package
+-------------------------------------------
+
+.. automodule:: forex_data.data_management.charts
+   :members:
+   :show-inheritance:
+   :undoc-members:
+   :no-index:
+
 
 Module contents
 ---------------

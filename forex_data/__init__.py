@@ -68,7 +68,12 @@ from .data_management import (
     POLARS_DTYPE_DICT,
     business_days_data,
     US_holiday_dates,
-    random_date_between
+    random_date_between,
+    DataCharts,
+    create_historical_figure,
+    RealtimeDashApp,
+    SupportedChartType,
+    SUPPORTED_CHARTS_TYPE
 )
 
 __all__ = [
@@ -131,5 +136,10 @@ __all__ = [
     'POLARS_DTYPE_DICT',
     'business_days_data',
     'US_holiday_dates',
-    'random_date_between'
+    'random_date_between',
+    'DataCharts',
+    'create_historical_figure',
+    'RealtimeDashApp',
+    'SupportedChartType',
+    'SUPPORTED_CHARTS_TYPE'
 ]
