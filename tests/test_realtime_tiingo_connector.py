@@ -221,6 +221,11 @@ class TestTiingoConnector(unittest.TestCase):
                 self.assertEqual(timestamps[1], datetime(2026, 6, 7, 21, 5))
                 self.assertEqual(timestamps[2], datetime(2026, 6, 8, 9, 0))
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_REALTIME_CONNECTOR_TEST") == "1",
+        "Skipped by default to prevent using API keys in pipeline. "
+        "Run with RUN_REALTIME_CONNECTOR_TEST=1"
+    )
     def test_live_data_fetch(self):
         """Live test for Tiingo real data fetch."""
         if not os.environ.get("TIINGO_API_KEY"):

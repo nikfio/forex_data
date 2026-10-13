@@ -414,9 +414,13 @@ print(data_lf.collect())
 #### Running Tests & Verification
 Run the test suite with flake8 linting:
 ```bash
+# Offline/mocked unit tests (default):
 uv run pytest tests/test_realtime_twelvedata_connector.py --flake8 -v
+
+# Live integration tests with real API data fetch:
+RUN_REALTIME_CONNECTOR_TEST=1 uv run pytest tests/test_realtime_twelvedata_connector.py --flake8 -v
 ```
-> **Note**: If `TWELVE_DATA_API_KEY` is missing or rejected, the test suite raises an actionable error with remediation hints directing you to https://twelvedata.com/.
+> **Note**: Live data fetch tests are skipped by default to avoid requiring API keys in CI/CD pipelines. Enable them with `RUN_REALTIME_CONNECTOR_TEST=1`. If `TWELVE_DATA_API_KEY` is missing or rejected when enabled, the test suite raises an actionable error with remediation hints directing you to https://twelvedata.com/.
 
 ---
 
@@ -479,9 +483,13 @@ print(data_lf.collect())
 #### Running Tests & Verification
 Run the test suite with flake8 linting:
 ```bash
+# Offline/mocked unit tests (default):
 uv run pytest tests/test_realtime_tiingo_connector.py --flake8 -v
+
+# Live integration tests with real API data fetch:
+RUN_REALTIME_CONNECTOR_TEST=1 uv run pytest tests/test_realtime_tiingo_connector.py --flake8 -v
 ```
-> **Note**: If `TIINGO_API_KEY` is missing or invalid, the test suite fails immediately with detailed remediation hints directing you to generate and export your token.
+> **Note**: Live data fetch tests are skipped by default to avoid requiring API keys in CI/CD pipelines. Enable them with `RUN_REALTIME_CONNECTOR_TEST=1`. If `TIINGO_API_KEY` is missing or invalid when enabled, the test suite fails immediately with detailed remediation hints directing you to generate and export your token.
 
 ---
 
@@ -570,9 +578,13 @@ connector.close()
 #### Running Tests & Verification
 Run the unit and live integration tests:
 ```bash
+# Protocol & mock-based tests (default):
 uv run pytest tests/test_ctrader_connector.py --flake8 -v
+
+# Live connection tests against demo.ctraderapi.com:
+RUN_REALTIME_CONNECTOR_TEST=1 uv run pytest tests/test_ctrader_connector.py --flake8 -v
 ```
-> **Note**: Both mock-based protocol tests and live connection tests against `demo.ctraderapi.com:5035` are verified. If credentials are missing or expired, clear error messages with renewal steps are displayed.
+> **Note**: Live data fetch tests are skipped by default to avoid requiring API keys in CI/CD pipelines. Enable them with `RUN_REALTIME_CONNECTOR_TEST=1`. If credentials are missing or expired when enabled, clear error messages with renewal steps are displayed.
 
 ---
 
