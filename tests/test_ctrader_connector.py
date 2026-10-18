@@ -106,6 +106,7 @@ class TestCTraderConnector(unittest.TestCase):
             broker_account_id="123456",
             data_path=Path.home() / ".test_database",
         )
+        self.connector.connect()
 
     def tearDown(self):
         self.connector.close()
@@ -117,6 +118,21 @@ class TestCTraderConnector(unittest.TestCase):
     def test_connect_and_symbols_mapping(self):
         self.assertEqual(self.connector._symbol_name_to_id.get("EURUSD"), 42)
         self.assertIn("EURUSD", self.connector.get_available_tickers())
+
+    def test_lazy_connection(self):
+        """Verify that CTraderConnector does not open a socket upon instantiation."""
+        conn = CTraderConnector(
+            client_id="test-client-id",
+            client_secret="test-client-secret",
+            access_token="test-access-token",
+            broker_account_id="123456",
+            data_path=Path.home() / ".test_database",
+        )
+        try:
+            self.assertIsNone(conn._socket)
+        finally:
+            conn.close()
+            conn.clear_temporary_folder()
 
     def test_trendbars_and_volume_split(self):
         """

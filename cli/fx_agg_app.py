@@ -5,13 +5,62 @@ Typer-based command-line interface for the Forex Data Aggregator.
 
 import datetime
 from pathlib import Path
+import re
 import time
 from typing import List
+import polars as pl
 import typer
 import yaml
 
 from forex_data import HistoricalManagerDB
 from forex_data.data_management.charts import DataCharts
+from forex_data.data_management.common import POLARS_DURATION_PATTERN_STR
+
+# Minimum timeframe duration supported by CLI (1 minute = 60 seconds)
+MIN_CLI_TIMEFRAME_SECONDS = 60
+
+
+def _validate_min_timeframe(tf_str: str) -> str:
+    """
+    Validate that the timeframe meets the minimum allowed resolution (1 minute).
+
+    Rejects sub-minute intervals (e.g., seconds, milliseconds) which are not
+    supported safely for high-volume database charting in CLI.
+    """
+    val = tf_str.strip().lower()
+    if val.endswith("min"):
+        val = val[:-3] + "m"
+
+    if not re.fullmatch(POLARS_DURATION_PATTERN_STR, val, flags=re.IGNORECASE):
+        typer.secho(
+            f"Error: Invalid timeframe format '{tf_str}'.",
+            fg=typer.colors.RED,
+            err=True
+        )
+        raise typer.Exit(code=1)
+
+    t0 = datetime.datetime(2020, 1, 1)
+    try:
+        t1 = pl.select(t1=pl.lit(t0).dt.offset_by(val))["t1"][0]
+        secs = (t1 - t0).total_seconds()
+    except Exception as e:
+        typer.secho(
+            f"Error parsing timeframe '{tf_str}': {e}",
+            fg=typer.colors.RED,
+            err=True
+        )
+        raise typer.Exit(code=1)
+
+    if secs < MIN_CLI_TIMEFRAME_SECONDS:
+        typer.secho(
+            f"Error: Timeframe '{tf_str}' ({int(secs)}s) is below the minimum "
+            f"allowed resolution of 1 minute (1m).",
+            fg=typer.colors.RED,
+            err=True
+        )
+        raise typer.Exit(code=1)
+
+    return val
 
 
 def _load_default_data_path() -> str:
@@ -99,7 +148,9 @@ def generate_database(
     normalized_timeframe = []
     for tf_arg in timeframe:
         parts = [t.strip().lower() for t in tf_arg.split(",") if t.strip()]
-        normalized_timeframe.extend(parts)
+        for p in parts:
+            validated_p = _validate_min_timeframe(p)
+            normalized_timeframe.append(validated_p)
 
     if not normalized_tickers:
         typer.secho("Error: No valid tickers provided.", fg=typer.colors.RED, err=True)
@@ -193,7 +244,7 @@ def plot_data(
         "now", help="End date (YYYY-MM-DD) or 'now' or 'live' for real-time plot."
     ),
     timeframe: str = typer.Argument(
-        ..., help="Timeframe interval (e.g., 1D, 1h, 15m)."
+        ..., help="Timeframe interval (e.g., 1m, 5m, 1h, 1D; minimum resolution: 1m)."
     ),
     chart_type: str = typer.Option(
         "ohlc", "--type", help="Type of chart (ohlc, line, scatter)."
@@ -219,6 +270,9 @@ def plot_data(
     """
     Launch an interactive plot for historical or live forex data.
     """
+    # Validate timeframe meets minimum resolution (1 minute)
+    timeframe = _validate_min_timeframe(timeframe)
+
     typer.secho(f"Initializing DataCharts for {ticker}...", fg=typer.colors.BLUE)
 
     is_live = end_date.lower() == "live"

@@ -29,7 +29,7 @@ import struct
 import time
 import urllib3
 import zoneinfo
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from textwrap import dedent
@@ -118,6 +118,7 @@ from .common import (
     read_csv,
     PolarsDatetime,
     any_date_to_datetime64,
+    normalize_to_naive_utc,
     business_days_data,
     reframe_data,
     TickerNotFoundError,
@@ -1194,12 +1195,25 @@ class DukascopyConnector(RemoteConnector):
             # Rename columns to match TIME_TICK_DTYPE
             pl_df = pl_df.rename({"time": COLUMN_NAME.TIMESTAMP})
 
-            # Calculate vwmp (volume weighted mid price)
+            # Ensure any volume and price raw values are strictly positive (> 0.0)
+            pl_df = pl_df.filter(
+                (pl.col(COLUMN_NAME.ASK_VOLUME) > 0.0) &
+                (pl.col(COLUMN_NAME.BID_VOLUME) > 0.0) &
+                (pl.col(COLUMN_NAME.ASK) > 0.0) &
+                (pl.col(COLUMN_NAME.BID) > 0.0)
+            )
+
+            # Calculate vwmp (volume weighted mid price) using regular formula with volumes
+            total_vol = pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.BID_VOLUME)
+            weighted_price = (
+                pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) +
+                pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)
+            )
+
             pl_df = pl_df.with_columns([
                 pl.col(COLUMN_NAME.ASK_VOLUME).cast(pl.Float32),
                 pl.col(COLUMN_NAME.BID_VOLUME).cast(pl.Float32),
-                ((pl.col(COLUMN_NAME.BID) * pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.ASK) * pl.col(COLUMN_NAME.BID_VOLUME)) /
-                 (pl.col(COLUMN_NAME.ASK_VOLUME) + pl.col(COLUMN_NAME.BID_VOLUME))).cast(pl.Float32).alias(COLUMN_NAME.VWMP)
+                (weighted_price / total_vol).cast(pl.Float32).alias(COLUMN_NAME.VWMP)
             ])
 
             # Cast to required TICK schema
@@ -2046,8 +2060,6 @@ class CTraderConnector(RemoteConnector):
         if not self.client_id or not self.client_secret or not self.access_token or not self.broker_account_id:
             raise ValueError("cTrader credentials and account ID are required.")
 
-        self.connect()
-
     def connect(self) -> None:
         if self._socket is not None:
             return
@@ -2164,9 +2176,16 @@ class CTraderConnector(RemoteConnector):
             return False
 
     def get_available_tickers(self) -> List[str]:
+        if not self._symbol_name_to_id:
+            try:
+                self.connect()
+            except Exception:
+                pass
         return list(self._symbol_name_to_id.keys())
 
     def get_data(self, symbol: str, timeframe: str, start_date: str, end_date: str) -> PolarsLazyFrame:
+        if not self._symbol_name_to_id:
+            self.connect()
         symbol_norm = symbol.upper().replace("/", "").replace("_", "").replace("-", "")
         symbol_id = self._symbol_name_to_id.get(symbol_norm)
         if symbol_id is None:
@@ -2367,6 +2386,142 @@ class CTraderConnector(RemoteConnector):
             start_date=start_dt.strftime("%Y-%m-%d %H:%M:%S"),
             end_date=end_dt.strftime("%Y-%m-%d %H:%M:%S")
         )
+
+    def download_day_raw(
+        self,
+        ticker: str,
+        day_date: Union[str, datetime, date],
+        engine: str = 'polars_lazy'
+    ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
+        """
+        Download raw tick data synthesized from 1-minute trendbars for a single day.
+        Uses 4-point OHLC tick synthesis at seconds :00, :15, :30, :45 to preserve
+        the exact Open, High, Low, Close, and regular VWMP with volumes when reframed.
+        """
+        self.connect()
+        dt_val = normalize_to_naive_utc(day_date, to_pydatetime=True)
+        start_dt = datetime(dt_val.year, dt_val.month, dt_val.day, 0, 0, 0)
+        end_dt = start_dt + timedelta(days=1)
+
+        symbol_norm = ticker.upper().replace("/", "").replace("_", "").replace("-", "")
+        symbol_id = self._symbol_name_to_id.get(symbol_norm)
+        if symbol_id is None:
+            raise TickerNotFoundError(f"Symbol {ticker} not found in cTrader symbols.")
+
+        from_ts = int(start_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        to_ts = int(end_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+        req = ProtoOAGetTrendbarsReq()
+        req.ctidTraderAccountId = int(self.broker_account_id)
+        req.symbolId = symbol_id
+        req.period = ProtoOATrendbarPeriod.M1
+        req.fromTimestamp = from_ts
+        req.toTimestamp = to_ts
+
+        res = self._send_and_receive(req, ProtoOAGetTrendbarsRes)
+        if not res.trendbar:
+            empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            return empty_df.lazy() if engine == 'polars_lazy' else empty_df
+
+        digits = 3 if "JPY" in symbol_norm else 5
+        scale = float(10 ** digits)
+        spread_offset = 0.00010 if digits == 5 else 0.010
+        half_spread = spread_offset / 2.0
+
+        records = []
+        for b in res.trendbar:
+            ts = datetime.fromtimestamp(b.utcTimestampInMinutes * 60, tz=timezone.utc).replace(tzinfo=None)
+            low_p = float(b.low) / scale
+            open_p = float(b.low + b.deltaOpen) / scale
+            high_p = float(b.low + b.deltaHigh) / scale
+            close_p = float(b.low + b.deltaClose) / scale
+            vol = max(float(b.volume), 1.0)
+
+            # Sequence preserving OHLC direction
+            if open_p <= close_p:
+                prices = [open_p, low_p, high_p, close_p]
+            else:
+                prices = [open_p, high_p, low_p, close_p]
+
+            # Scale cTrader tick count by 2,500,000.0 (average currency units per tick in interbank FX)
+            # to match Dukascopy volume magnitude and prevent relative volume normalization underflow
+            tick_vol = (vol / 8.0) * 2_500_000.0  # V/4 total per tick, split 50/50 ask/bid
+            for i, p in enumerate(prices):
+                records.append({
+                    COLUMN_NAME.TIMESTAMP: ts + timedelta(seconds=i * 15),
+                    COLUMN_NAME.ASK: p + half_spread,
+                    COLUMN_NAME.BID: p - half_spread,
+                    COLUMN_NAME.ASK_VOLUME: tick_vol,
+                    COLUMN_NAME.BID_VOLUME: tick_vol,
+                    COLUMN_NAME.VWMP: p,
+                })
+
+        if not records:
+            empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            return empty_df.lazy() if engine == 'polars_lazy' else empty_df
+
+        df = pl.DataFrame(records).cast(POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+        df = df.unique(subset=[COLUMN_NAME.TIMESTAMP], keep='first', maintain_order=True).sort(COLUMN_NAME.TIMESTAMP)
+        df = business_days_data(df)
+
+        return df.lazy() if engine == 'polars_lazy' else df
+
+    def download_range_raw(
+        self,
+        ticker: str,
+        start_date: Union[str, datetime, date],
+        end_date: Union[str, datetime, date],
+        engine: str = 'polars_lazy'
+    ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
+        """
+        Download raw tick data across a date range in 1-day chunks.
+        """
+        self.connect()
+        start_dt = normalize_to_naive_utc(start_date, to_pydatetime=True)
+        end_dt = normalize_to_naive_utc(end_date, to_pydatetime=True)
+
+        current_day = datetime(start_dt.year, start_dt.month, start_dt.day, 0, 0, 0)
+        end_day = datetime(end_dt.year, end_dt.month, end_dt.day, 0, 0, 0)
+
+        all_dfs = []
+        while current_day <= end_day:
+            day_df = self.download_day_raw(ticker, current_day, engine='polars')
+            if isinstance(day_df, PolarsLazyFrame):
+                day_df = collect_lazyframe(day_df, self.polars_gpu_engine)
+            if not day_df.is_empty():
+                all_dfs.append(day_df)
+            current_day += timedelta(days=1)
+
+        if not all_dfs:
+            empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            return empty_df.lazy() if engine == 'polars_lazy' else empty_df
+
+        combined = pl.concat(all_dfs).filter(
+            (pl.col(COLUMN_NAME.TIMESTAMP) >= start_dt) &
+            (pl.col(COLUMN_NAME.TIMESTAMP) <= end_dt)
+        ).unique(subset=[COLUMN_NAME.TIMESTAMP], keep='first', maintain_order=True).sort(COLUMN_NAME.TIMESTAMP)
+
+        return combined.lazy() if engine == 'polars_lazy' else combined
+
+    def download_month_raw(
+        self,
+        ticker: str,
+        year: int,
+        month_num: int,
+        temp_filepath: str = '',
+        engine: str = 'polars_lazy'
+    ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
+        """
+        Download raw tick data for an entire month from cTrader in 1-day chunks.
+        Matches the interface of DukascopyConnector.download_month_raw.
+        """
+        start = datetime(year, month_num, 1)
+        if month_num == 12:
+            end = datetime(year + 1, 1, 1) - timedelta(milliseconds=1)
+        else:
+            end = datetime(year, month_num + 1, 1) - timedelta(milliseconds=1)
+
+        return self.download_range_raw(ticker, start, end, engine=engine)
 
 
 cTraderDataConnector = CTraderConnector
