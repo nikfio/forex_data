@@ -35,6 +35,7 @@ from pyarrow import (
 )
 
 # POLARS
+import polars as pl
 from polars import (
     String as polars_string,
     col,
@@ -76,7 +77,8 @@ from .database import (
 from .remoteconnector import (
     RemoteConnector,
     HistDataConnector,
-    DukascopyConnector
+    DukascopyConnector,
+    CTraderConnector
 )
 
 __all__ = ['HistoricalManagerDB']
@@ -277,7 +279,9 @@ class HistoricalManagerDB:
             raise ValueError(f'Data type {self.data_type} not supported')
 
         # initialize histdata connectors
-        if self.volume_data:
+        if self.offline:
+            self._histdata_connector = []
+        elif self.volume_data:
             self._histdata_connector = [
                 DukascopyConnector(
                     ssl_verify=self.ssl_verify,
@@ -307,14 +311,15 @@ class HistoricalManagerDB:
 
         # cache histdata tickers list at initialization (merged from all connectors)
         tickers_set = set()
-        for conn in self._histdata_connector:
-            try:
-                for ticker in conn.get_available_tickers():
-                    tickers_set.add(ticker.upper())
-            except Exception as e:
-                logger.bind(target='histmanager').warning(
-                    f"Failed to get tickers from connector {conn.__class__.__name__}: {e}"
-                )
+        if not self.offline:
+            for conn in self._histdata_connector:
+                try:
+                    for ticker in conn.get_available_tickers():
+                        tickers_set.add(ticker.upper())
+                except Exception as e:
+                    logger.bind(target='histmanager').warning(
+                        f"Failed to get tickers from connector {conn.__class__.__name__}: {e}"
+                    )
         self._histdata_tickers_list = sorted(list(tickers_set))
 
         # initialize tickers years dict info of data available
@@ -1551,3 +1556,155 @@ class HistoricalManagerDB:
         # call connectors clear method
         for conn in self.get_source_connectors():
             conn.clear_temporary_folder()
+
+    def patch_raw_tick_holes(
+        self,
+        ticker: str,
+        year: int,
+        start_date: Optional[Union[str, datetime, date]] = None,
+        end_date: Optional[Union[str, datetime, date]] = None,
+        min_volume: float = 0.0,
+    ) -> bool:
+        """
+        Scans origin raw tick parquet (forex_{ticker}_tick_{year}.parquet) for data holes:
+        rows with nulls, NaNs, or non-positive values (<= 0.0) across ANY feature column during business hours.
+        Optionally accepts start_date/end_date to force patch a specific range, or min_volume threshold.
+        Fetches clean replacement chunks from cTrader in 1-day chunks, splices them into the raw tick file,
+        and re-reframes all downstream timeframes.
+        """
+        ticker_upper = ticker.upper()
+
+        if not self.db_files_year_partitioning:
+            logger.bind(target='histmanager').warning("patch_raw_tick_holes requires db_files_year_partitioning=True")
+            return False
+
+        tick_filename = self._db_connector._get_filename('forex', ticker_upper, 'tick', year)
+        tick_filepath = self._db_connector.data_path / 'forex' / ticker_upper / 'tick' / tick_filename
+
+        if not (tick_filepath.exists() and tick_filepath.is_file()):
+            logger.bind(target='histmanager').warning(f"Raw tick file not found: {tick_filepath}")
+            return False
+
+        file_lock_path = str(tick_filepath) + '.lock'
+        with FileLock(file_lock_path):
+            tick_df = read_parquet(self.engine, tick_filepath)
+            if hasattr(tick_df, 'collect'):
+                tick_df = collect_lazyframe(tick_df, self.polars_gpu_engine)
+
+            if start_date is not None and end_date is not None:
+                start_dt = normalize_to_naive_utc(start_date, to_pydatetime=True)
+                end_dt = normalize_to_naive_utc(end_date, to_pydatetime=True)
+                is_hole = (
+                    (pl.col(COLUMN_NAME.TIMESTAMP) >= start_dt)
+                    & (pl.col(COLUMN_NAME.TIMESTAMP) <= end_dt)
+                )
+                hole_min = start_dt
+                hole_max = end_dt
+                holes = tick_df.filter(is_hole)
+            else:
+                feature_cols = [c for c in tick_df.columns if c != COLUMN_NAME.TIMESTAMP]
+                predicates = [
+                    pl.col(c).is_null() | pl.col(c).is_nan() | (pl.col(c) <= 0.0)
+                    for c in feature_cols
+                ]
+                if min_volume > 0.0:
+                    predicates.append(
+                        (pl.col(COLUMN_NAME.ASK_VOLUME) < min_volume) |
+                        (pl.col(COLUMN_NAME.BID_VOLUME) < min_volume)
+                    )
+                is_hole = pl.any_horizontal(predicates)
+
+                holes = tick_df.filter(is_hole)
+                if holes.is_empty():
+                    logger.bind(target='histmanager').info(f"No corrupt rows found in {tick_filepath}")
+                    return False
+
+                hole_min = holes[COLUMN_NAME.TIMESTAMP].min()
+                hole_max = holes[COLUMN_NAME.TIMESTAMP].max()
+
+            logger.bind(target='histmanager').warning(
+                f"Found {holes.height} corrupt tick rows in {tick_filepath} between {hole_min} and {hole_max}. Patching with cTrader..."
+            )
+
+            # Find or instantiate cTrader connector
+            ctrader_conn = None
+            for conn in self._histdata_connector:
+                if isinstance(conn, CTraderConnector):
+                    ctrader_conn = conn
+                    break
+
+            if ctrader_conn is None:
+                ctrader_conn = CTraderConnector(
+                    data_path=str(self._histdata_path / 'ctrader'),
+                    engine='polars',
+                )
+
+            # Determine day range to patch (inclusive 24h days)
+            start_day = datetime(hole_min.year, hole_min.month, hole_min.day, 0, 0, 0)
+            end_day = datetime(hole_max.year, hole_max.month, hole_max.day, 23, 59, 59)
+
+            ctrader_ticks = ctrader_conn.download_range_raw(ticker_upper, start_day, end_day, engine='polars')
+            if hasattr(ctrader_ticks, 'collect'):
+                ctrader_ticks = collect_lazyframe(ctrader_ticks, self.polars_gpu_engine)
+
+            # Align patch boundaries to minute edges (covering full candles)
+            patch_start = hole_min.replace(second=0, microsecond=0)
+            patch_end = hole_max.replace(second=59, microsecond=999999)
+
+            # Squeeze cTrader replacement ticks strictly to the hole boundary
+            ctrader_ticks = ctrader_ticks.filter(
+                (pl.col(COLUMN_NAME.TIMESTAMP) >= patch_start)
+                & (pl.col(COLUMN_NAME.TIMESTAMP) <= patch_end)
+            )
+
+            if ctrader_ticks.is_empty():
+                logger.bind(target='histmanager').error(
+                    f"cTrader returned no ticks within hole window [{patch_start}, {patch_end}]. Cannot patch."
+                )
+                return False
+
+            # Remove ticks inside the patch window and splice in cTrader replacement ticks
+            clean_existing = tick_df.filter(
+                (pl.col(COLUMN_NAME.TIMESTAMP) < patch_start)
+                | (pl.col(COLUMN_NAME.TIMESTAMP) > patch_end)
+            )
+            patched_tick_df = pl.concat([clean_existing, ctrader_ticks]).unique(
+                subset=[COLUMN_NAME.TIMESTAMP], keep='last'
+            ).sort(COLUMN_NAME.TIMESTAMP)
+
+            write_parquet(patched_tick_df, tick_filepath)
+            logger.bind(target='histmanager').info(
+                f"Successfully patched {tick_filepath} in range [{patch_start}, {patch_end}]. "
+                f"Spliced {ctrader_ticks.height} cTrader ticks. Total tick count: {patched_tick_df.height}"
+            )
+
+        # Re-reframe all existing or configured timeframes
+        ticker_dir = self._db_connector.data_path / 'forex' / ticker_upper
+        tf_candidates = set(self._tf_list) if hasattr(self, '_tf_list') and self._tf_list else set()
+        if ticker_dir.exists():
+            for p in ticker_dir.iterdir():
+                if p.is_dir() and p.name.lower() != 'tick':
+                    tf_candidates.add(p.name.lower())
+
+        tf_candidates.discard('tick')
+        if not tf_candidates:
+            tf_candidates = {'1m', '5m', '10m', '1h', '4h', '1d'}
+
+        for tf in sorted(list(tf_candidates)):
+            try:
+                tf_df = reframe_data(patched_tick_df, tf)
+                tf_df = business_days_data(tf_df)
+                tf_filename = self._db_connector._get_filename('forex', ticker_upper, tf, year)
+                tf_filepath = ticker_dir / tf / tf_filename
+                tf_filepath.parent.mkdir(parents=True, exist_ok=True)
+                with FileLock(str(tf_filepath) + '.lock'):
+                    write_parquet(tf_df, tf_filepath)
+                logger.bind(target='histmanager').info(
+                    f"Re-reframed {tf} for {ticker_upper} {year}: {tf_df.height} bars written to {tf_filepath}"
+                )
+            except Exception as e:
+                logger.bind(target='histmanager').error(
+                    f"Failed to re-reframe {tf} for {ticker_upper} {year}: {e}"
+                )
+
+        return True
