@@ -85,6 +85,7 @@ Quick Example
    * :doc:`installation` - Install forex_data and dependencies
    * :doc:`quickstart` - Learn the basics with hands-on examples
    * :doc:`configuration` - Configure data paths and provider API keys
+   * :doc:`cli` - Terminal CLI tool for dataset generation and plotting
 
 💡 **Learn More**
    * :doc:`examples` - 15+ comprehensive code examples
@@ -106,6 +107,7 @@ Documentation Contents
    installation
    quickstart
    configuration
+   cli
    examples
 
 .. toctree::

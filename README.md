@@ -110,7 +110,6 @@ Because these are built-in defaults, you **do not need** to specify `ENGINE` or 
 * **`DATA_PATH`**: Absolute or relative directory path where downloaded market data files and local databases will be stored. Defaults to `~/.database/` (or `~/.test_database` for test suites).
 * **`DEVICE`** *(Optional)*: Compute device selection (`auto`, `cpu`, `cuda`). Default is `auto`.
 * **`POLARS_GPU_ENGINE`** *(Optional)*: Boolean flag to enable Polars GPU engine acceleration (`True` or `False`). Default is `False`.
-* **`PROVIDERS_KEY`** *(Optional)*: Dictionary of API keys and credentials for real-time market data providers. Alternatively, credentials can be set via system environment variables.
 
 #### Minimal Configuration Template (`data_config.yaml`)
 
@@ -123,15 +122,6 @@ DATA_PATH: '~/.test_database'
 # Optional GPU acceleration
 DEVICE: 'auto'
 POLARS_GPU_ENGINE: False
-
-# Optional provider keys (can also be set as environment variables)
-PROVIDERS_KEY:
-  TWELVE_DATA_API_KEY: 'your_twelvedata_key'
-  TIINGO_API_KEY: 'your_tiingo_token'
-  CTRADER_CLIENT_ID: 'your_ctrader_client_id'
-  CTRADER_CLIENT_SECRET: 'your_ctrader_client_secret'
-  CTRADER_ACCESS_TOKEN: 'your_ctrader_access_token'
-  CTRADER_ACCOUNT_ID: 'your_ctrader_account_id'
 ```
 
 ## LOGGING
@@ -145,7 +135,7 @@ Here log is dumped in a file called `forexdata.log`, the complete location of th
 
 ## CLI
 
-The `forex-data-aggregator` package includes a command-line interface tool named `fx-agg` to manage data generation and charting from the terminal.
+The `forex-data-aggregator` package includes a command-line interface script at `cli/fx_agg_app.py` to manage data generation and charting from the terminal.
 
 ### `generate-database`
 
@@ -157,14 +147,14 @@ Generate and cache historical forex data in the local database. It downloads mis
 * `end_date`: End date for data retrieval (default: `now`).
 
 **Options:**
-* `--timeframe`, `-t`: Timeframe interval(s) (e.g., 1m, 5m, 1h, 1D). Can be specified multiple times or as comma-separated. Default is `1D`.
+* `--timeframe`, `-t`: Timeframe interval(s) (e.g., 1m, 5m, 1h, 1D; minimum resolution: 1m). Can be specified multiple times or as comma-separated. Default is `1D`.
 * `--data-path`, `-d`: Database root directory path. Defaults to `DATA_PATH` configured in `appconfig/data_config.yaml` (e.g. `~/.test_database`).
 * `--offline`, `--no-download`: Run in offline mode without attempting remote downloads.
 * `--config`, `-c`: YAML configuration file path or a YAML formatted string.
 
 **Example:**
 ```bash
-uv run fx-agg generate-database EURUSD,GBPUSD 2018-01-01 2018-12-31 -t 1D,1h
+uv run python cli/fx_agg_app.py generate-database EURUSD,GBPUSD 2018-01-01 2018-12-31 -t 1D,1h
 ```
 
 ### `plot`
@@ -175,7 +165,7 @@ Launch an interactive plot for historical or live forex data.
 * `ticker`: Ticker symbol (e.g., EURUSD).
 * `start_date`: Start date (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS).
 * `end_date`: End date (format: YYYY-MM-DD). Use `now` for a static plot up to the current time, or `live` to launch a continuous real-time Dash server.
-* `timeframe`: Timeframe interval (e.g., 1D, 1h, 15m).
+* `timeframe`: Timeframe interval (e.g., 1m, 5m, 1h, 1D; minimum resolution: 1m).
 
 **Options:**
 * `--type`: Type of chart to display (`ohlc`, `line`, `scatter`). Default is `ohlc`.
@@ -188,13 +178,13 @@ Launch an interactive plot for historical or live forex data.
 **Examples:**
 ```bash
 # Static historical plot up to the current time (offline from existing DB)
-uv run fx-agg plot EURUSD 2024-01-01 now 1D --no-download
+uv run python cli/fx_agg_app.py plot EURUSD 2024-01-01 now 1D --no-download
 
 # Custom data path
-uv run fx-agg plot EURUSD 2024-01-01 2026-06-06 1D -d ~/.test_database
+uv run python cli/fx_agg_app.py plot EURUSD 2024-01-01 2026-06-06 1D -d ~/.test_database
 
 # Live interactive plot starting from a specific date, updating continuously
-uv run fx-agg plot EURUSD 2024-01-01 live 1D --port 8050
+uv run python cli/fx_agg_app.py plot EURUSD 2024-01-01 live 1D --port 8050
 ```
 
 ## EXAMPLES
@@ -385,12 +375,6 @@ You can provide your API key via environment variables or in `data_config.yaml`:
   $env:TWELVE_DATA_API_KEY="your_twelvedata_api_key"
   ```
 
-* **YAML Configuration (`data_config.yaml`)**:
-  ```yaml
-  PROVIDERS_KEY:
-    TWELVE_DATA_API_KEY: "your_twelvedata_api_key"
-  ```
-
 #### Python Usage Example
 ```python
 from forex_data import TwelveDataConnector
@@ -452,12 +436,6 @@ RUN_REALTIME_CONNECTOR_TEST=1 uv run pytest tests/test_realtime_twelvedata_conne
   # PowerShell
   [System.Environment]::SetEnvironmentVariable('TIINGO_API_KEY', 'your_tiingo_api_token', 'User')
   $env:TIINGO_API_KEY="your_tiingo_api_token"
-  ```
-
-* **YAML Configuration (`data_config.yaml`)**:
-  ```yaml
-  PROVIDERS_KEY:
-    TIINGO_API_KEY: "your_tiingo_api_token"
   ```
 
 #### Python Usage Example
@@ -541,11 +519,6 @@ cTrader Open API provides direct, high-frequency access to broker market feeds v
 
 * **YAML Configuration (`data_config.yaml`)**:
   ```yaml
-  PROVIDERS_KEY:
-    CTRADER_CLIENT_ID: "your_client_id"
-    CTRADER_CLIENT_SECRET: "your_client_secret"
-    CTRADER_ACCESS_TOKEN: "your_access_token"
-    CTRADER_ACCOUNT_ID: "your_account_id"
   ```
 
 #### Python Usage Example
@@ -666,19 +639,19 @@ charts.plot_historical(
 
 ![EURUSD Hourly Line Chart with VWMP](docs/imgs/historical_line_plot.png)
 
-### CLI Plotting with `fx-agg plot`
+### CLI Plotting with `fx_agg_app.py`
 
 You can also launch plots directly from your terminal:
 
 ```bash
 # Static OHLC plot up to current date (offline mode)
-uv run fx-agg plot EURUSD 2024-01-01 now 1D --no-download
+uv run python cli/fx_agg_app.py plot EURUSD 2024-01-01 now 1D --no-download
 
 # Custom database directory and line chart
-uv run fx-agg plot EURUSD 2024-01-01 2024-06-01 1h -d ~/.test_database --type line
+uv run python cli/fx_agg_app.py plot EURUSD 2024-01-01 2024-06-01 1h -d ~/.test_database --type line
 
 # Live interactive plot starting from a specific date, updating continuously
-uv run fx-agg plot EURUSD 2024-01-01 live 1D --port 8050
+uv run python cli/fx_agg_app.py plot EURUSD 2024-01-01 live 1D --port 8050
 ```
 
 
