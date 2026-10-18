@@ -30,10 +30,6 @@ Create a file ending with ``data_config.yaml``:
 .. code-block:: yaml
 
    DATA_PATH: 'ABSOLUTE-PATH-TO-DATA-DIRECTORY' # Optional custom path
-   
-   # API keys for real-time providers (optional)
-   PROVIDERS_KEY:
-     TWELVE_DATA_API_KEY: your_api_key_here
 
 .. tip::
    The engine automatically defaults to ``polars_lazy`` with binary ``parquet`` storage. You do not need to configure ``ENGINE`` or ``DATA_TYPE``.
