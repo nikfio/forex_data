@@ -116,6 +116,13 @@ class HistoricalManagerDB:
             validate_timedelta_str
         )
     )
+    download_overlap_margin: str = field(
+        default='2h',
+        validator=validators.and_(
+            validators.instance_of(str),
+            validate_timedelta_str
+        )
+    )
     offline: bool = field(default=False,
                           validator=validators.instance_of(bool))
 
@@ -530,7 +537,9 @@ class HistoricalManagerDB:
                        year,
                        start_month: int = 1,
                        end_month: int = 12,
-                       missing_downloads: Optional[list] = None) -> Union[
+                       missing_downloads: Optional[list] = None,
+                       start_date: Optional[datetime] = None,
+                       end_date: Optional[datetime] = None) -> Union[
                            PolarsDataFrame,
                            PolarsLazyFrame,
                            pandas_dataframe,
@@ -539,6 +548,9 @@ class HistoricalManagerDB:
 
         year_tick_df = empty_dataframe(self.engine)
         now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        last_db_ts = self._db_connector.read_last_timestamp('forex', ticker, TICK_TIMEFRAME, year=year)
+        overlap_margin = to_timedelta(self.download_overlap_margin)
 
         for month in MONTHS:
 
@@ -553,15 +565,50 @@ class HistoricalManagerDB:
             if year == now_utc.year and month_num > now_utc.month:
                 break
 
-            # Skip download if the month is already in the db and is not the current month
-            is_current_month = (year == now_utc.year and month_num == now_utc.month)
-            if not is_current_month:
-                available_months = getattr(self._tickers_years_dict.get(ticker, {}).get(TICK_TIMEFRAME, {}), "months", {}).get(year, [])
+            month_start = datetime(year, month_num, 1)
+            if month_num == 12:
+                month_end = datetime(year + 1, 1, 1)
+            else:
+                month_end = datetime(year, month_num + 1, 1)
+
+            # Skip download if the month is already in the db and complete
+            available_months = getattr(self._tickers_years_dict.get(ticker, {}).get(TICK_TIMEFRAME, {}), "months", {}).get(year, [])
+
+            if last_db_ts is not None and last_db_ts.year == year and month_num < last_db_ts.month:
                 if month_num in available_months:
                     logger.bind(target='histmanager').info(
                         f"Skipping download for {ticker} {year}-{month} (already in DB)"
                     )
                     continue
+            elif last_db_ts is None:
+                is_current_month = (year == now_utc.year and month_num == now_utc.month)
+                if not is_current_month and month_num in available_months:
+                    logger.bind(target='histmanager').info(
+                        f"Skipping download for {ticker} {year}-{month} (already in DB)"
+                    )
+                    continue
+
+            # Determine start and end date for this month's download
+            if last_db_ts is not None and last_db_ts.year == year and month_num == last_db_ts.month:
+                # Incremental download: start from last known timestamp minus overlap margin to prevent data holes
+                download_start = max(month_start, last_db_ts - overlap_margin).replace(minute=0, second=0, microsecond=0)
+            else:
+                download_start = month_start
+
+            if start_date is not None and start_date > download_start:
+                download_start = max(download_start, start_date)
+
+            download_end = month_end
+            if end_date is not None and end_date < download_end:
+                download_end = min(download_end, end_date)
+            if year == now_utc.year and month_num == now_utc.month:
+                download_end = min(download_end, now_utc)
+
+            if download_start >= download_end:
+                logger.bind(target='histmanager').info(
+                    f"Data for {ticker} {year}-{month} is already up to date in DB (last ts: {last_db_ts}), skipping download"
+                )
+                continue
 
             month_data = None
             last_err = None
@@ -588,7 +635,9 @@ class HistoricalManagerDB:
                         ticker,
                         year,
                         month_num,
-                        engine=conn_engine
+                        engine=conn_engine,
+                        start_date=download_start,
+                        end_date=download_end,
                     )
 
                     if isinstance(connector, DukascopyConnector) and self.engine not in ('polars', 'polars_lazy'):
@@ -661,7 +710,9 @@ class HistoricalManagerDB:
                   start_month: int = 1,
                   end_month: int = 12,
                   start_year: int = None,
-                  end_year: int = None) -> None:
+                  end_year: int = None,
+                  start_date: Optional[datetime] = None,
+                  end_date: Optional[datetime] = None) -> None:
 
         missing_downloads = []
 
@@ -697,13 +748,17 @@ class HistoricalManagerDB:
             for year in years:
                 y_start_month = start_month if year == start_year else 1
                 y_end_month = end_month if year == end_year else 12
+                y_start_date = start_date if year == start_year else None
+                y_end_date = end_date if year == end_year else None
 
                 year_tick_df = self._download_year(
                     ticker,
                     year,
                     start_month=y_start_month,
                     end_month=y_end_month,
-                    missing_downloads=missing_downloads
+                    missing_downloads=missing_downloads,
+                    start_date=y_start_date,
+                    end_date=y_end_date,
                 )
 
                 # get data id key for the year
@@ -735,13 +790,17 @@ class HistoricalManagerDB:
             for year in years:
                 y_start_month = start_month if year == start_year else 1
                 y_end_month = end_month if year == end_year else 12
+                y_start_date = start_date if year == start_year else None
+                y_end_date = end_date if year == end_year else None
 
                 year_tick_df = self._download_year(
                     ticker,
                     year,
                     start_month=y_start_month,
                     end_month=y_end_month,
-                    missing_downloads=missing_downloads
+                    missing_downloads=missing_downloads,
+                    start_date=y_start_date,
+                    end_date=y_end_date,
                 )
 
                 # if first iteration, assign instead of concat
@@ -1140,7 +1199,9 @@ class HistoricalManagerDB:
                         start_month=start.month,
                         end_month=end.month,
                         start_year=start.year,
-                        end_year=end.year
+                        end_year=end.year,
+                        start_date=start,
+                        end_date=end
                     )
                 elif year_tick_missing and self.offline:
                     logger.bind(
@@ -1489,7 +1550,9 @@ class HistoricalManagerDB:
                         start_month=start.month,
                         end_month=end.month,
                         start_year=start.year,
-                        end_year=end.year
+                        end_year=end.year,
+                        start_date=start,
+                        end_date=end
                     )
                 elif year_tick_missing and self.offline:
                     logger.bind(

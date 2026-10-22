@@ -32,6 +32,7 @@ from polars import (
 from forex_data.data_management import (
     HistDataConnector,
     DukascopyConnector,
+    LocalDBYearConnector,
 )
 from forex_data import (
     HistoricalManagerDB,
@@ -1067,7 +1068,10 @@ class TestHistoricalManagerDB(unittest.TestCase):
         Test read_last_timestamp function
         """
         tickers = self.hist_manager._get_ticker_list()
-        self.assertGreater(len(tickers), 0)
+        if not tickers:
+            self.skipTest(
+                "No tickers in test database (requires earlier tests to run first)"
+            )
         ticker = tickers[0]
 
         # Test with timeframe=None (should auto-select smallest timeframe available)
@@ -1086,6 +1090,24 @@ class TestHistoricalManagerDB(unittest.TestCase):
             timeframe=timeframe
         )
         self.assertIsInstance(ts_explicit, datetime)
+
+        # Test with uppercase ticker
+        ts_upper = self.hist_manager._db_connector.read_last_timestamp(
+            'forex', ticker.upper()
+        )
+        self.assertEqual(ts, ts_upper)
+
+        # Test with specific year
+        ts_year = self.hist_manager._db_connector.read_last_timestamp(
+            'forex', ticker, year=ts.year
+        )
+        self.assertIsInstance(ts_year, datetime)
+
+        # Test with non-existent year
+        ts_none = self.hist_manager._db_connector.read_last_timestamp(
+            'forex', ticker, year=2099
+        )
+        self.assertIsNone(ts_none)
 
         # Apply to a ticker that does not exist and assert is None
         invalid_ticker = 'INVALID_TICKER_XYZ'
@@ -1108,6 +1130,49 @@ class TestHistoricalManagerDB(unittest.TestCase):
         # 3. Invalid timedelta string should raise ValueError
         with self.assertRaises(ValueError):
             HistoricalManagerDB(max_discrepancy_with_now='invalid_td')
+
+    def test_33b_download_overlap_margin_validation(self):
+        """Test that download_overlap_margin is correctly validated on init."""
+        manager = HistoricalManagerDB(download_overlap_margin='4h')
+        self.assertEqual(manager.download_overlap_margin, '4h')
+
+        with self.assertRaises(TypeError):
+            HistoricalManagerDB(download_overlap_margin=123)
+
+        with self.assertRaises(ValueError):
+            HistoricalManagerDB(download_overlap_margin='invalid_td')
+
+    def test_33c_download_year_incremental_boundaries(self):
+        """Test _download_year incremental download start with overlap margin."""
+        ticker = 'EURUSD'
+        mock_last_ts = datetime(2026, 10, 19, 21, 59, 35)
+        captured_kwargs = {}
+
+        def mock_download_month(
+            t, y, m, engine='polars_lazy', start_date=None, end_date=None, **kwargs
+        ):
+            captured_kwargs['start_date'] = start_date
+            captured_kwargs['end_date'] = end_date
+            return PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE).lazy()
+
+        manager = HistoricalManagerDB(volume_data=True, download_overlap_margin='2h')
+        with patch.object(
+            LocalDBYearConnector, 'read_last_timestamp', return_value=mock_last_ts
+        ):
+            with patch.object(
+                DukascopyConnector, 'download_month_raw',
+                side_effect=mock_download_month
+            ):
+                with patch.object(
+                    DukascopyConnector, 'get_available_tickers',
+                    return_value=[ticker.upper()]
+                ):
+                    manager._download_year(ticker, 2026, start_month=10, end_month=10)
+
+        self.assertIn('start_date', captured_kwargs)
+        # 2026-10-19 21:59:35 - 2h = 19:59:35, rounded to hour = 19:00:00
+        expected_start = datetime(2026, 10, 19, 19, 0, 0)
+        self.assertEqual(captured_kwargs['start_date'], expected_start)
 
     @unittest.skipUnless(
         os.environ.get("RUN_DUCKASCOPY_DOWNLOAD_TESTS") == "1",

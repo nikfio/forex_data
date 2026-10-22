@@ -1409,12 +1409,9 @@ def concat_data(data_list=field(validator=validators.instance_of(list))):
 
         return concat_tables(data_list)
 
-    elif isinstance(data_list[0], PolarsDataFrame):
-
-        return polars_concat(data_list, how='vertical')
-
-    elif isinstance(data_list[0], PolarsLazyFrame):
-
+    elif isinstance(data_list[0], (PolarsDataFrame, PolarsLazyFrame)):
+        if any(isinstance(x, PolarsLazyFrame) for x in data_list):
+            data_list = [x.lazy() if isinstance(x, PolarsDataFrame) else x for x in data_list]
         return polars_concat(data_list, how='vertical')
 
     else:
