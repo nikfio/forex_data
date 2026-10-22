@@ -157,7 +157,8 @@ class DatabaseConnector:
     def read_last_timestamp(self,
                             market: str,
                             ticker: str,
-                            timeframe: str = None) -> datetime:
+                            timeframe: str = None,
+                            year: Optional[int] = None) -> Optional[datetime]:
         """Read last timestamp from database - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement read_last_timestamp")
 
@@ -1124,35 +1125,41 @@ class LocalDBConnector(DatabaseConnector):
         self,
         market: str,
         ticker: str,
-        timeframe: str = None
-    ) -> datetime:
+        timeframe: str = None,
+        year: Optional[int] = None,
+    ) -> Optional[datetime]:
         """
         Read last timestamp from database.
         If timeframe is not set (None), retrieve the smallest timeframe
-        available in local database
+        available in local database.
+        If year is set, retrieve the last timestamp for that specific year.
 
         Args:
             market (str): Market name
             ticker (str): Ticker symbol
             timeframe (str, optional): Timeframe of the data
+            year (int, optional): Year of the data
 
         Returns:
             datetime: Last timestamp in the local database for the
                 specified market, ticker and timeframe (or smallest available
                 timeframe if timeframe is not set)
         """
+        ticker = ticker.lower()
+        market = market.lower()
+
         if timeframe is None:
             # get timeframes available
             timeframes_available = self.get_ticker_timeframes_list(ticker)
             if not timeframes_available:
-                logger.bind(target='localdb').critical(
-                    f'No timeframes available for {market} {ticker}')
-                raise ValueError(f"No timeframes available for {market} {ticker}")
+                return None
 
             # get smallest timeframe
             timeframe = timeframes_available[0]
+        else:
+            timeframe = timeframe.lower()
 
-        cache_key = (market.lower(), ticker.lower(), timeframe.lower())
+        cache_key = (market, ticker, timeframe, year)
         if self._last_timestamp_cache is not None and cache_key in self._last_timestamp_cache:
             return self._last_timestamp_cache[cache_key]
 
@@ -1160,8 +1167,7 @@ class LocalDBConnector(DatabaseConnector):
         filepath = (self.data_path / market / ticker / filename)
 
         if not (filepath.exists() and filepath.is_file()):
-            logger.bind(target='localdb').critical(f'file {filepath} not found')
-            raise FileNotFoundError(f"file {filepath} not found")
+            return None
 
         # Per-file lock ensures we don't read while write_data is writing.
         file_lock_path = str(filepath) + '.lock'
@@ -1175,9 +1181,15 @@ class LocalDBConnector(DatabaseConnector):
                 if hasattr(dataframe, 'collect'):
                     dataframe = collect_lazyframe(dataframe, self.polars_gpu_engine).lazy()
 
-        query = f'''SELECT MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
-                    FROM self
-                    '''
+        if year is not None:
+            query = f'''SELECT MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
+                        FROM self
+                        WHERE EXTRACT(YEAR FROM {COLUMN_NAME.TIMESTAMP}) = {year}
+                        '''
+        else:
+            query = f'''SELECT MAX({COLUMN_NAME.TIMESTAMP}) AS end_time
+                        FROM self
+                        '''
 
         try:
             window_dates = dataframe.sql(query)
@@ -1790,23 +1802,28 @@ class LocalDBYearConnector(DatabaseConnector):
         self,
         market: str,
         ticker: str,
-        timeframe: str = None
-    ) -> datetime:
+        timeframe: str = None,
+        year: Optional[int] = None,
+    ) -> Optional[datetime]:
         """
         Read last timestamp from database.
         If timeframe is not set (None), retrieve the smallest timeframe
-        available in local database
+        available in local database.
+        If year is set, retrieve the last timestamp for that specific year.
 
         Args:
             market (str): Market name
             ticker (str): Ticker symbol
             timeframe (str, optional): Timeframe of the data
+            year (int, optional): Year of the data
 
         Returns:
             datetime: Last timestamp in the local database for the
                 specified market, ticker and timeframe (or smallest available
                 timeframe if timeframe is not set)
         """
+        ticker = ticker.lower()
+        market = market.lower()
 
         # if tickers is not in database return None
         if ticker not in self.get_tickers_list():
@@ -1832,25 +1849,30 @@ class LocalDBYearConnector(DatabaseConnector):
                 )
                 # get smallest timeframe
                 timeframe = timeframes_available[0]
+        else:
+            timeframe = timeframe.lower()
 
-        cache_key = (market.lower(), ticker.lower(), timeframe.lower())
+        cache_key = (market, ticker, timeframe, year)
         if self._last_timestamp_cache is not None and cache_key in self._last_timestamp_cache:
             return self._last_timestamp_cache[cache_key]
 
         # Get list of years available for this ticker and timeframe
         years_list = self._get_ticker_years_list_from_db(ticker, timeframe)
         if not years_list:
-            logger.bind(target='localdb').critical(
-                f'No data found for {market} {ticker} {timeframe}')
-            raise FileNotFoundError(f"No data found for {market} {ticker} {timeframe}")
-        latest_year = max(years_list)
+            return None
 
-        filename = self._get_filename(market, ticker, timeframe, latest_year)
+        if year is not None:
+            if year not in years_list:
+                return None
+            target_year = year
+        else:
+            target_year = max(years_list)
+
+        filename = self._get_filename(market, ticker, timeframe, target_year)
         filepath = (self.data_path / market / ticker / timeframe / filename)
 
         if not (filepath.exists() and filepath.is_file()):
-            logger.bind(target='localdb').critical(f'file {filepath} not found')
-            raise FileNotFoundError(f"file {filepath} not found")
+            return None
 
         # Per-file lock ensures we don't read while write_data is writing.
         file_lock_path = str(filepath) + '.lock'

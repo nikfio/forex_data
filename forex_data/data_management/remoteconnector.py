@@ -33,7 +33,7 @@ from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 from zipfile import BadZipFile, ZipExtFile, ZipFile
 
@@ -268,7 +268,9 @@ class RemoteConnector:
         ticker: str,
         year: int,
         month_num: int,
-        engine: str = 'polars_lazy'
+        engine: str = 'polars_lazy',
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """Download a single month of tick data from histdata.com and
         parse it into a DataFrame.
@@ -451,7 +453,9 @@ class HistDataConnector(RemoteConnector):
         ticker: str,
         year: int,
         month_num: int,
-        engine: str = 'polars_lazy'
+        engine: str = 'polars_lazy',
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """
         Download a single month of tick data from histdata.com and
@@ -573,9 +577,16 @@ class HistDataConnector(RemoteConnector):
                         f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
                 else:
                     if isinstance(ExtFile, ZipExtFile):
-                        return self._raw_zipfile_to_df(
+                        df = self._raw_zipfile_to_df(
                             ExtFile, temp_filepath, engine=engine
                         )
+                        if start_date is not None:
+                            start_naive = normalize_to_naive_utc(start_date, to_pydatetime=True)
+                            df = df.filter(col(COLUMN_NAME.TIMESTAMP) >= start_naive)
+                        if end_date is not None:
+                            end_naive = normalize_to_naive_utc(end_date, to_pydatetime=True)
+                            df = df.filter(col(COLUMN_NAME.TIMESTAMP) <= end_naive)
+                        return df
                     else:
                         logger.bind(target='histdata').error(
                             f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
@@ -1114,7 +1125,9 @@ class DukascopyConnector(RemoteConnector):
         year: int,
         month_num: int,
         temp_filepath: str = '',
-        engine: str = 'polars_lazy'
+        engine: str = 'polars_lazy',
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """
         Downloads tick data for a specific year and month from Dukascopy using tick_vault.
@@ -1127,8 +1140,14 @@ class DukascopyConnector(RemoteConnector):
             Year of the data to download.
         month_num: int
             Month of the data (1-12).
+        temp_filepath: str
+            Optional temporary file path.
         engine: str
             Either 'polars' or 'polars_lazy'.
+        start_date: Optional[datetime]
+            Optional start datetime boundary (inclusive).
+        end_date: Optional[datetime]
+            Optional end datetime boundary (exclusive).
 
         Returns
         -------
@@ -1169,6 +1188,25 @@ class DukascopyConnector(RemoteConnector):
                 end = datetime(year + 1, 1, 1)
             else:
                 end = datetime(year, month_num + 1, 1)
+
+            if start_date is not None:
+                start = max(start, normalize_to_naive_utc(start_date, to_pydatetime=True))
+            if end_date is not None:
+                end = min(end, normalize_to_naive_utc(end_date, to_pydatetime=True))
+
+            now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+            if end > now_utc:
+                end = min(end, now_utc)
+
+            # Round start down to the hour for chunk alignment
+            start = start.replace(minute=0, second=0, microsecond=0)
+
+            if start >= end:
+                logger.bind(target='dukascopy').info(
+                    f"Start time {start} >= end time {end} for {ticker_upper}. Nothing to download."
+                )
+                empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                return empty_df.lazy() if engine == 'polars_lazy' else empty_df
 
             # Run async download process in the event loop
             logger.bind(target='dukascopy').info(f"Downloading {ticker_upper} for {year}-{month_num:02d}...")
@@ -2509,7 +2547,9 @@ class CTraderConnector(RemoteConnector):
         year: int,
         month_num: int,
         temp_filepath: str = '',
-        engine: str = 'polars_lazy'
+        engine: str = 'polars_lazy',
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """
         Download raw tick data for an entire month from cTrader in 1-day chunks.
@@ -2520,6 +2560,15 @@ class CTraderConnector(RemoteConnector):
             end = datetime(year + 1, 1, 1) - timedelta(milliseconds=1)
         else:
             end = datetime(year, month_num + 1, 1) - timedelta(milliseconds=1)
+
+        if start_date is not None:
+            start = max(start, normalize_to_naive_utc(start_date, to_pydatetime=True))
+        if end_date is not None:
+            end = min(end, normalize_to_naive_utc(end_date, to_pydatetime=True))
+
+        if start >= end:
+            empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+            return empty_df.lazy() if engine == 'polars_lazy' else empty_df
 
         return self.download_range_raw(ticker, start, end, engine=engine)
 
