@@ -577,16 +577,9 @@ class HistDataConnector(RemoteConnector):
                         f"Data {ticker} - {year} - {MONTHS[month_num - 1]} not found or not supported by histdata.com")
                 else:
                     if isinstance(ExtFile, ZipExtFile):
-                        df = self._raw_zipfile_to_df(
+                        return self._raw_zipfile_to_df(
                             ExtFile, temp_filepath, engine=engine
                         )
-                        if start_date is not None:
-                            start_naive = normalize_to_naive_utc(start_date, to_pydatetime=True)
-                            df = df.filter(col(COLUMN_NAME.TIMESTAMP) >= start_naive)
-                        if end_date is not None:
-                            end_naive = normalize_to_naive_utc(end_date, to_pydatetime=True)
-                            df = df.filter(col(COLUMN_NAME.TIMESTAMP) <= end_naive)
-                        return df
                     else:
                         logger.bind(target='histdata').error(
                             f'{ticker} - {year} - {MONTHS[month_num - 1]}: '
