@@ -589,20 +589,20 @@ class HistoricalManagerDB:
                     continue
 
             # Determine start and end date for this month's download
+            is_current_month = (year == now_utc.year and month_num == now_utc.month)
+
             if last_db_ts is not None and last_db_ts.year == year and month_num == last_db_ts.month:
                 # Incremental download: start from last known timestamp minus overlap margin to prevent data holes
                 download_start = max(month_start, last_db_ts - overlap_margin).replace(minute=0, second=0, microsecond=0)
             else:
                 download_start = month_start
 
-            if start_date is not None and start_date > download_start:
-                download_start = max(download_start, start_date)
-
-            download_end = month_end
-            if end_date is not None and end_date < download_end:
-                download_end = min(download_end, end_date)
-            if year == now_utc.year and month_num == now_utc.month:
-                download_end = min(download_end, now_utc)
+            if is_current_month:
+                download_end = min(month_end, now_utc)
+                if end_date is not None and end_date < download_end:
+                    download_end = min(download_end, end_date)
+            else:
+                download_end = month_end
 
             if download_start >= download_end:
                 logger.bind(target='histmanager').info(
