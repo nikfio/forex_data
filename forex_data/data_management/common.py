@@ -217,6 +217,8 @@ __all__ = [
     'PolarsLazyFrame',
 ]
 
+DISCREPANCY_ONLY_DUKASCOPY: str = '2h'
+
 
 # CUSTOM EXCEPTIONS
 # =============================================================================
@@ -1775,11 +1777,23 @@ def validator_list_ge(min_value):
 
 def validate_timedelta_str(instance, attribute, value):
     try:
-        res = to_timedelta(value)
+        resolved_val = (
+            DISCREPANCY_ONLY_DUKASCOPY
+            if str(value).strip().upper() == "DISCREPANCY_ONLY_DUKASCOPY"
+            else value
+        )
+        res = to_timedelta(resolved_val)
         if not isinstance(res, Timedelta):
             raise TypeError(
                 f"'{attribute.name}' must be a valid timedelta representation, got {type(res).__name__}"
             )
+        if str(value).strip().upper() == "DISCREPANCY_ONLY_DUKASCOPY":
+            try:
+                object.__setattr__(
+                    instance, attribute.name, DISCREPANCY_ONLY_DUKASCOPY
+                )
+            except Exception:
+                pass
     except Exception as e:
         raise ValueError(
             f"'{attribute.name}' must be a valid timedelta representation, error: {e}"

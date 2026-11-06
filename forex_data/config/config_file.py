@@ -13,6 +13,8 @@ from typing import Any, Dict, Optional, Union
 from numpy import array
 from loguru import logger
 
+DISCREPANCY_ONLY_DUKASCOPY: str = '2h'
+
 
 def read_config_file(config_file: str) -> Dict[str, Any]:
 
@@ -159,6 +161,14 @@ def _apply_config(
                             f'{kwargs["config"]}: '
                             'required str or path to yaml file, got '
                             f'{type(kwargs["config"])}')
+
+        # map symbolic macro constants if present
+        for key, val in list(config_args.items()):
+            if (
+                isinstance(val, str)
+                and val.strip().upper() == "DISCREPANCY_ONLY_DUKASCOPY"
+            ):
+                config_args[key] = DISCREPANCY_ONLY_DUKASCOPY
 
         # set args from config file
         attrs_keys_configfile = \

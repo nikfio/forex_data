@@ -14,11 +14,13 @@ from attrs import (
 )
 
 # PANDAS
+import pandas as pd
 from pandas import (
     DataFrame as pandas_dataframe,
     to_datetime,
     to_timedelta,
-    Timedelta
+    Timedelta,
+    isna
 )
 
 # PYARROW
@@ -175,6 +177,13 @@ class HistoricalManagerDB:
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
+
+        if (
+            isinstance(self.max_discrepancy_with_now, str)
+            and self.max_discrepancy_with_now.strip().upper()
+            == "DISCREPANCY_ONLY_DUKASCOPY"
+        ):
+            self.max_discrepancy_with_now = DISCREPANCY_ONLY_DUKASCOPY
 
         # create data folder if not exists
         self.data_path = Path(self.data_path).expanduser().resolve()
@@ -432,6 +441,49 @@ class HistoricalManagerDB:
                         tf_months = getattr(ticker_years_list, "months", {}).get(y, [])
                         if not set(tick_months).issubset(tf_months):
                             missing_years.append(y)
+                        else:
+                            # For existing years/months, check if new ticks have arrived that are newer than timeframe data
+                            try:
+                                last_tick_time = self._db_connector.read_last_timestamp(
+                                    market='forex', ticker=ticker, timeframe=TICK_TIMEFRAME, year=y
+                                )
+                                last_tf_time = self._db_connector.read_last_timestamp(
+                                    market='forex', ticker=ticker, timeframe=tf, year=y
+                                )
+                                if last_tick_time is not None:
+                                    if last_tf_time is None:
+                                        missing_years.append(y)
+                                    else:
+                                        last_tick_utc = normalize_to_naive_utc(last_tick_time)
+                                        last_tf_utc = normalize_to_naive_utc(last_tf_time)
+                                        try:
+                                            tf_delta = to_timedelta(tf)
+                                        except Exception:
+                                            tf_delta = timedelta(hours=1)
+                                        if last_tick_utc >= last_tf_utc + tf_delta:
+                                            missing_years.append(y)
+                                        elif isinstance(self._db_connector, LocalDBYearConnector):
+                                            tick_file = (
+                                                Path(self._db_connector.data_path)
+                                                / 'forex'
+                                                / ticker
+                                                / TICK_TIMEFRAME
+                                                / self._db_connector._get_filename('forex', ticker, TICK_TIMEFRAME, y)
+                                            )
+                                            tf_file = (
+                                                Path(self._db_connector.data_path)
+                                                / 'forex'
+                                                / ticker
+                                                / tf
+                                                / self._db_connector._get_filename('forex', ticker, tf, y)
+                                            )
+                                            if tick_file.exists() and tf_file.exists():
+                                                if tick_file.stat().st_mtime > tf_file.stat().st_mtime:
+                                                    missing_years.append(y)
+                            except Exception as e_check:
+                                logger.bind(target='histmanager').debug(
+                                    f"Failed checking timestamps for {ticker} {tf} {y}: {e_check}"
+                                )
 
                 if missing_years:
                     missing_years_per_tf[tf] = missing_years
@@ -995,11 +1047,17 @@ class HistoricalManagerDB:
             raise ValueError(f'timeframe request {timeframe} invalid')
 
         else:
-            if start == 'now':
-                raise ValueError("start date cannot be 'now'")
+            if start is None or start == '' or pd.isna(start):
+                start = normalize_to_naive_utc(HISTORICAL_DB_MIN_DATE)
+            else:
+                if start == 'now':
+                    raise ValueError("start date cannot be 'now'")
+                start = normalize_to_naive_utc(start)
 
-            start = normalize_to_naive_utc(start)
-            end = normalize_to_naive_utc(end)
+            if end is None or end == '' or pd.isna(end) or end == 'now':
+                end = datetime.now(timezone.utc).replace(tzinfo=None)
+            else:
+                end = normalize_to_naive_utc(end)
 
         # sanity checks on query dates specific to historical data
         if end < start:

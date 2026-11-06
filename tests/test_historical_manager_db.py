@@ -1123,6 +1123,12 @@ class TestHistoricalManagerDB(unittest.TestCase):
         manager = HistoricalManagerDB(max_discrepancy_with_now='2D')
         self.assertEqual(manager.max_discrepancy_with_now, '2D')
 
+        # 1b. Macro constant name string resolves to '2h'
+        manager_macro = HistoricalManagerDB(
+            max_discrepancy_with_now='DISCREPANCY_ONLY_DUKASCOPY'
+        )
+        self.assertEqual(manager_macro.max_discrepancy_with_now, '2h')
+
         # 2. Non-string should raise TypeError
         with self.assertRaises(TypeError):
             HistoricalManagerDB(max_discrepancy_with_now=123)
