@@ -99,5 +99,13 @@ async def metadata_worker(
                     # To ensure other processes stop, maybe download workers
                     # are stuck.
                     raise
+            except asyncio.CancelledError:
+                if batch:
+                    try:
+                        db.insert_rows(batch)
+                        batch.clear()
+                    except Exception as e:
+                        logger.warning(f"Error flushing batch on cancel: {e}")
+                raise
 
     logger.debug("Metadata worker shutting down")

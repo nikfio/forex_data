@@ -218,7 +218,10 @@ async def fetch_with_retry(client: AsyncClient, url: str) -> bytes | None:
                 f"waiting {CONFIG.fetch_cooldown_delay:.0f}s "
                 f"before retrying: {url}{date_info}"
             )
-            await asyncio.sleep(CONFIG.fetch_cooldown_delay)
+            sleep_remaining = float(CONFIG.fetch_cooldown_delay)
+            while sleep_remaining > 0:
+                await asyncio.sleep(min(1.0, sleep_remaining))
+                sleep_remaining -= 1.0
 
         for attempt in range(CONFIG.fetch_max_retry_attempts + 1):
             try:
@@ -242,7 +245,10 @@ async def fetch_with_retry(client: AsyncClient, url: str) -> bytes | None:
                     f"Rate limit hit (503={is_503}), retrying in {delay:.1f}s "
                     f"(attempt {attempt + 1}/{CONFIG.fetch_max_retry_attempts + 1})"
                 )
-                await asyncio.sleep(delay)
+                sleep_rem = float(delay)
+                while sleep_rem > 0:
+                    await asyncio.sleep(min(1.0, sleep_rem))
+                    sleep_rem -= 1.0
 
             except RetryableError as e:
                 last_error = e
@@ -258,7 +264,10 @@ async def fetch_with_retry(client: AsyncClient, url: str) -> bytes | None:
                     f"Retryable error (503={is_503}), backing off {delay:.1f}s "
                     f"(attempt {attempt + 1}/{CONFIG.fetch_max_retry_attempts + 1})"
                 )
-                await asyncio.sleep(delay)
+                sleep_rem = float(delay)
+                while sleep_rem > 0:
+                    await asyncio.sleep(min(1.0, sleep_rem))
+                    sleep_rem -= 1.0
 
     # All retries (fast + cooldown) exhausted
     logger.error(

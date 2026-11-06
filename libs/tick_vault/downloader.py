@@ -125,7 +125,7 @@ async def download_range(
     )
 
     completed = 0
-    error_occurred = False
+    download_success = False
 
     try:
         # Process results as they come in
@@ -148,40 +148,38 @@ async def download_range(
                 await downloader_input_queue.put(chunks_remaining.pop(0))
 
         pbar.close()
+        download_success = True
         logger.info(f"Successfully downloaded {total_chunks} chunks for {symbol}")
 
-    except Exception as e:
-        logger.error(f"Error during download: {e}", exc_info=True)
-        error_occurred = True
+    except (Exception, asyncio.CancelledError, KeyboardInterrupt) as e:
         pbar.close()
+        if isinstance(e, (asyncio.CancelledError, KeyboardInterrupt)):
+            logger.warning(f"Download cancelled or interrupted: {type(e).__name__}")
+        else:
+            logger.error(f"Error during download: {e}", exc_info=True)
         raise
 
     finally:
-        logger.debug("Sending stop signals to workers")
-
-        # Send stop signals to all workers
-        for _ in range(actual_workers):
-            await downloader_input_queue.put(None)
-
-        # Stop metadata worker
-        await metadata_queue.put(None)
-
-        logger.debug("Waiting for workers to finish")
-        # Wait for all workers to finish
-        try:
-            if error_occurred:
-                # Cancel tasks if error occurred
-                for task in download_tasks:
-                    task.cancel()
-                metadata_task.cancel()
-
+        if not download_success:
+            logger.debug("Download incomplete or interrupted, cancelling workers")
+            for task in download_tasks:
+                task.cancel()
+            metadata_task.cancel()
+            try:
                 await asyncio.gather(
                     *download_tasks, metadata_task, return_exceptions=True
                 )
-            else:
-                # Normal shutdown
+            except Exception:
+                pass
+        else:
+            logger.debug("Sending stop signals to workers")
+            for _ in range(actual_workers):
+                await downloader_input_queue.put(None)
+            await metadata_queue.put(None)
+            logger.debug("Waiting for workers to finish")
+            try:
                 await asyncio.gather(*download_tasks, metadata_task)
-        except asyncio.CancelledError:
-            pass
+            except asyncio.CancelledError:
+                pass
 
-        logger.debug("Workers cancelled")
+        logger.debug("Workers finished or cancelled")

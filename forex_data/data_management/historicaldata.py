@@ -1301,6 +1301,38 @@ class HistoricalManagerDB:
                         f'processing year data completion for '
                         f'{years_interval_req} not ok')
                     raise ValueError
+        elif current_year in years_interval_req and ticker_available_last_timestamp is not None:
+            needs_reframe = False
+            try:
+                last_tick_utc = normalize_to_naive_utc(ticker_available_last_timestamp)
+                check_tfs = set(self._tf_list) | {timeframe}
+                for tf_c in check_tfs:
+                    if tf_c == TICK_TIMEFRAME:
+                        continue
+                    last_tf_time = self._db_connector.read_last_timestamp(
+                        market='forex', ticker=ticker, timeframe=tf_c, year=current_year
+                    )
+                    if last_tf_time is None:
+                        needs_reframe = True
+                        break
+                    last_tf_utc = normalize_to_naive_utc(last_tf_time)
+                    try:
+                        tf_delta = to_timedelta(tf_c)
+                    except Exception:
+                        tf_delta = timedelta(hours=1)
+                    if last_tick_utc >= last_tf_utc + tf_delta:
+                        needs_reframe = True
+                        break
+            except Exception as e_chk:
+                logger.bind(target='histmanager').debug(
+                    f"Failed checking timeframe freshness for {ticker} {current_year}: {e_chk}"
+                )
+
+            if needs_reframe:
+                lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
+                with FileLock(lock_file):
+                    self.add_timeframe(timeframe)
+                    self._update_db(ticker)
 
         # execute a read query on database
         return self._db_connector.read_data(
@@ -1652,6 +1684,38 @@ class HistoricalManagerDB:
                         f'processing year data completion for '
                         f'{years_interval_req} not ok')
                     raise ValueError
+        elif current_year in years_interval_req and ticker_available_last_timestamp is not None:
+            needs_reframe = False
+            try:
+                last_tick_utc = normalize_to_naive_utc(ticker_available_last_timestamp)
+                check_tfs = set(self._tf_list) | {timeframe}
+                for tf_c in check_tfs:
+                    if tf_c == TICK_TIMEFRAME:
+                        continue
+                    last_tf_time = self._db_connector.read_last_timestamp(
+                        market='forex', ticker=ticker, timeframe=tf_c, year=current_year
+                    )
+                    if last_tf_time is None:
+                        needs_reframe = True
+                        break
+                    last_tf_utc = normalize_to_naive_utc(last_tf_time)
+                    try:
+                        tf_delta = to_timedelta(tf_c)
+                    except Exception:
+                        tf_delta = timedelta(hours=1)
+                    if last_tick_utc >= last_tf_utc + tf_delta:
+                        needs_reframe = True
+                        break
+            except Exception as e_chk:
+                logger.bind(target='histmanager').debug(
+                    f"Failed checking timeframe freshness for {ticker} {current_year}: {e_chk}"
+                )
+
+            if needs_reframe:
+                lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
+                with FileLock(lock_file):
+                    self.add_timeframe(timeframe)
+                    self._update_db(ticker)
 
         return self._db_connector.read_data_window(
             market='forex',
