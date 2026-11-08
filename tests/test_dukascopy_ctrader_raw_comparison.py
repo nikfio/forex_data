@@ -19,7 +19,7 @@ def test_dukascopy_and_ctrader_raw_week_comparison():
     and high correlation / low MAE at 1m timeframe.
     """
     tick_path = Path(
-        '~/.test_vol_database/HistoricalData/LocalDB/forex/EURUSD/tick/'
+        '~/.database/HistoricalData/LocalDB/forex/EURUSD/tick/'
         'forex_eurusd_tick_2021.parquet'
     ).expanduser()
 
