@@ -33,7 +33,7 @@ from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 from zipfile import BadZipFile, ZipExtFile, ZipFile
 
@@ -1394,7 +1394,7 @@ class TwelveDataConnector(RemoteConnector):
     """
 
     # interface parameters
-    api_key: str = field(default='', validator=validators.instance_of(str))
+    api_key: str = field(default='', repr=False, validator=validators.instance_of(str))
     plan: str = field(
         default='',
         validator=validators.and_(
@@ -1741,7 +1741,7 @@ class TiingoConnector(RemoteConnector):
     Provides top-of-book bid/ask quotes and size liquidity in base currency units.
     """
 
-    api_key: str = field(default='', validator=validators.instance_of(str))
+    api_key: str = field(default='', repr=False, validator=validators.instance_of(str))
     plan: str = field(
         default='free',
         validator=validators.and_(
@@ -2017,12 +2017,13 @@ class CTraderConnector(RemoteConnector):
     formula to derive ask_volume and bid_volume from total tick volume.
     """
     client_id: str = field(default='', validator=validators.instance_of(str))
-    client_secret: str = field(default='', validator=validators.instance_of(str))
-    access_token: str = field(default='', validator=validators.instance_of(str))
-    refresh_token: str = field(default='', validator=validators.instance_of(str))
+    client_secret: str = field(default='', repr=False, validator=validators.instance_of(str))
+    access_token: str = field(default='', repr=False, validator=validators.instance_of(str))
+    refresh_token: str = field(default='', repr=False, validator=validators.instance_of(str))
     broker_account_id: str = field(default='', validator=validators.instance_of(str))
     broker_account_is_demo: bool = field(default=True, validator=validators.instance_of(bool))
     chunk_size: int = field(default=CTRADER_CHUNK_SIZE, validator=validators.instance_of(int))
+    on_token_refresh_callback: Optional[Callable[[], Tuple[str, str]]] = field(default=None, repr=False)
 
     _socket: Any = field(init=False, default=None)
     _symbol_name_to_id: Dict[str, int] = field(init=False, factory=dict)
@@ -2129,7 +2130,19 @@ class CTraderConnector(RemoteConnector):
             acc_req = ProtoOAAccountAuthReq()
             acc_req.ctidTraderAccountId = int(self.broker_account_id)
             acc_req.accessToken = self.access_token
-            self._send_and_receive_raw(acc_req, ProtoOAAccountAuthRes)
+            try:
+                self._send_and_receive_raw(acc_req, ProtoOAAccountAuthRes)
+            except Exception as e_auth:
+                if self._is_token_expired_error(e_auth) and self.on_token_refresh_callback is not None:
+                    logger.bind(target='ctrader').info(
+                        "cTrader access token expired during connector handshake. Invoking refresh callback..."
+                    )
+                    new_acc, new_ref = self.on_token_refresh_callback()
+                    self.update_tokens(new_acc, new_ref)
+                    acc_req.accessToken = self.access_token
+                    self._send_and_receive_raw(acc_req, ProtoOAAccountAuthRes)
+                else:
+                    raise e_auth
 
             # 3. Retrieve Symbols list
             sym_req = ProtoOASymbolsListReq()
@@ -2190,6 +2203,24 @@ class CTraderConnector(RemoteConnector):
             self.close()
             self.connect()
             return self._send_and_receive_raw(request_msg, expected_res_klass)
+
+    def update_tokens(self, access_token: str, refresh_token: Optional[str] = None) -> None:
+        """Update active access_token and refresh_token in memory."""
+        self.access_token = access_token
+        if refresh_token:
+            self.refresh_token = refresh_token
+
+    @staticmethod
+    def _is_token_expired_error(e: Exception) -> bool:
+        msg = str(e).lower()
+        return any(term in msg for term in [
+            "ch_access_denied",
+            "ch_access_token_invalid",
+            "unauthorized",
+            "expired",
+            "invalid access token",
+            "access token"
+        ])
 
     def close(self) -> None:
         if self._socket:
