@@ -26,6 +26,7 @@ import shutil
 import socket
 import ssl
 import struct
+import sys
 import time
 import urllib3
 import zoneinfo
@@ -33,7 +34,7 @@ from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Union
 from uuid import uuid4
 from zipfile import BadZipFile, ZipExtFile, ZipFile
 
@@ -952,6 +953,45 @@ class HistDataConnector(RemoteConnector):
         return df
 
 
+class InterceptHandler(logging.Handler):
+    """
+    Standard logging Handler that intercepts log records and redirects
+    them to Loguru, preserving caller location and extra target tagging.
+    """
+
+    def __init__(
+        self, target: str = "dukascopy", level: int = logging.NOTSET
+    ) -> None:
+        super().__init__(level)
+        self.target = target
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        depth = 2
+        try:
+            frame = sys._getframe(2)
+            log_dir = os.path.dirname(logging.__file__)
+            while frame and (
+                frame.f_code.co_filename == logging.__file__
+                or frame.f_code.co_filename.startswith(log_dir)
+            ):
+                if frame.f_back:
+                    frame = frame.f_back
+                    depth += 1
+                else:
+                    break
+        except Exception:
+            depth = 2
+
+        logger.bind(target=self.target).opt(
+            depth=depth, exception=record.exc_info
+        ).log(level, record.getMessage())
+
+
 @define(kw_only=True, slots=True)
 class DukascopyConnector(RemoteConnector):
     """
@@ -961,6 +1001,8 @@ class DukascopyConnector(RemoteConnector):
     behind a single RemoteConnector-derived interface.
     """
 
+    DEFAULT_DATA_FOLDER: ClassVar[str] = "dukascopy"
+
     # interface parameters
     ssl_verify: bool = field(default=True, validator=validators.instance_of(bool))
 
@@ -968,6 +1010,15 @@ class DukascopyConnector(RemoteConnector):
     _session: Session = field(factory=Session)
     _tickers_cache: List[str] = field(factory=list,
                                       validator=validators.instance_of(list))
+
+    @classmethod
+    def get_default_data_path(cls) -> Path:
+        """Return default data directory for Dukascopy connector."""
+        return (
+            Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+            / DEFAULT_PATHS.HIST_DATA_FOLDER
+            / cls.DEFAULT_DATA_FOLDER
+        )
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -996,8 +1047,13 @@ class DukascopyConnector(RemoteConnector):
             if self.data_path
             else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
         )
-        if "historicaldata" not in [p.lower() for p in base_path.parts] and base_path.name.lower() != "dukascopy":
-            self.data_path = base_path / DEFAULT_PATHS.HIST_DATA_FOLDER / "dukascopy"
+        if (
+            "historicaldata" not in [p.lower() for p in base_path.parts]
+            and base_path.name.lower() != self.DEFAULT_DATA_FOLDER
+        ):
+            self.data_path = (
+                base_path / DEFAULT_PATHS.HIST_DATA_FOLDER / self.DEFAULT_DATA_FOLDER
+            )
         else:
             self.data_path = base_path
 
@@ -1026,7 +1082,25 @@ class DukascopyConnector(RemoteConnector):
                    filter=lambda record: ('dukascopy' == record['extra'].get('target') and
                                           bool(record["extra"].get('target'))))
 
+        self._setup_tick_vault_logging()
         self.connect()
+
+    def _setup_tick_vault_logging(self) -> None:
+        """Configure tick_vault standard logger to route records through Loguru."""
+        if not HAS_TICK_VAULT:
+            return
+        tv_logger = logging.getLogger("tick_vault")
+        has_intercept = any(
+            isinstance(h, InterceptHandler) for h in tv_logger.handlers
+        )
+        if not has_intercept:
+            for h in list(tv_logger.handlers):
+                if isinstance(h, logging.FileHandler):
+                    h.close()
+                tv_logger.removeHandler(h)
+            tv_logger.addHandler(InterceptHandler(target="dukascopy"))
+            tv_logger.setLevel(logging.DEBUG)
+            tv_logger.propagate = False
 
     def connect(self) -> None:
         """Configure session and tick_vault base directory."""
@@ -1044,8 +1118,9 @@ class DukascopyConnector(RemoteConnector):
 
         # Configure tick_vault if it's imported
         if HAS_TICK_VAULT and reload_config is not None:
+            self._setup_tick_vault_logging()
             reload_config(
-                base_directory=str(self._temporary_data_path),
+                base_directory=str(self.data_path),
                 worker_per_proxy=3,
                 fetch_max_retry_attempts=3,
             )
@@ -1167,6 +1242,7 @@ class DukascopyConnector(RemoteConnector):
 
         # Ensure temporary data path exists and reconfigure tick_vault to use it
         self._temporary_data_path.mkdir(parents=True, exist_ok=True)
+        self._setup_tick_vault_logging()
         if reload_config is not None:
             reload_config(
                 base_directory=str(self._temporary_data_path),
@@ -1299,6 +1375,7 @@ class DukascopyConnector(RemoteConnector):
 
         # Ensure temporary data path exists and reconfigure tick_vault to use it
         self._temporary_data_path.mkdir(parents=True, exist_ok=True)
+        self._setup_tick_vault_logging()
         if reload_config is not None:
             reload_config(
                 base_directory=str(self._temporary_data_path),

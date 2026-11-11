@@ -1,8 +1,27 @@
+import sys
 from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+try:
+    from forex_data.data_management.common import DEFAULT_PATHS
+    _FALLBACK_BASE_DIR = (
+        Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        / DEFAULT_PATHS.HIST_DATA_FOLDER
+        / "dukascopy"
+    )
+except Exception:
+    _FALLBACK_BASE_DIR = Path.home() / ".database" / "HistoricalData" / "dukascopy"
+
+
+def _resolve_default_base_dir() -> Path:
+    """Resolve default base directory, taking value from DukascopyConnector."""
+    remoteconnector = sys.modules.get("forex_data.data_management.remoteconnector")
+    if remoteconnector is not None and hasattr(remoteconnector, "DukascopyConnector"):
+        return remoteconnector.DukascopyConnector.get_default_data_path()
+    return _FALLBACK_BASE_DIR
 
 
 class Config(BaseSettings):
@@ -12,7 +31,7 @@ class Config(BaseSettings):
     Attributes:
         base_directory: Root directory for all TickVault data including downloads,
             metadata database, and logs. All subdirectories are created automatically.
-            Default: ./tick_vault_data
+            Default: ~/.database/HistoricalData/dukascopy (from DukascopyConnector)
 
         fetch_max_retry_attempts: Maximum number of fast retry attempts for failed
             HTTP requests before entering cooldown. Does not include the
@@ -81,7 +100,7 @@ class Config(BaseSettings):
     )
 
     base_directory: Path = Field(
-        default=Path("./tick_vault_data"),
+        default_factory=_resolve_default_base_dir,
         description="Root directory for all TickVault data",
     )
 

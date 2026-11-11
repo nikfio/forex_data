@@ -77,6 +77,10 @@ def update_log_file() -> None:
             handler.close()
             logger.removeHandler(handler)
 
+    # If InterceptHandler is active, routing is handled by Loguru
+    if any(type(h).__name__ == "InterceptHandler" for h in logger.handlers):
+        return
+
     # Add new LazyFileHandler with updated path
     log_file = CONFIG.log_file_path
     file_handler = LazyFileHandler(log_file)

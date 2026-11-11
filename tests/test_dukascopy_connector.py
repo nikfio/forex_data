@@ -5,20 +5,23 @@ Created on Thu May 21 00:30:00 2026
 @author: Antigravity
 """
 
+import logging
 import os
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
+from pathlib import Path
+import pandas as pd
 import polars as pl
 
 from forex_data import DukascopyConnector
 from forex_data.data_management.common import (
     DEFAULT_PATHS
 )
-from tick_vault.config import CONFIG
-
-from pathlib import Path
+from forex_data.data_management.remoteconnector import InterceptHandler
+from tick_vault.config import CONFIG, reload_config
 
 _base_path = Path.home() / ".test_database"
 _data_path = _base_path
@@ -36,6 +39,14 @@ class TestDukascopyConnector(unittest.TestCase):
     Uses mocks to test the logic of connection checking, scraper,
     data conversion, volume mapping, and recent data reframing.
     """
+
+    @classmethod
+    def setUpClass(cls):
+        pass
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
 
     def setUp(self):
         self.connector = DukascopyConnector(
@@ -245,6 +256,128 @@ class TestDukascopyConnector(unittest.TestCase):
         self.assertIn(
             "Mozilla", CONFIG.user_agent, "user_agent should contain Mozilla"
         )
+        self.assertEqual(
+            DukascopyConnector.get_default_data_path(),
+            Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+            / DEFAULT_PATHS.HIST_DATA_FOLDER
+            / DukascopyConnector.DEFAULT_DATA_FOLDER
+        )
+        self.assertEqual(
+            CONFIG.base_directory,
+            self.connector.data_path
+        )
+
+    def test_tick_vault_logging_intercept_and_routing(self):
+        with tempfile.TemporaryDirectory() as td:
+            temp_data_path = Path(td)
+            test_connector = DukascopyConnector(
+                data_path=temp_data_path, ssl_verify=True
+            )
+            log_file = test_connector.data_path / "log" / "dukascopy.log"
+
+            tv_logger = logging.getLogger("tick_vault")
+            self.assertTrue(
+                any(isinstance(h, InterceptHandler) for h in tv_logger.handlers)
+            )
+
+            unique_msg = (
+                "tick_vault download test line "
+                + datetime.now().isoformat()
+            )
+            tv_logger.info(unique_msg)
+
+            self.assertTrue(log_file.exists())
+            content = log_file.read_text()
+            self.assertIn(unique_msg, content)
+            self.assertIn("INFO", content)
+
+            test_connector.clear_temporary_folder()
+
+    def test_tick_vault_logging_reload_config_no_redundant_file_handler(self):
+        tv_logger = logging.getLogger("tick_vault")
+        self.assertTrue(
+            any(isinstance(h, InterceptHandler) for h in tv_logger.handlers)
+        )
+        reload_config(worker_per_proxy=3)
+        has_file_handler = any(
+            isinstance(h, logging.FileHandler) for h in tv_logger.handlers
+        )
+        self.assertFalse(has_file_handler)
+
+    def test_tick_vault_logging_levels(self):
+        with tempfile.TemporaryDirectory() as td:
+            temp_data_path = Path(td)
+            test_connector = DukascopyConnector(
+                data_path=temp_data_path, ssl_verify=True
+            )
+            log_file = test_connector.data_path / "log" / "dukascopy.log"
+
+            tv_logger = logging.getLogger("tick_vault")
+            warn_msg = "test_warning_tick_vault_capture"
+            err_msg = "test_error_tick_vault_capture"
+            tv_logger.warning(warn_msg)
+            tv_logger.error(err_msg)
+
+            self.assertTrue(log_file.exists())
+            content = log_file.read_text()
+            self.assertIn(warn_msg, content)
+            self.assertIn("WARNING", content)
+            self.assertIn(err_msg, content)
+            self.assertIn("ERROR", content)
+
+            test_connector.clear_temporary_folder()
+
+    @patch("forex_data.data_management.remoteconnector.read_tick_data")
+    @patch("forex_data.data_management.remoteconnector.download_range")
+    def test_download_month_raw_tick_vault_logs_dumped_to_file(
+        self, mock_download, mock_read
+    ):
+        with tempfile.TemporaryDirectory() as td:
+            test_connector = DukascopyConnector(
+                data_path=Path(td), ssl_verify=True
+            )
+            test_connector._tickers_cache = ["EURUSD"]
+            log_file = test_connector.data_path / "log" / "dukascopy.log"
+
+            async def _fake_download(symbol, start, end):
+                tv_log = logging.getLogger("tick_vault")
+                tv_log.info(f"Starting download for {symbol}")
+                tv_log.info(f"Found 21 chunks to download for {symbol}")
+                tv_log.info(f"Successfully downloaded 21 chunks for {symbol}")
+
+            def _fake_read(symbol, start, end, strict=False):
+                tv_log = logging.getLogger("tick_vault")
+                tv_log.info(f"Reading tick data for {symbol}")
+                tv_log.info(f"Decoding 21 chunks for {symbol}")
+                df = pd.DataFrame({
+                    "time": [datetime(2026, 5, 1, 10, 0, 0)],
+                    "ask": [1.0850],
+                    "bid": [1.0848],
+                    "ask_volume": [100.0],
+                    "bid_volume": [100.0]
+                })
+                tv_log.info(f"Successfully loaded {len(df)} ticks for {symbol}")
+                return df
+
+            mock_download.side_effect = _fake_download
+            mock_read.side_effect = _fake_read
+
+            res = test_connector.download_month_raw(
+                "EURUSD", 2026, 5, engine="polars"
+            )
+            self.assertEqual(res.height, 1)
+
+            content = log_file.read_text()
+            self.assertIn("Starting download for EURUSD", content)
+            self.assertIn("Found 21 chunks to download for EURUSD", content)
+            self.assertIn(
+                "Successfully downloaded 21 chunks for EURUSD", content
+            )
+            self.assertIn("Reading tick data for EURUSD", content)
+            self.assertIn("Decoding 21 chunks for EURUSD", content)
+            self.assertIn("Successfully loaded 1 ticks for EURUSD", content)
+
+            test_connector.clear_temporary_folder()
 
 
 def main():
