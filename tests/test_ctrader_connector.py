@@ -76,6 +76,14 @@ class TestCTraderConnector(unittest.TestCase):
     Unit tests for CTraderConnector.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        pass
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
     @patch("forex_data.data_management.remoteconnector.ssl.create_default_context")
     @patch("forex_data.data_management.remoteconnector.socket.socket")
     def setUp(self, mock_socket, mock_create_default_context):
@@ -279,6 +287,59 @@ class TestCTraderConnector(unittest.TestCase):
         self.assertAlmostEqual(df["ask"][0], 1.0813)
         self.assertAlmostEqual(df["bid"][1], 1.0812)
         self.assertAlmostEqual(df["ask"][1], 1.0814)
+
+    def test_trendbars_paginated_chunks(self):
+        """
+        Verify large trendbar windows paginate using chunk_size and deduplicate
+        overlapping boundary bars cleanly without holes.
+        """
+        self.connector.chunk_size = 3
+        base_min = 28421280  # 2024-01-15 00:00 UTC
+
+        res_chunk_1 = ProtoOAGetTrendbarsRes()
+        res_chunk_1.ctidTraderAccountId = 123456
+        res_chunk_1.period = ProtoOATrendbarPeriod.H1
+        res_chunk_1.timestamp = 1705276800000
+        for offset in range(3):
+            b = res_chunk_1.trendbar.add()
+            b.utcTimestampInMinutes = base_min + offset * 60
+            b.volume = 1000
+            b.low = 108000
+            b.deltaOpen = 10
+            b.deltaHigh = 20
+            b.deltaClose = 15
+
+        # Chunk 2 overlaps on offset=2 and continues through offset=4
+        res_chunk_2 = ProtoOAGetTrendbarsRes()
+        res_chunk_2.ctidTraderAccountId = 123456
+        res_chunk_2.period = ProtoOATrendbarPeriod.H1
+        res_chunk_2.timestamp = 1705294800000
+        for offset in (2, 3, 4):
+            b = res_chunk_2.trendbar.add()
+            b.utcTimestampInMinutes = base_min + offset * 60
+            b.volume = 1000
+            b.low = 108000
+            b.deltaOpen = 10
+            b.deltaHigh = 20
+            b.deltaClose = 15
+
+        self.mock_ssl_sock.recv_queue.extend([
+            make_mock_packet(res_chunk_1),
+            make_mock_packet(res_chunk_2),
+        ])
+
+        lf = self.connector.get_data(
+            symbol="EURUSD",
+            timeframe="1h",
+            start_date="2024-01-15 00:00:00",
+            end_date="2024-01-15 05:00:00",
+        )
+        df = lf.collect()
+        self.assertEqual(df.height, 5)
+        self.assertEqual(df["timestamp"].n_unique(), 5)
+        self.assertEqual(df["timestamp"][0], datetime(2024, 1, 15, 0, 0, 0))
+        self.assertEqual(df["timestamp"][-1], datetime(2024, 1, 15, 4, 0, 0))
+        self.assertEqual(self.mock_ssl_sock.recv_queue, [])
 
 
 class TestCTraderLiveConnector(unittest.TestCase):

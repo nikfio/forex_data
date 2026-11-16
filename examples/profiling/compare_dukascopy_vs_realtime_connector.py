@@ -609,7 +609,7 @@ def main(
             conn = TiingoConnector(
                 api_key=effective_key,
                 plan="free",
-                data_path=data_path / "Realtime_Tiingo",
+                data_path=data_path,
             )
             lf_conn = conn.get_data(
                 symbol=ticker,
@@ -636,7 +636,7 @@ def main(
                 client_secret=c_secret,
                 access_token=token,
                 broker_account_id=acc_id_str,
-                data_path=data_path / "Realtime_cTrader",
+                data_path=data_path,
             )
             lf_conn = conn.get_data(
                 symbol=ticker,
@@ -657,7 +657,7 @@ def main(
             conn = TwelveDataConnector(
                 api_key=effective_key,
                 plan="free",
-                data_path=data_path / "Realtime_TwelveData",
+                data_path=data_path,
             )
             lf_conn = conn.get_data(
                 symbol=ticker,

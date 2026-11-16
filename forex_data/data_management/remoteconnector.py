@@ -252,6 +252,72 @@ class RemoteConnector:
             except Exception:
                 pass
 
+    @staticmethod
+    def _build_realtime_default_data_path(connector_folder: str) -> Path:
+        """Return default `<BASE_PATH>/RealtimeData/<connector_folder>` directory."""
+        return (
+            Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+            / DEFAULT_PATHS.REALTIME_DATA_FOLDER
+            / connector_folder
+        )
+
+    @staticmethod
+    def _resolve_realtime_data_path(
+        raw_data_path: Union[str, Path],
+        connector_folder: str,
+        legacy_folders: Tuple[str, ...] = (),
+    ) -> Path:
+        """Resolve a realtime connector path under `<data_path>/RealtimeData/<connector_folder>`."""
+        base_path = (
+            Path(raw_data_path).expanduser().resolve()
+            if raw_data_path and str(raw_data_path).strip() not in ("", ".")
+            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        )
+        parts_lower = [part.lower() for part in base_path.parts]
+        realtime_root_lower = DEFAULT_PATHS.REALTIME_DATA_FOLDER.lower()
+        if realtime_root_lower in parts_lower:
+            rt_idx = len(parts_lower) - 1 - parts_lower[::-1].index(realtime_root_lower)
+            return Path(*base_path.parts[: rt_idx + 1]) / connector_folder
+
+        legacy_names = {"realtime", *(name.lower() for name in legacy_folders)}
+        if base_path.name.lower() in legacy_names:
+            return (
+                base_path.parent
+                / DEFAULT_PATHS.REALTIME_DATA_FOLDER
+                / connector_folder
+            )
+
+        return base_path / DEFAULT_PATHS.REALTIME_DATA_FOLDER / connector_folder
+
+    def _configure_log_sink(self, target: str) -> Path:
+        """Register a deduplicated rotating Loguru file sink under `<data_path>/log/<target>.log`."""
+        log_dir = self.data_path / "log"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / f"{target}.log"
+
+        handlers_to_remove = []
+        for handler_id, handler in logger._core.handlers.items():
+            if hasattr(handler, "_sink") and hasattr(handler._sink, "_path"):
+                if str(handler._sink._path) == str(log_path):
+                    handlers_to_remove.append(handler_id)
+
+        for handler_id in handlers_to_remove:
+            try:
+                logger.remove(handler_id)
+            except ValueError:
+                pass
+
+        logger.add(
+            log_path,
+            level="TRACE",
+            rotation="5 MB",
+            filter=lambda record: (
+                target == record["extra"].get("target")
+                and bool(record["extra"].get("target"))
+            ),
+        )
+        return log_path
+
     def get_available_tickers(self) -> List[str]:
         """Get available tickers - must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement get_available_tickers")
@@ -356,30 +422,7 @@ class HistDataConnector(RemoteConnector):
 
         super().__attrs_post_init__()
 
-        # set up log sink for histdata connector
-        log_dir = self.data_path / 'log'
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / 'histdata.log'
-
-        handlers_to_remove = []
-        for handler_id, handler in logger._core.handlers.items():
-            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
-                if str(handler._sink._path) == str(log_path):
-                    handlers_to_remove.append(handler_id)
-
-        for handler_id in handlers_to_remove:
-            try:
-                logger.remove(handler_id)
-            except ValueError:
-                # Handler already removed by another thread
-                pass
-
-        logger.add(log_path,
-                   level="TRACE",
-                   rotation="5 MB",
-                   filter=lambda record: ('histdata' == record['extra'].get('target') and
-                                          bool(record["extra"].get('target'))))
-
+        self._configure_log_sink("histdata")
         self.connect()
 
     def connect(self) -> None:
@@ -1059,29 +1102,7 @@ class DukascopyConnector(RemoteConnector):
 
         super().__attrs_post_init__()
 
-        # set up log sink for dukascopy connector
-        log_dir = self.data_path / 'log'
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / 'dukascopy.log'
-
-        handlers_to_remove = []
-        for handler_id, handler in logger._core.handlers.items():
-            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
-                if str(handler._sink._path) == str(log_path):
-                    handlers_to_remove.append(handler_id)
-
-        for handler_id in handlers_to_remove:
-            try:
-                logger.remove(handler_id)
-            except ValueError:
-                pass
-
-        logger.add(log_path,
-                   level="TRACE",
-                   rotation="5 MB",
-                   filter=lambda record: ('dukascopy' == record['extra'].get('target') and
-                                          bool(record["extra"].get('target'))))
-
+        self._configure_log_sink("dukascopy")
         self._setup_tick_vault_logging()
         self.connect()
 
@@ -1470,6 +1491,8 @@ class TwelveDataConnector(RemoteConnector):
     Class to read real-time data from the database using TwelveData API.
     """
 
+    DEFAULT_DATA_FOLDER: ClassVar[str] = "twelvedata"
+
     # interface parameters
     api_key: str = field(default='', repr=False, validator=validators.instance_of(str))
     plan: str = field(
@@ -1492,6 +1515,11 @@ class TwelveDataConnector(RemoteConnector):
     )
     _request_timestamps: List[float] = field(factory=list, init=False)
     _base_url: str = field(default="https://api.twelvedata.com", init=False)
+
+    @classmethod
+    def get_default_data_path(cls) -> Path:
+        """Return default data directory for TwelveData connector."""
+        return cls._build_realtime_default_data_path(cls.DEFAULT_DATA_FOLDER)
 
     @property
     def tier(self) -> str:
@@ -1527,24 +1555,15 @@ class TwelveDataConnector(RemoteConnector):
         if not self.api_key:
             raise ValueError("API key is required for TwelveDataConnector")
 
-        base_path = (
-            Path(self.data_path).expanduser().resolve()
-            if self.data_path
-            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        self.data_path = self._resolve_realtime_data_path(
+            self.data_path,
+            self.DEFAULT_DATA_FOLDER,
+            legacy_folders=("realtime_twelvedata",),
         )
-        if base_path.name.lower() == "realtime_twelvedata":
-            self.data_path = base_path
-        elif base_path.name.lower() == "realtime":
-            self.data_path = base_path.parent / "Realtime_TwelveData"
-        else:
-            self.data_path = base_path / "Realtime_TwelveData"
 
         super().__attrs_post_init__()
 
-        # set up log sink for twelvedata connector
-        log_dir = self.data_path / 'log'
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / 'twelvedata.log'
+        self._configure_log_sink("twelvedata")
 
         # set default twelve data chunk size
         self._chunk_size = TWELVE_DATA_CHUNK_SIZE
@@ -1554,24 +1573,6 @@ class TwelveDataConnector(RemoteConnector):
             self._max_requests_per_minute = TWELVE_DATA_FREE_TIER_MINUTE_RATE_LIMIT
         else:  # 'paid' / 'grow' plan specifications
             self._max_requests_per_minute = TWELVE_DATA_PRO_MINUTE_RATE_LIMIT
-
-        handlers_to_remove = []
-        for handler_id, handler in logger._core.handlers.items():
-            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
-                if str(handler._sink._path) == str(log_path):
-                    handlers_to_remove.append(handler_id)
-
-        for handler_id in handlers_to_remove:
-            try:
-                logger.remove(handler_id)
-            except ValueError:
-                pass
-
-        logger.add(log_path,
-                   level="TRACE",
-                   rotation="5 MB",
-                   filter=lambda record: ('twelvedata' == record['extra'].get('target') and
-                                          bool(record["extra"].get('target'))))
 
     @property
     def chunk_size(self) -> int:
@@ -1818,6 +1819,8 @@ class TiingoConnector(RemoteConnector):
     Provides top-of-book bid/ask quotes and size liquidity in base currency units.
     """
 
+    DEFAULT_DATA_FOLDER: ClassVar[str] = "tiingo"
+
     api_key: str = field(default='', repr=False, validator=validators.instance_of(str))
     plan: str = field(
         default='free',
@@ -1838,6 +1841,11 @@ class TiingoConnector(RemoteConnector):
     )
     _request_timestamps: List[float] = field(factory=list, init=False)
     _base_url: str = field(default="https://api.tiingo.com", init=False)
+
+    @classmethod
+    def get_default_data_path(cls) -> Path:
+        """Return default data directory for Tiingo connector."""
+        return cls._build_realtime_default_data_path(cls.DEFAULT_DATA_FOLDER)
 
     @property
     def tier(self) -> str:
@@ -1869,24 +1877,15 @@ class TiingoConnector(RemoteConnector):
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
-        base_path = (
-            Path(self.data_path).expanduser().resolve()
-            if self.data_path
-            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        self.data_path = self._resolve_realtime_data_path(
+            self.data_path,
+            self.DEFAULT_DATA_FOLDER,
+            legacy_folders=("realtime_tiingo",),
         )
-        if base_path.name.lower() == "realtime_tiingo":
-            self.data_path = base_path
-        elif base_path.name.lower() == "realtime":
-            self.data_path = base_path.parent / "Realtime_Tiingo"
-        else:
-            self.data_path = base_path / "Realtime_Tiingo"
 
         super().__attrs_post_init__()
 
-        # set up log sink for tiingo connector
-        log_dir = self.data_path / 'log'
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / 'tiingo.log'
+        self._configure_log_sink("tiingo")
 
         if not self.api_key:
             self.api_key = os.environ.get("TIINGO_API_KEY", "")
@@ -1895,24 +1894,6 @@ class TiingoConnector(RemoteConnector):
             logger.bind(target='tiingo').warning("API key is not set for TiingoConnector. Live queries may fail.")
 
         self._chunk_size = TIINGO_CHUNK_SIZE
-
-        handlers_to_remove = []
-        for handler_id, handler in logger._core.handlers.items():
-            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
-                if str(handler._sink._path) == str(log_path):
-                    handlers_to_remove.append(handler_id)
-
-        for handler_id in handlers_to_remove:
-            try:
-                logger.remove(handler_id)
-            except ValueError:
-                pass
-
-        logger.add(log_path,
-                   level="TRACE",
-                   rotation="5 MB",
-                   filter=lambda record: ('tiingo' == record['extra'].get('target') and
-                                          bool(record["extra"].get('target'))))
 
     def _rate_limit(self) -> None:
         """Enforces request rate limits for free / starter tier."""
@@ -2093,6 +2074,9 @@ class CTraderConnector(RemoteConnector):
     Fetches real broker trendbars and ticks, applying a 50/50 volume split
     formula to derive ask_volume and bid_volume from total tick volume.
     """
+
+    DEFAULT_DATA_FOLDER: ClassVar[str] = "ctrader"
+
     client_id: str = field(default='', validator=validators.instance_of(str))
     client_secret: str = field(default='', repr=False, validator=validators.instance_of(str))
     access_token: str = field(default='', repr=False, validator=validators.instance_of(str))
@@ -2106,6 +2090,11 @@ class CTraderConnector(RemoteConnector):
     _symbol_name_to_id: Dict[str, int] = field(init=False, factory=dict)
     _asset_id_to_name: Dict[int, str] = field(init=False, factory=dict)
 
+    @classmethod
+    def get_default_data_path(cls) -> Path:
+        """Return default data directory for cTrader connector."""
+        return cls._build_realtime_default_data_path(cls.DEFAULT_DATA_FOLDER)
+
     def __init__(self, **kwargs: Any) -> None:
         _class_attributes_name = get_attrs_names(self, **kwargs)
         _not_assigned_attrs_index_mask = [True] * len(_class_attributes_name)
@@ -2117,42 +2106,15 @@ class CTraderConnector(RemoteConnector):
         validate(self)
 
     def __attrs_post_init__(self, **kwargs: Any) -> None:
-        base_path = (
-            Path(self.data_path).expanduser().resolve()
-            if self.data_path
-            else Path(DEFAULT_PATHS.BASE_PATH).expanduser().resolve()
+        self.data_path = self._resolve_realtime_data_path(
+            self.data_path,
+            self.DEFAULT_DATA_FOLDER,
+            legacy_folders=("realtime_ctrader",),
         )
-        if base_path.name.lower() == "realtime_ctrader":
-            self.data_path = base_path
-        elif base_path.name.lower() == "realtime":
-            self.data_path = base_path.parent / "Realtime_cTrader"
-        else:
-            self.data_path = base_path / "Realtime_cTrader"
 
         super().__attrs_post_init__()
 
-        # set up log sink for ctrader connector
-        log_dir = self.data_path / 'log'
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / 'ctrader.log'
-
-        handlers_to_remove = []
-        for handler_id, handler in logger._core.handlers.items():
-            if hasattr(handler, '_sink') and hasattr(handler._sink, '_path'):
-                if str(handler._sink._path) == str(log_path):
-                    handlers_to_remove.append(handler_id)
-
-        for handler_id in handlers_to_remove:
-            try:
-                logger.remove(handler_id)
-            except ValueError:
-                pass
-
-        logger.add(log_path,
-                   level="TRACE",
-                   rotation="5 MB",
-                   filter=lambda record: ('ctrader' == record['extra'].get('target') and
-                                          bool(record["extra"].get('target'))))
+        self._configure_log_sink("ctrader")
 
         # Fallbacks to env
         if not self.client_id:
@@ -2335,53 +2297,18 @@ class CTraderConnector(RemoteConnector):
         else:
             return self._get_trendbar_data(symbol_id, symbol_norm, timeframe, start_date, end_date)
 
-    def _get_trendbar_data(
-        self, symbol_id: int, symbol_norm: str, timeframe: str, start_date: str, end_date: str
-    ) -> PolarsLazyFrame:
-        tf_lower = timeframe.lower()
-        reframe_timeframes = {"2h", "3h", "4h", "6h", "8h", "12h", "1d"}
-        needs_reframe = tf_lower in reframe_timeframes
-        fetch_tf = "1h" if needs_reframe else tf_lower
-
-        tf_mapping = {
-            "1m": ProtoOATrendbarPeriod.M1,
-            "2m": ProtoOATrendbarPeriod.M2,
-            "3m": ProtoOATrendbarPeriod.M3,
-            "4m": ProtoOATrendbarPeriod.M4,
-            "5m": ProtoOATrendbarPeriod.M5,
-            "10m": ProtoOATrendbarPeriod.M10,
-            "15m": ProtoOATrendbarPeriod.M15,
-            "30m": ProtoOATrendbarPeriod.M30,
-            "1h": ProtoOATrendbarPeriod.H1,
-            "4h": ProtoOATrendbarPeriod.H4,
-            "12h": ProtoOATrendbarPeriod.H12,
-            "1d": ProtoOATrendbarPeriod.D1,
-        }
-        period = tf_mapping.get(fetch_tf)
-        if period is None:
-            raise ValueError(f"Unsupported timeframe for cTrader: {timeframe}")
-
-        ts_from = int(pd.to_datetime(start_date, utc=True).timestamp() * 1000)
-        ts_to = int(pd.to_datetime(end_date, utc=True).timestamp() * 1000)
-
-        tb_req = ProtoOAGetTrendbarsReq()
-        tb_req.ctidTraderAccountId = int(self.broker_account_id)
-        tb_req.symbolId = symbol_id
-        tb_req.period = period
-        tb_req.fromTimestamp = ts_from
-        tb_req.toTimestamp = ts_to
-
-        tb_res = self._send_and_receive(tb_req, ProtoOAGetTrendbarsRes)
-        if not tb_res.trendbar:
-            return PolarsLazyFrame(schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE)
-
-        digits = 3 if "JPY" in symbol_norm else 5
-        scale = float(10 ** digits)
-        spread_offset = 0.00010 if digits == 5 else 0.010
-
-        records = []
-        for b in tb_res.trendbar:
-            ts = datetime.fromtimestamp(b.utcTimestampInMinutes * 60, tz=timezone.utc).replace(tzinfo=None)
+    @staticmethod
+    def _decode_trendbar_records(
+        trendbars: Any,
+        scale: float,
+        spread_offset: float,
+    ) -> List[Dict[str, Any]]:
+        """Decode protobuf trendbars into normalized OHLCV dictionary records."""
+        records: List[Dict[str, Any]] = []
+        for b in trendbars:
+            ts = datetime.fromtimestamp(
+                b.utcTimestampInMinutes * 60, tz=timezone.utc
+            ).replace(tzinfo=None)
             low_p = float(b.low) / scale
             open_p = float(b.low + b.deltaOpen) / scale
             high_p = float(b.low + b.deltaHigh) / scale
@@ -2405,8 +2332,79 @@ class CTraderConnector(RemoteConnector):
                 "vwmp": vwmp,
                 "vwmp_avg": vwmp,
             })
+        return records
 
-        df = pl.DataFrame(records)
+    def _get_trendbar_data(
+        self, symbol_id: int, symbol_norm: str, timeframe: str, start_date: str, end_date: str
+    ) -> PolarsLazyFrame:
+        tf_lower = timeframe.lower()
+        reframe_timeframes = {"2h", "3h", "4h", "6h", "8h", "12h", "1d"}
+        needs_reframe = tf_lower in reframe_timeframes
+        fetch_tf = "1h" if needs_reframe else tf_lower
+
+        tf_mapping = {
+            "1m": (ProtoOATrendbarPeriod.M1, 60_000),
+            "2m": (ProtoOATrendbarPeriod.M2, 120_000),
+            "3m": (ProtoOATrendbarPeriod.M3, 180_000),
+            "4m": (ProtoOATrendbarPeriod.M4, 240_000),
+            "5m": (ProtoOATrendbarPeriod.M5, 300_000),
+            "10m": (ProtoOATrendbarPeriod.M10, 600_000),
+            "15m": (ProtoOATrendbarPeriod.M15, 900_000),
+            "30m": (ProtoOATrendbarPeriod.M30, 1_800_000),
+            "1h": (ProtoOATrendbarPeriod.H1, 3_600_000),
+            "4h": (ProtoOATrendbarPeriod.H4, 14_400_000),
+            "12h": (ProtoOATrendbarPeriod.H12, 43_200_000),
+            "1d": (ProtoOATrendbarPeriod.D1, 86_400_000),
+        }
+        mapped = tf_mapping.get(fetch_tf)
+        if mapped is None:
+            raise ValueError(f"Unsupported timeframe for cTrader: {timeframe}")
+        period, tf_ms = mapped
+
+        ts_from = int(pd.to_datetime(start_date, utc=True).timestamp() * 1000)
+        ts_to = int(pd.to_datetime(end_date, utc=True).timestamp() * 1000)
+        if ts_from >= ts_to:
+            return PolarsLazyFrame(schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        digits = 3 if "JPY" in symbol_norm else 5
+        scale = float(10 ** digits)
+        spread_offset = 0.00010 if digits == 5 else 0.010
+
+        max_bars = max(int(self.chunk_size or CTRADER_CHUNK_SIZE), 1)
+        span_ms = max_bars * tf_ms
+        step_ms = max(max_bars - 1, 1) * tf_ms
+
+        records: List[Dict[str, Any]] = []
+        chunk_start = ts_from
+        while chunk_start < ts_to:
+            chunk_end = (
+                ts_to if (ts_to - chunk_start) <= span_ms else chunk_start + step_ms
+            )
+            tb_req = ProtoOAGetTrendbarsReq()
+            tb_req.ctidTraderAccountId = int(self.broker_account_id)
+            tb_req.symbolId = symbol_id
+            tb_req.period = period
+            tb_req.fromTimestamp = chunk_start
+            tb_req.toTimestamp = chunk_end
+
+            tb_res = self._send_and_receive(tb_req, ProtoOAGetTrendbarsRes)
+            if tb_res.trendbar:
+                records.extend(
+                    self._decode_trendbar_records(
+                        tb_res.trendbar, scale=scale, spread_offset=spread_offset
+                    )
+                )
+
+            if chunk_end >= ts_to:
+                break
+            chunk_start = chunk_end
+
+        if not records:
+            return PolarsLazyFrame(schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE)
+
+        df = pl.DataFrame(records).unique(
+            subset=[COLUMN_NAME.TIMESTAMP], keep="first", maintain_order=True
+        ).sort(COLUMN_NAME.TIMESTAMP)
         if df.is_empty():
             return PolarsLazyFrame(schema=POLARS_DTYPE_DICT.TIME_TF_DTYPE)
 

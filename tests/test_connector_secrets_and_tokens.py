@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import tempfile
 import unittest
+from pathlib import Path
 from forex_data.data_management.remoteconnector import (
     CTraderConnector,
     TwelveDataConnector,
@@ -11,25 +13,30 @@ class TestConnectorSecretsAndTokens(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls._tmp_dir = tempfile.TemporaryDirectory()
+        cls._data_path = Path(cls._tmp_dir.name)
         cls.ctrader_conn = CTraderConnector(
             client_id="test_client_id",
             client_secret="SUPER_SECRET_CLIENT_SECRET",
             access_token="SUPER_SECRET_ACCESS_TOKEN",
             refresh_token="SUPER_SECRET_REFRESH_TOKEN",
             broker_account_id="123456",
+            data_path=cls._data_path,
         )
         cls.twelve_conn = TwelveDataConnector(
             api_key="SUPER_SECRET_TWELVE_KEY",
             plan="free",
+            data_path=cls._data_path,
         )
         cls.tiingo_conn = TiingoConnector(
             api_key="SUPER_SECRET_TIINGO_KEY",
             plan="free",
+            data_path=cls._data_path,
         )
 
     @classmethod
     def tearDownClass(cls):
-        pass
+        cls._tmp_dir.cleanup()
 
     def test_ctrader_repr_redaction(self):
         repr_str = repr(self.ctrader_conn)
@@ -56,6 +63,7 @@ class TestConnectorSecretsAndTokens(unittest.TestCase):
             access_token="old_access_token",
             refresh_token="old_refresh_token",
             broker_account_id="123456",
+            data_path=self._data_path,
         )
         self.assertEqual(conn.access_token, "old_access_token")
         self.assertEqual(conn.refresh_token, "old_refresh_token")

@@ -2,6 +2,7 @@
 from loguru import logger
 from typing import Any, Dict, List, Optional, Union, Literal
 from datetime import datetime, date, timedelta, timezone
+from zoneinfo import ZoneInfo
 from uuid import uuid4
 from filelock import FileLock
 from textwrap import dedent
@@ -86,6 +87,35 @@ from .remoteconnector import (
 __all__ = ['HistoricalManagerDB']
 
 
+def _get_market_reference_utc(now_utc: datetime) -> datetime:
+    """
+    Return the upper-bound naive UTC timestamp achievable in LocalDB for freshness checks.
+
+    LocalDB persists Mon-Fri UTC sessions via ``business_days_data``. Once New York
+    reaches Friday 17:00 America/New_York close and across Saturday/Sunday, clamp to
+    that Friday's 17:00 America/New_York close in naive UTC (22:00 UTC in EST,
+    21:00 UTC in EDT).
+    """
+    utc_tz = ZoneInfo("UTC")
+    ny_tz = ZoneInfo("America/New_York")
+    now_naive = now_utc.replace(tzinfo=None)
+    now_ny = now_naive.replace(tzinfo=utc_tz).astimezone(ny_tz)
+    ny_wd = now_ny.weekday()
+
+    if ny_wd == 4 and now_ny.hour >= 17:
+        fri_close_ny = now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
+        return fri_close_ny.astimezone(utc_tz).replace(tzinfo=None)
+
+    if now_naive.weekday() in (5, 6):
+        fri_date = (now_naive - timedelta(days=now_naive.weekday() - 4)).date()
+        fri_close_ny = datetime(
+            fri_date.year, fri_date.month, fri_date.day, 17, 0, tzinfo=ny_tz
+        )
+        return fri_close_ny.astimezone(utc_tz).replace(tzinfo=None)
+
+    return now_naive
+
+
 # HISTORICAL DATA MANAGER
 @define(kw_only=True, slots=True)
 class HistoricalManagerDB:
@@ -112,7 +142,7 @@ class HistoricalManagerDB:
     connector_id: str = field(default='',
                               validator=validators.optional(validators.instance_of(str)))
     max_discrepancy_with_now: str = field(
-        default='1D',
+        default=DISCREPANCY_ONLY_DUKASCOPY,
         validator=validators.and_(
             validators.instance_of(str),
             validate_timedelta_str
@@ -952,6 +982,28 @@ class HistoricalManagerDB:
             # only just new elements not already present
             self._tf_list.extend(set(tf_list).difference(self._tf_list))
 
+    def _is_current_year_update_required(
+        self,
+        ticker_available_last_timestamp: Optional[datetime],
+        end: datetime,
+        now_utc: datetime,
+    ) -> bool:
+        """
+        Return True when LocalDB lacks up-to-date data relative to the bounded
+        market reference time (Friday 17:00 America/New_York close on weekends).
+        """
+        if not ticker_available_last_timestamp:
+            return True
+        if end < ticker_available_last_timestamp:
+            return False
+
+        now_ref_ts = to_datetime(_get_market_reference_utc(now_utc))
+        reference_time = min(to_datetime(end), now_ref_ts)
+        return (
+            (reference_time - to_datetime(ticker_available_last_timestamp)).total_seconds()
+            > to_timedelta(self.max_discrepancy_with_now).total_seconds()
+        )
+
     def get_data(
         self,
         ticker,
@@ -1101,48 +1153,11 @@ class HistoricalManagerDB:
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
 
         if current_year in years_interval_req and not self.offline:
-
-            if not ticker_available_last_timestamp:
-
-                # ticker is not in DD
-                # request for current year forced to True
-                is_current_year_requested = True
-
-            elif end >= ticker_available_last_timestamp:
-
-                # determine if to include and update of current year data
-                # if not is on a weekend day (Saturday or Sunday)
-                # set now as previous Friday at 17:00
-                if now_utc.weekday() in [5, 6]:
-                    days_back = now_utc.weekday() - 4
-                    now_ref = now_utc - timedelta(days=days_back)
-                    now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
-                else:
-                    now_ref = now_utc
-
-                # Use the requested end date as the reference point for update,
-                # but capped at the current time (now_ref) since we cannot download future data.
-                # This prevents downloads when the requested end date is in the past
-                # and the database already has data up to that end date.
-                now_ref_ts = to_datetime(now_ref)
-                end_ts = to_datetime(end)
-                reference_time = min(end_ts, now_ref_ts)
-
-                is_current_year_requested = (
-                    (
-                        reference_time
-                        -
-                        to_datetime(ticker_available_last_timestamp)
-                    ).total_seconds()
-                    >
-                    to_timedelta(self.max_discrepancy_with_now).total_seconds()
-                )
-
-            else:
-
-                # db already cover request for current year
-                # end date is less recent than available timestamp
-                is_current_year_requested = False
+            is_current_year_requested = self._is_current_year_update_required(
+                ticker_available_last_timestamp=ticker_available_last_timestamp,
+                end=end,
+                now_utc=now_utc,
+            )
 
         # here determine if to ask for new download
         # if requested years are not already in localdb (tracked by tickers years dict)
@@ -1485,48 +1500,11 @@ class HistoricalManagerDB:
         ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
 
         if current_year in years_interval_req and not self.offline:
-
-            if not ticker_available_last_timestamp:
-
-                # ticker is not in DD
-                # request for current year forced to True
-                is_current_year_requested = True
-
-            elif end >= ticker_available_last_timestamp:
-
-                # determine if to include and update of current year data
-                # if not is on a weekend day (Saturday or Sunday)
-                # set now as previous Friday at 17:00
-                if now_utc.weekday() in [5, 6]:
-                    days_back = now_utc.weekday() - 4
-                    now_ref = now_utc - timedelta(days=days_back)
-                    now_ref = now_ref.replace(hour=17, minute=0, second=0, microsecond=0)
-                else:
-                    now_ref = now_utc
-
-                # Use the requested end date as the reference point for update,
-                # but capped at the current time (now_ref) since we cannot download future data.
-                # This prevents downloads when the requested end date is in the past
-                # and the database already has data up to that end date.
-                now_ref_ts = to_datetime(now_ref)
-                end_ts = to_datetime(end)
-                reference_time = min(end_ts, now_ref_ts)
-
-                is_current_year_requested = (
-                    (
-                        reference_time
-                        -
-                        to_datetime(ticker_available_last_timestamp)
-                    ).total_seconds()
-                    >
-                    to_timedelta(self.max_discrepancy_with_now).total_seconds()
-                )
-
-            else:
-
-                # db already cover request for current year
-                # end date is less recent than available timestamp
-                is_current_year_requested = False
+            is_current_year_requested = self._is_current_year_update_required(
+                ticker_available_last_timestamp=ticker_available_last_timestamp,
+                end=end,
+                now_utc=now_utc,
+            )
 
         # here determine if to ask for new download
         # if requested years are not already in localdb (tracked by tickers years dict)
@@ -1820,7 +1798,7 @@ class HistoricalManagerDB:
 
             if ctrader_conn is None:
                 ctrader_conn = CTraderConnector(
-                    data_path=str(self._histdata_path / 'ctrader'),
+                    data_path=str(self.data_path),
                     engine='polars',
                 )
 

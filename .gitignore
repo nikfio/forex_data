@@ -10,7 +10,7 @@ examples/profiling-logs/
 *.code-workspace
 
 # Documentation guide files
-docs/*.md
+docs/**/*.md
 # Sphinx build output (generated files)
 docs/build/
 

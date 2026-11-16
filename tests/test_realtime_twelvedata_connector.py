@@ -25,7 +25,7 @@ from forex_data import (
 )
 
 _base_path = Path.home() / ".test_database"
-_data_path = _base_path / "Realtime_TwelveData"
+_data_path = _base_path
 
 
 class TestTwelveDataConnector(unittest.TestCase):

@@ -36,6 +36,7 @@ from forex_data.data_management import (
 )
 from forex_data import (
     HistoricalManagerDB,
+    DISCREPANCY_ONLY_DUKASCOPY,
     TickerNotFoundError,
     TickerDataBadTypeException,
     is_empty_dataframe,
@@ -1118,7 +1119,13 @@ class TestHistoricalManagerDB(unittest.TestCase):
         self.assertIsNone(ts_invalid)
 
     def test_33_max_discrepancy_validation(self):
-        """Test that max_discrepancy_with_now is correctly validated on init."""
+        """Test that max_discrepancy_with_now defaults to 2h and validates inputs."""
+        default_manager = HistoricalManagerDB()
+        self.assertEqual(
+            default_manager.max_discrepancy_with_now,
+            DISCREPANCY_ONLY_DUKASCOPY,
+        )
+
         # 1. Valid string representing a timedelta should succeed
         manager = HistoricalManagerDB(max_discrepancy_with_now='2D')
         self.assertEqual(manager.max_discrepancy_with_now, '2D')
