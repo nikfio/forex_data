@@ -39,13 +39,17 @@ run_profiling:
   name: run profiling with pyinstrument
   command: |
     mkdir -p test-results/profiling
-    echo "Profiling test suite execution..."
-    uv run pyinstrument --renderer html \
-      --outfile test-results/profiling/full_test_suite.html \
-      -m pytest --flake8 -vvv
-    uv run pyinstrument --renderer json \
-      --outfile test-results/profiling/full_test_suite.json \
-      -m pytest --flake8 -vvv
+    echo "Profiling fast test suite execution..."
+    uv run pyinstrument --renderer pyisession \
+      --outfile test-results/profiling/full_test_suite.pyisession \
+      -m pytest --ignore=tests/test_historical_manager_db.py -vv
+    uv run pyinstrument --load test-results/profiling/full_test_suite.pyisession \
+      --renderer html \
+      --outfile test-results/profiling/full_test_suite.html
+    uv run pyinstrument --load test-results/profiling/full_test_suite.pyisession \
+      --renderer json \
+      --outfile test-results/profiling/full_test_suite.json
+    rm -f test-results/profiling/full_test_suite.pyisession
     echo "Profiling completed. Reports saved to test-results/profiling/"
   
 jobs:

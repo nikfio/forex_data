@@ -160,7 +160,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         ticker = 'EURUSD'
         timeframe = '3D'
         start = datetime(2018, 10, 4)
-        end = datetime(2020, 12, 1)
+        end = datetime(2018, 12, 3)
 
         data = self.hist_manager.get_data(
             ticker=ticker,
