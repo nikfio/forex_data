@@ -29,6 +29,8 @@ import struct
 import sys
 import time
 import urllib3
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 import zoneinfo
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
@@ -426,9 +428,21 @@ class HistDataConnector(RemoteConnector):
         self.connect()
 
     def connect(self) -> None:
-        """Configure the requests session with SSL settings."""
+        """Configure the requests session with SSL settings and retry adapter."""
         self._session = Session()
         self._session.verify = self.ssl_verify
+        retry_strategy = Retry(
+            total=3,
+            connect=3,
+            read=3,
+            status=3,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset(["HEAD", "GET", "POST"]),
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
         if not self.ssl_verify:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -468,7 +482,7 @@ class HistDataConnector(RemoteConnector):
             return []
 
         try:
-            response = self._session.get(url)
+            response = self._session.get(url, timeout=(10, 60))
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -556,7 +570,7 @@ class HistDataConnector(RemoteConnector):
                 year=year,
                 month_num=month_num
             )
-            r = self._session.get(url)
+            r = self._session.get(url, timeout=(10, 60))
 
             token = None
             try:
@@ -591,7 +605,8 @@ class HistDataConnector(RemoteConnector):
                 HISTDATA_BASE_DOWNLOAD_URL,
                 data=data,
                 headers=headers,
-                stream=True
+                stream=True,
+                timeout=(10, 60),
             )
 
             bio = BytesIO()
