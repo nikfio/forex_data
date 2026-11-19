@@ -152,7 +152,7 @@ class TestGracefulShutdownDump(unittest.TestCase):
                     )
                     persisted = manager._db_connector.read_data(
                         "forex",
-                        "EURUSD",
+                        "eurusd",
                         "tick",
                         datetime(2024, 1, 1),
                         datetime(2024, 4, 30),
