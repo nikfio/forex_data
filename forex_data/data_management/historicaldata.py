@@ -2,11 +2,11 @@
 from loguru import logger
 import inspect
 import threading
-from typing import Any, Dict, List, Optional, Union, Literal
+from typing import Any, Dict, List, Optional, Set, Union, Literal
 from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
 from uuid import uuid4
-from filelock import FileLock
+from filelock import FileLock, Timeout as FileLockTimeout
 from textwrap import dedent
 
 from attrs import (
@@ -177,6 +177,7 @@ class HistoricalManagerDB:
     _tickers_years_dict = field(factory=dict, validator=validators.instance_of(dict))
     _stop_event: threading.Event = field(init=False, factory=threading.Event)
     _last_interrupted_timestamp: Optional[datetime] = field(init=False, default=None)
+    _touched_tickers: Set[str] = field(init=False, factory=set)
 
     # if a valid config file or string
     # is passed
@@ -991,8 +992,10 @@ class HistoricalManagerDB:
 
         if filter:
             self._tickers_years_dict = self._db_connector.load_tickers_years_info()
+            self._touched_tickers.discard(filter.lower())
         else:
             self._tickers_years_dict.clear()
+            self._touched_tickers.clear()
 
     def add_timeframe(self, timeframe: str | List[str]) -> None:
         """
@@ -1069,6 +1072,204 @@ class HistoricalManagerDB:
             (reference_time - to_datetime(ticker_available_last_timestamp)).total_seconds()
             > to_timedelta(self.max_discrepancy_with_now).total_seconds()
         )
+
+    def _get_ticker_lock_path(self, ticker: str) -> str:
+        """Return per-ticker lock path so downloads/updates never block other tickers."""
+        return str(Path(self.data_path) / f"tickers_years_info.{ticker.lower()}.lock")
+
+    def _ensure_ticker_entries(self, ticker: str, timeframe: str) -> None:
+        """Ensure in-memory ``_tickers_years_dict`` contains entries for ``ticker``."""
+        if ticker not in self._tickers_years_dict:
+            self._tickers_years_dict[ticker] = {}
+        if timeframe not in self._tickers_years_dict[ticker]:
+            self._tickers_years_dict[ticker][timeframe] = YearMonthList()
+        if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
+            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
+
+    @staticmethod
+    def _missing_years_for_timeframe(
+        ticker_years: Dict[str, Any],
+        tf_key: str,
+        years_interval_req: List[int],
+        start: datetime,
+        end: datetime,
+        now_utc: datetime,
+    ) -> List[int]:
+        """Return years in ``years_interval_req`` whose requested months for ``tf_key`` are incomplete."""
+        missing: List[int] = []
+        tf_years = ticker_years[tf_key]
+        for y in years_interval_req:
+            start_m = start.month if y == start.year else 1
+            end_m = end.month if y == end.year else 12
+            if y == now_utc.year:
+                end_m = min(end_m, now_utc.month)
+            req_months = list(range(start_m, end_m + 1))
+            if not req_months:
+                continue
+            if y not in tf_years:
+                missing.append(y)
+            else:
+                available_months = tf_years.months.get(y, [])
+                if not set(req_months).issubset(available_months):
+                    missing.append(y)
+        return missing
+
+    def _acquire_ticker_lock(self, ticker: str) -> Optional[FileLock]:
+        """
+        Acquire the per-ticker update lock (non-blocking timeout when ``self.offline``
+        is True so live read queries never stall behind an active downloader).
+        """
+        lock_file = self._get_ticker_lock_path(ticker)
+        lock = FileLock(lock_file, timeout=0.05) if self.offline else FileLock(lock_file)
+        try:
+            lock.acquire()
+            return lock
+        except FileLockTimeout:
+            logger.bind(target='histmanager').debug(
+                f"Offline mode: skipping update lock for {ticker} while another process updates it."
+            )
+            return None
+
+    def _ensure_ticker_data(
+        self,
+        ticker: str,
+        timeframe: str,
+        start: datetime,
+        end: datetime,
+        now_utc: datetime,
+    ) -> None:
+        """
+        Ensure requested ``ticker``/``timeframe`` data and aggregations exist up to ``end``
+        using a per-ticker lock (so unrelated tickers download concurrently without blocking).
+        """
+        years_interval_req = list(range(start.year, end.year + 1, 1))
+        self._ensure_ticker_entries(ticker, timeframe)
+
+        current_year = now_utc.year
+        is_current_year_requested = False
+        ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
+
+        if current_year in years_interval_req and not self.offline:
+            is_current_year_requested = self._is_current_year_update_required(
+                ticker_available_last_timestamp=ticker_available_last_timestamp,
+                end=end,
+                now_utc=now_utc,
+            )
+
+        requested_subset = not self._missing_years_for_timeframe(
+            self._tickers_years_dict[ticker],
+            timeframe,
+            years_interval_req,
+            start,
+            end,
+            now_utc,
+        )
+
+        if not requested_subset or is_current_year_requested:
+            if is_current_year_requested:
+                for tf in list(self._tickers_years_dict[ticker].keys()):
+                    if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
+                        self._tickers_years_dict[ticker][tf].remove(current_year)
+
+            ticker_lock = self._acquire_ticker_lock(ticker)
+            if ticker_lock is None:
+                return
+            try:
+                self._tickers_years_dict = self._db_connector.refresh_ticker_years_info(ticker)
+                self._ensure_ticker_entries(ticker, timeframe)
+                self._touched_tickers.add(ticker)
+
+                if is_current_year_requested:
+                    for tf in list(self._tickers_years_dict[ticker].keys()):
+                        if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
+                            self._tickers_years_dict[ticker][tf].remove(current_year)
+
+                year_tick_missing = self._missing_years_for_timeframe(
+                    self._tickers_years_dict[ticker],
+                    TICK_TIMEFRAME,
+                    years_interval_req,
+                    start,
+                    end,
+                    now_utc,
+                )
+                if is_current_year_requested and current_year not in year_tick_missing:
+                    year_tick_missing.append(current_year)
+
+                if year_tick_missing and not self.offline:
+                    self._download(
+                        ticker,
+                        year_tick_missing,
+                        start_month=start.month,
+                        end_month=end.month,
+                        start_year=start.year,
+                        end_year=end.year,
+                        start_date=start,
+                        end_date=end,
+                    )
+                elif year_tick_missing and self.offline:
+                    logger.bind(target='histmanager').info(
+                        f"Offline mode: skipping download for {ticker} {year_tick_missing}"
+                    )
+                else:
+                    logger.bind(target='histmanager').info(
+                        f"Skipped downloading {ticker} {years_interval_req} as it was managed by another process."
+                    )
+
+                self.add_timeframe(timeframe)
+                self._update_db(ticker)
+
+                completed_ok = not self._missing_years_for_timeframe(
+                    self._tickers_years_dict[ticker],
+                    timeframe,
+                    years_interval_req,
+                    start,
+                    end,
+                    now_utc,
+                )
+                if not completed_ok and not self.offline:
+                    logger.bind(target='histmanager').critical(
+                        f'processing year data completion for {years_interval_req} not ok'
+                    )
+                    raise ValueError
+            finally:
+                ticker_lock.release()
+        elif current_year in years_interval_req and ticker_available_last_timestamp is not None:
+            needs_reframe = False
+            try:
+                last_tick_utc = normalize_to_naive_utc(ticker_available_last_timestamp)
+                check_tfs = set(self._tf_list) | {timeframe}
+                for tf_c in check_tfs:
+                    if tf_c == TICK_TIMEFRAME:
+                        continue
+                    last_tf_time = self._db_connector.read_last_timestamp(
+                        market='forex', ticker=ticker, timeframe=tf_c, year=current_year
+                    )
+                    if last_tf_time is None:
+                        needs_reframe = True
+                        break
+                    last_tf_utc = normalize_to_naive_utc(last_tf_time)
+                    try:
+                        tf_delta = to_timedelta(tf_c)
+                    except Exception:
+                        tf_delta = timedelta(hours=1)
+                    if last_tick_utc >= last_tf_utc + tf_delta:
+                        needs_reframe = True
+                        break
+            except Exception as e_chk:
+                logger.bind(target='histmanager').debug(
+                    f"Failed checking timeframe freshness for {ticker} {current_year}: {e_chk}"
+                )
+
+            if needs_reframe:
+                ticker_lock = self._acquire_ticker_lock(ticker)
+                if ticker_lock is None:
+                    return
+                try:
+                    self._touched_tickers.add(ticker)
+                    self.add_timeframe(timeframe)
+                    self._update_db(ticker)
+                finally:
+                    ticker_lock.release()
 
     def get_data(
         self,
@@ -1200,220 +1401,13 @@ class HistoricalManagerDB:
                 f'date in database {now_utc}')
             raise ValueError(f'start date {start} is newer now date')
 
-        # get years including interval requested
-        years_interval_req = list(range(start.year, end.year + 1, 1))
-
-        # Initialize ticker/timeframe in dict if not present
-        if ticker not in self._tickers_years_dict:
-            self._tickers_years_dict[ticker] = {}
-        if timeframe not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][timeframe] = YearMonthList()
-        if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
-
-        # determine if current year data new download
-        # has to be requested
-        current_year = now_utc.year
-        is_current_year_requested = False
-
-        ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
-
-        if current_year in years_interval_req and not self.offline:
-            is_current_year_requested = self._is_current_year_update_required(
-                ticker_available_last_timestamp=ticker_available_last_timestamp,
-                end=end,
-                now_utc=now_utc,
-            )
-
-        # here determine if to ask for new download
-        # if requested years are not already in localdb (tracked by tickers years dict)
-        # or if current year is requested
-        # check if requested year/months are subset
-        requested_subset = True
-        for y in years_interval_req:
-            start_m = start.month if y == start.year else 1
-            end_m = end.month if y == end.year else 12
-            if y == now_utc.year:
-                end_m = min(end_m, now_utc.month)
-            req_months = list(range(start_m, end_m + 1))
-            if not req_months:
-                continue
-            if y not in self._tickers_years_dict[ticker][timeframe]:
-                requested_subset = False
-                break
-            else:
-                available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
-                if not set(req_months).issubset(available_months):
-                    requested_subset = False
-                    break
-
-        if not requested_subset or is_current_year_requested:
-
-            # If the current year is requested, we force re-aggregation
-            # by removing it from the known timeframe list in memory
-            if is_current_year_requested:
-                for tf in list(self._tickers_years_dict[ticker].keys()):
-                    if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
-                        self._tickers_years_dict[ticker][tf].remove(current_year)
-
-            year_tf_missing = []
-            for y in years_interval_req:
-                start_m = start.month if y == start.year else 1
-                end_m = end.month if y == end.year else 12
-                if y == now_utc.year:
-                    end_m = min(end_m, now_utc.month)
-                req_months = list(range(start_m, end_m + 1))
-                if not req_months:
-                    continue
-                if y not in self._tickers_years_dict[ticker][timeframe]:
-                    year_tf_missing.append(y)
-                else:
-                    available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
-                    if not set(req_months).issubset(available_months):
-                        year_tf_missing.append(y)
-
-            year_tick_missing = []
-            for y in years_interval_req:
-                start_m = start.month if y == start.year else 1
-                end_m = end.month if y == end.year else 12
-                if y == now_utc.year:
-                    end_m = min(end_m, now_utc.month)
-                req_months = list(range(start_m, end_m + 1))
-                if not req_months:
-                    continue
-                if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
-                    year_tick_missing.append(y)
-                else:
-                    available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
-                    if not set(req_months).issubset(available_months):
-                        year_tick_missing.append(y)
-
-            if is_current_year_requested and current_year not in year_tick_missing:
-                year_tick_missing.append(current_year)
-
-            lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
-
-            with FileLock(lock_file):
-                # Re-read the JSON file to fetch the latest state from disk
-                self._tickers_years_dict = self._db_connector.create_tickers_years_dict()
-
-                # Initialize ticker/timeframe in dict if not present after rebuild
-                if ticker not in self._tickers_years_dict:
-                    self._tickers_years_dict[ticker] = {}
-                if timeframe not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][timeframe] = YearMonthList()
-                if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
-
-                if is_current_year_requested:
-                    for tf in list(self._tickers_years_dict[ticker].keys()):
-                        if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
-                            self._tickers_years_dict[ticker][tf].remove(current_year)
-
-                # Re-calculate missing years after re-reading
-                year_tick_missing = []
-                for y in years_interval_req:
-                    start_m = start.month if y == start.year else 1
-                    end_m = end.month if y == end.year else 12
-                    if y == now_utc.year:
-                        end_m = min(end_m, now_utc.month)
-                    req_months = list(range(start_m, end_m + 1))
-                    if not req_months:
-                        continue
-                    if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
-                        year_tick_missing.append(y)
-                    else:
-                        available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
-                        if not set(req_months).issubset(available_months):
-                            year_tick_missing.append(y)
-
-                if is_current_year_requested and current_year not in year_tick_missing:
-                    year_tick_missing.append(current_year)
-
-                # ONLY download years not already in the database
-                if year_tick_missing and not self.offline:
-                    self._download(
-                        ticker,
-                        year_tick_missing,
-                        start_month=start.month,
-                        end_month=end.month,
-                        start_year=start.year,
-                        end_year=end.year,
-                        start_date=start,
-                        end_date=end
-                    )
-                elif year_tick_missing and self.offline:
-                    logger.bind(
-                        target='histmanager').info(
-                        f"Offline mode: skipping download for {ticker} {year_tick_missing}")
-                else:
-                    logger.bind(
-                        target='histmanager').info(
-                        f"Skipped downloading {ticker} {years_interval_req} as it was managed by another process.")
-
-                # add timeframe and update db INSIDE the lock so that
-                # a concurrent process can't read a parquet that is still
-                # being written by this process
-                self.add_timeframe(timeframe)
-                self._update_db(ticker)
-
-                # check if requested year/months are subset after processing
-                completed_ok = True
-                for y in years_interval_req:
-                    start_m = start.month if y == start.year else 1
-                    end_m = end.month if y == end.year else 12
-                    if y == now_utc.year:
-                        end_m = min(end_m, now_utc.month)
-                    req_months = list(range(start_m, end_m + 1))
-                    if not req_months:
-                        continue
-                    if y not in self._tickers_years_dict[ticker][timeframe]:
-                        completed_ok = False
-                        break
-                    else:
-                        available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
-                        if not set(req_months).issubset(available_months):
-                            completed_ok = False
-                            break
-
-                if not completed_ok and not self.offline:
-
-                    logger.bind(target='histmanager').critical(
-                        f'processing year data completion for '
-                        f'{years_interval_req} not ok')
-                    raise ValueError
-        elif current_year in years_interval_req and ticker_available_last_timestamp is not None:
-            needs_reframe = False
-            try:
-                last_tick_utc = normalize_to_naive_utc(ticker_available_last_timestamp)
-                check_tfs = set(self._tf_list) | {timeframe}
-                for tf_c in check_tfs:
-                    if tf_c == TICK_TIMEFRAME:
-                        continue
-                    last_tf_time = self._db_connector.read_last_timestamp(
-                        market='forex', ticker=ticker, timeframe=tf_c, year=current_year
-                    )
-                    if last_tf_time is None:
-                        needs_reframe = True
-                        break
-                    last_tf_utc = normalize_to_naive_utc(last_tf_time)
-                    try:
-                        tf_delta = to_timedelta(tf_c)
-                    except Exception:
-                        tf_delta = timedelta(hours=1)
-                    if last_tick_utc >= last_tf_utc + tf_delta:
-                        needs_reframe = True
-                        break
-            except Exception as e_chk:
-                logger.bind(target='histmanager').debug(
-                    f"Failed checking timeframe freshness for {ticker} {current_year}: {e_chk}"
-                )
-
-            if needs_reframe:
-                lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
-                with FileLock(lock_file):
-                    self.add_timeframe(timeframe)
-                    self._update_db(ticker)
+        self._ensure_ticker_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end,
+            now_utc=now_utc,
+        )
 
         # execute a read query on database
         return self._db_connector.read_data(
@@ -1547,219 +1541,13 @@ class HistoricalManagerDB:
                 f'date in database {now_utc}')
             raise ValueError(f'start date {start} is newer now date')
 
-        # get years including interval requested
-        years_interval_req = list(range(start.year, end.year + 1, 1))
-
-        # Initialize ticker/timeframe in dict if not present
-        if ticker not in self._tickers_years_dict:
-            self._tickers_years_dict[ticker] = {}
-        if timeframe not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][timeframe] = YearMonthList()
-        if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-            self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
-
-        # determine if current year data new download
-        # has to be requested
-        is_current_year_requested = False
-        current_year = now_utc.year
-
-        ticker_available_last_timestamp = self._db_connector.read_last_timestamp('forex', ticker)
-
-        if current_year in years_interval_req and not self.offline:
-            is_current_year_requested = self._is_current_year_update_required(
-                ticker_available_last_timestamp=ticker_available_last_timestamp,
-                end=end,
-                now_utc=now_utc,
-            )
-
-        # here determine if to ask for new download
-        # if requested years are not already in localdb (tracked by tickers years dict)
-        # or if current year is requested
-        # check if requested year/months are subset
-        requested_subset = True
-        for y in years_interval_req:
-            start_m = start.month if y == start.year else 1
-            end_m = end.month if y == end.year else 12
-            if y == now_utc.year:
-                end_m = min(end_m, now_utc.month)
-            req_months = list(range(start_m, end_m + 1))
-            if not req_months:
-                continue
-            if y not in self._tickers_years_dict[ticker][timeframe]:
-                requested_subset = False
-                break
-            else:
-                available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
-                if not set(req_months).issubset(available_months):
-                    requested_subset = False
-                    break
-
-        if not requested_subset or is_current_year_requested:
-
-            # If the current year is requested, we force re-aggregation by removing it from the known timeframe list in memory
-            if is_current_year_requested:
-                for tf in list(self._tickers_years_dict[ticker].keys()):
-                    if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
-                        self._tickers_years_dict[ticker][tf].remove(current_year)
-
-            year_tf_missing = []
-            for y in years_interval_req:
-                start_m = start.month if y == start.year else 1
-                end_m = end.month if y == end.year else 12
-                if y == now_utc.year:
-                    end_m = min(end_m, now_utc.month)
-                req_months = list(range(start_m, end_m + 1))
-                if not req_months:
-                    continue
-                if y not in self._tickers_years_dict[ticker][timeframe]:
-                    year_tf_missing.append(y)
-                else:
-                    available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
-                    if not set(req_months).issubset(available_months):
-                        year_tf_missing.append(y)
-
-            year_tick_missing = []
-            for y in years_interval_req:
-                start_m = start.month if y == start.year else 1
-                end_m = end.month if y == end.year else 12
-                if y == now_utc.year:
-                    end_m = min(end_m, now_utc.month)
-                req_months = list(range(start_m, end_m + 1))
-                if not req_months:
-                    continue
-                if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
-                    year_tick_missing.append(y)
-                else:
-                    available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
-                    if not set(req_months).issubset(available_months):
-                        year_tick_missing.append(y)
-
-            if is_current_year_requested and current_year not in year_tick_missing:
-                year_tick_missing.append(current_year)
-
-            lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
-
-            with FileLock(lock_file):
-                # Re-read the JSON file to fetch the latest state from disk
-                self._tickers_years_dict = self._db_connector.create_tickers_years_dict()
-
-                # Initialize ticker/timeframe in dict if not present after rebuild
-                if ticker not in self._tickers_years_dict:
-                    self._tickers_years_dict[ticker] = {}
-                if timeframe not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][timeframe] = YearMonthList()
-                if TICK_TIMEFRAME not in self._tickers_years_dict[ticker]:
-                    self._tickers_years_dict[ticker][TICK_TIMEFRAME] = YearMonthList()
-
-                if is_current_year_requested:
-                    for tf in list(self._tickers_years_dict[ticker].keys()):
-                        if tf != TICK_TIMEFRAME and current_year in self._tickers_years_dict[ticker][tf]:
-                            self._tickers_years_dict[ticker][tf].remove(current_year)
-
-                # Re-calculate missing years after re-reading
-                year_tick_missing = []
-                for y in years_interval_req:
-                    start_m = start.month if y == start.year else 1
-                    end_m = end.month if y == end.year else 12
-                    if y == now_utc.year:
-                        end_m = min(end_m, now_utc.month)
-                    req_months = list(range(start_m, end_m + 1))
-                    if not req_months:
-                        continue
-                    if y not in self._tickers_years_dict[ticker][TICK_TIMEFRAME]:
-                        year_tick_missing.append(y)
-                    else:
-                        available_months = self._tickers_years_dict[ticker][TICK_TIMEFRAME].months.get(y, [])
-                        if not set(req_months).issubset(available_months):
-                            year_tick_missing.append(y)
-
-                if is_current_year_requested and current_year not in year_tick_missing:
-                    year_tick_missing.append(current_year)
-
-                # ONLY download years not already in the database
-                if year_tick_missing and not self.offline:
-                    self._download(
-                        ticker,
-                        year_tick_missing,
-                        start_month=start.month,
-                        end_month=end.month,
-                        start_year=start.year,
-                        end_year=end.year,
-                        start_date=start,
-                        end_date=end
-                    )
-                elif year_tick_missing and self.offline:
-                    logger.bind(
-                        target='histmanager').info(
-                        f"Offline mode: skipping download for {ticker} {year_tick_missing}")
-                else:
-                    logger.bind(
-                        target='histmanager').info(
-                        f"Skipped downloading {ticker} {years_interval_req} as it was managed by another process.")
-
-                # add timeframe and update db INSIDE the lock so that
-                # a concurrent process can't read a parquet that is still
-                # being written by this process
-                self.add_timeframe(timeframe)
-                self._update_db(ticker)
-
-                # check if requested year/months are subset after processing
-                completed_ok = True
-                for y in years_interval_req:
-                    start_m = start.month if y == start.year else 1
-                    end_m = end.month if y == end.year else 12
-                    if y == now_utc.year:
-                        end_m = min(end_m, now_utc.month)
-                    req_months = list(range(start_m, end_m + 1))
-                    if not req_months:
-                        continue
-                    if y not in self._tickers_years_dict[ticker][timeframe]:
-                        completed_ok = False
-                        break
-                    else:
-                        available_months = self._tickers_years_dict[ticker][timeframe].months.get(y, [])
-                        if not set(req_months).issubset(available_months):
-                            completed_ok = False
-                            break
-
-                if not completed_ok and not self.offline:
-
-                    logger.bind(target='histmanager').critical(
-                        f'processing year data completion for '
-                        f'{years_interval_req} not ok')
-                    raise ValueError
-        elif current_year in years_interval_req and ticker_available_last_timestamp is not None:
-            needs_reframe = False
-            try:
-                last_tick_utc = normalize_to_naive_utc(ticker_available_last_timestamp)
-                check_tfs = set(self._tf_list) | {timeframe}
-                for tf_c in check_tfs:
-                    if tf_c == TICK_TIMEFRAME:
-                        continue
-                    last_tf_time = self._db_connector.read_last_timestamp(
-                        market='forex', ticker=ticker, timeframe=tf_c, year=current_year
-                    )
-                    if last_tf_time is None:
-                        needs_reframe = True
-                        break
-                    last_tf_utc = normalize_to_naive_utc(last_tf_time)
-                    try:
-                        tf_delta = to_timedelta(tf_c)
-                    except Exception:
-                        tf_delta = timedelta(hours=1)
-                    if last_tick_utc >= last_tf_utc + tf_delta:
-                        needs_reframe = True
-                        break
-            except Exception as e_chk:
-                logger.bind(target='histmanager').debug(
-                    f"Failed checking timeframe freshness for {ticker} {current_year}: {e_chk}"
-                )
-
-            if needs_reframe:
-                lock_file = str(Path(self.data_path) / "tickers_years_info.json.lock")
-                with FileLock(lock_file):
-                    self.add_timeframe(timeframe)
-                    self._update_db(ticker)
+        self._ensure_ticker_data(
+            ticker=ticker,
+            timeframe=timeframe,
+            start=start,
+            end=end,
+            now_utc=now_utc,
+        )
 
         return self._db_connector.read_data_window(
             market='forex',
@@ -1776,8 +1564,11 @@ class HistoricalManagerDB:
 
     def close(self):
 
-        # update tickers years info file with current data status
-        self._db_connector.save_tickers_years_info(self._tickers_years_dict)
+        # merge only touched ticker metadata so concurrent processes on other tickers aren't clobbered
+        self._db_connector.merge_ticker_years_info(
+            self._tickers_years_dict,
+            tickers=self._touched_tickers if self._touched_tickers else None,
+        )
 
         # clear temporary files
         self._clear_temporary_data_folder()
