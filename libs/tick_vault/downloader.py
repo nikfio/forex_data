@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime
+from typing import Any
 
 from tqdm.asyncio import tqdm
 
@@ -16,6 +17,7 @@ async def download_range(
     start: datetime,
     end: datetime = datetime.now(tz=UTC),
     proxies: list[str] | None = None,
+    stop_event: Any = None,
 ) -> None:
     """
     Download tick data for a symbol within a date range using concurrent workers.
@@ -126,15 +128,31 @@ async def download_range(
 
     completed = 0
     download_success = False
+    interrupted = False
 
     try:
         # Process results as they come in
         while completed < total_chunks:
+            if stop_event is not None and stop_event.is_set():
+                interrupted = True
+                logger.warning(
+                    f"Stop requested during download for {symbol}; flushing progress"
+                )
+                break
+
             # Propagate child errors
             [t.result() for t in all_tasks if t.done()]
 
-            # Get result from download workers
-            chunk = await downloader_output_queue.get()
+            # Get result from download workers (poll short window if stoppable)
+            if stop_event is not None:
+                try:
+                    chunk = await asyncio.wait_for(
+                        downloader_output_queue.get(), timeout=0.25
+                    )
+                except asyncio.TimeoutError:
+                    continue
+            else:
+                chunk = await downloader_output_queue.get()
 
             # Forward to metadata worker
             await metadata_queue.put(chunk)
@@ -148,8 +166,11 @@ async def download_range(
                 await downloader_input_queue.put(chunks_remaining.pop(0))
 
         pbar.close()
-        download_success = True
-        logger.info(f"Successfully downloaded {total_chunks} chunks for {symbol}")
+        if not interrupted:
+            download_success = True
+            logger.info(
+                f"Successfully downloaded {total_chunks} chunks for {symbol}"
+            )
 
     except (Exception, asyncio.CancelledError, KeyboardInterrupt) as e:
         pbar.close()
@@ -160,7 +181,22 @@ async def download_range(
         raise
 
     finally:
-        if not download_success:
+        if interrupted:
+            logger.debug("Interrupted: stopping download workers and flushing metadata")
+            for task in download_tasks:
+                task.cancel()
+            await metadata_queue.put(None)
+            try:
+                await asyncio.wait_for(metadata_task, timeout=2.0)
+            except Exception:
+                metadata_task.cancel()
+            try:
+                await asyncio.gather(
+                    *download_tasks, metadata_task, return_exceptions=True
+                )
+            except Exception:
+                pass
+        elif not download_success:
             logger.debug("Download incomplete or interrupted, cancelling workers")
             for task in download_tasks:
                 task.cancel()

@@ -12,7 +12,11 @@ import polars as pl
 import typer
 import yaml
 
-from forex_data import HistoricalManagerDB
+from forex_data import (
+    DownloadInterruptedError,
+    HistoricalManagerDB,
+    graceful_shutdown_guard,
+)
 from forex_data.data_management.charts import DataCharts
 from forex_data.data_management.common import POLARS_DURATION_PATTERN_STR
 
@@ -184,46 +188,63 @@ def generate_database(
         )
         raise typer.Exit(code=1)
 
-    for ticker in normalized_tickers:
+    def _on_shutdown(sig_name: str) -> None:
         typer.secho(
-            f"Generating database for ticker: {ticker} | "
-            f"Timeframes: {', '.join(normalized_timeframe)} | "
-            f"Range: {start_date} to {end_date}",
-            fg=typer.colors.CYAN
+            f"\nCaught shutdown signal ({sig_name}); "
+            "flushing downloaded ticks cleanly...",
+            fg=typer.colors.YELLOW,
         )
+        manager.request_stop()
 
-        try:
-            # Query / download data. HistoricalManagerDB automatically downloads
-            # missing historical periods and caches them locally.
-            lazy_frame = manager.get_data(
-                ticker=ticker,
-                timeframe=normalized_timeframe[0],
-                start=start_date,
-                end=end_date
-            )
+    with graceful_shutdown_guard(on_shutdown=_on_shutdown):
+        for ticker in normalized_tickers:
+            if manager.stop_requested:
+                break
 
-            # Collect lazy frame if applicable to get actual row count
-            if hasattr(lazy_frame, "collect"):
-                df = lazy_frame.collect()
-            else:
-                df = lazy_frame
-
-            row_count = len(df)
             typer.secho(
-                f"Successfully retrieved tick data ({row_count} rows) "
-                f"for {ticker} from start date {start_date} to end date {end_date}",
-                fg=typer.colors.GREEN
+                f"Generating database for ticker: {ticker} | "
+                f"Timeframes: {', '.join(normalized_timeframe)} | "
+                f"Range: {start_date} to {end_date}",
+                fg=typer.colors.CYAN
             )
 
-        except Exception as e:
-            typer.secho(
-                f"Error downloading tick data for ticker {ticker} "
-                f"and processing timeframes {', '.join(normalized_timeframe)}: {e}",
-                fg=typer.colors.RED,
-                err=True
-            )
-            manager.close()
-            raise typer.Exit(code=1)
+            try:
+                # Query / download data. HistoricalManagerDB automatically downloads
+                # missing historical periods and caches them locally.
+                lazy_frame = manager.get_data(
+                    ticker=ticker,
+                    timeframe=normalized_timeframe[0],
+                    start=start_date,
+                    end=end_date
+                )
+
+                # Collect lazy frame if applicable to get actual row count
+                if hasattr(lazy_frame, "collect"):
+                    df = lazy_frame.collect()
+                else:
+                    df = lazy_frame
+
+                row_count = len(df)
+                typer.secho(
+                    f"Successfully retrieved tick data ({row_count} rows) "
+                    f"for {ticker} from start date {start_date} to end date {end_date}",
+                    fg=typer.colors.GREEN
+                )
+
+            except DownloadInterruptedError as e:
+                typer.secho(str(e), fg=typer.colors.YELLOW, bold=True)
+                manager.close()
+                raise typer.Exit(code=130)
+
+            except Exception as e:
+                typer.secho(
+                    f"Error downloading tick data for ticker {ticker} "
+                    f"and processing timeframes {', '.join(normalized_timeframe)}: {e}",
+                    fg=typer.colors.RED,
+                    err=True
+                )
+                manager.close()
+                raise typer.Exit(code=1)
 
     manager.close()
     typer.secho(

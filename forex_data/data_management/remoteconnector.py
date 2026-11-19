@@ -27,6 +27,7 @@ import socket
 import ssl
 import struct
 import sys
+import threading
 import time
 import urllib3
 from urllib3.util.retry import Retry
@@ -1232,6 +1233,7 @@ class DukascopyConnector(RemoteConnector):
         engine: str = 'polars_lazy',
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
+        stop_event: Optional[threading.Event] = None,
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """
         Downloads tick data for a specific year and month from Dukascopy using tick_vault.
@@ -1321,11 +1323,44 @@ class DukascopyConnector(RemoteConnector):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-            loop.run_until_complete(download_range(symbol=ticker_upper, start=start, end=end))
+            dl_kwargs: Dict[str, Any] = {
+                "symbol": ticker_upper,
+                "start": start,
+                "end": end,
+            }
+            if stop_event is not None:
+                dl_kwargs["stop_event"] = stop_event
+
+            loop.run_until_complete(download_range(**dl_kwargs))
+
+            read_end = end
+            if stop_event is not None and stop_event.is_set() and MetadataDB is not None:
+                with MetadataDB() as mdb:
+                    missing = mdb.find_not_attempted_chunks(ticker_upper, start, end)
+                if missing:
+                    read_end = min(end, missing[0].time.replace(tzinfo=None))
+
+            if read_end <= start:
+                empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                return empty_df.lazy() if engine == 'polars_lazy' else empty_df
 
             # Read downloaded tick data into Pandas DataFrame
             logger.bind(target='dukascopy').info(f"Reading downloaded tick data for {ticker_upper}...")
-            pandas_df = read_tick_data(symbol=ticker_upper, start=start, end=end, strict=False)
+            try:
+                pandas_df = read_tick_data(
+                    symbol=ticker_upper,
+                    start=start,
+                    end=read_end,
+                    strict=False,
+                )
+            except (ValueError, RuntimeError) as read_err:
+                if stop_event is not None and stop_event.is_set():
+                    logger.bind(target='dukascopy').warning(
+                        f"Partial tick recovery stopped with no readable range for {ticker_upper}: {read_err}"
+                    )
+                    empty_df = PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE)
+                    return empty_df.lazy() if engine == 'polars_lazy' else empty_df
+                raise
 
             if pandas_df.empty:
                 logger.bind(target='dukascopy').warning(f"No data returned for {ticker_upper} {year}-{month_num}")
@@ -2664,6 +2699,7 @@ class CTraderConnector(RemoteConnector):
         engine: str = 'polars_lazy',
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
+        stop_event: Optional[threading.Event] = None,
     ) -> Union[PolarsDataFrame, PolarsLazyFrame]:
         """
         Download raw tick data for an entire month from cTrader in 1-day chunks.

@@ -76,6 +76,10 @@ from .data_management import (
     SupportedChartType,
     SUPPORTED_CHARTS_TYPE
 )
+from .utils import (
+    DownloadInterruptedError,
+    graceful_shutdown_guard,
+)
 
 __all__ = [
     'config_module',
@@ -143,5 +147,7 @@ __all__ = [
     'create_historical_figure',
     'RealtimeDashApp',
     'SupportedChartType',
-    'SUPPORTED_CHARTS_TYPE'
+    'SUPPORTED_CHARTS_TYPE',
+    'DownloadInterruptedError',
+    'graceful_shutdown_guard',
 ]

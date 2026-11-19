@@ -17,7 +17,9 @@ Created on Sun Feb 23 00:02:36 2025
         OSS versions for windows required
 '''
 
+import os
 import time
+from uuid import uuid4
 import requests
 from requests import Session
 from filelock import FileLock
@@ -353,10 +355,19 @@ class DatabaseConnector:
                 else:
                     serializable[ticker][tf] = {str(y): list(range(1, 13)) for y in yml}
 
+        tmp_path = self._tickers_years_info_filepath.with_name(
+            f'.{self._tickers_years_info_filepath.name}.{uuid4().hex}.tmp'
+        )
         try:
-            with open(self._tickers_years_info_filepath, 'w') as f:
+            with open(tmp_path, 'w') as f:
                 json.dump(serializable, f, indent=2)
+            os.replace(tmp_path, self._tickers_years_info_filepath)
         except Exception as e:
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
             logger.bind(
                 target='localdb').error(
                 f'Error writing ticker years data to {

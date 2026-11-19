@@ -1,5 +1,7 @@
 
 from loguru import logger
+import inspect
+import threading
 from typing import Any, Dict, List, Optional, Union, Literal
 from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -83,6 +85,7 @@ from .remoteconnector import (
     DukascopyConnector,
     CTraderConnector
 )
+from ..utils.shutdown import DownloadInterruptedError
 
 __all__ = ['HistoricalManagerDB']
 
@@ -172,6 +175,8 @@ class HistoricalManagerDB:
             validators.instance_of(Path)))
     _histdata_tickers_list = field(factory=list, validator=validators.instance_of(list))
     _tickers_years_dict = field(factory=dict, validator=validators.instance_of(dict))
+    _stop_event: threading.Event = field(init=False, factory=threading.Event)
+    _last_interrupted_timestamp: Optional[datetime] = field(init=False, default=None)
 
     # if a valid config file or string
     # is passed
@@ -389,6 +394,25 @@ class HistoricalManagerDB:
                 # failure is not sign of malfunction
                 # not to log
                 pass
+
+    def request_stop(self) -> None:
+        """Signal an in-progress historical download to flush partial ticks and stop."""
+        self._stop_event.set()
+
+    def clear_stop(self) -> None:
+        """Clear any previously raised stop request before starting a new download."""
+        self._stop_event.clear()
+        self._last_interrupted_timestamp = None
+
+    @property
+    def stop_requested(self) -> bool:
+        """Return True when a graceful stop has been requested."""
+        return self._stop_event.is_set()
+
+    @property
+    def last_interrupted_timestamp(self) -> Optional[datetime]:
+        """Latest naive UTC tick timestamp persisted on the last interrupted run."""
+        return self._last_interrupted_timestamp
 
     def get_source_connectors(self) -> List[RemoteConnector]:
 
@@ -636,6 +660,12 @@ class HistoricalManagerDB:
 
         for month in MONTHS:
 
+            if self._stop_event.is_set():
+                logger.bind(target='histmanager').warning(
+                    f"Stop requested for {ticker} {year}; stopping month loop"
+                )
+                break
+
             month_num = MONTHS.index(month) + 1
 
             if month_num < start_month:
@@ -695,6 +725,8 @@ class HistoricalManagerDB:
             month_data = None
             last_err = None
             for connector in self._histdata_connector:
+                if self._stop_event.is_set():
+                    break
                 if (
                     isinstance(connector, HistDataConnector) and
                     year == now_utc.year and
@@ -713,13 +745,23 @@ class HistoricalManagerDB:
                     if isinstance(connector, DukascopyConnector) and conn_engine not in ('polars', 'polars_lazy'):
                         conn_engine = 'polars'
 
+                    dl_month_kwargs: Dict[str, Any] = {
+                        "engine": conn_engine,
+                        "start_date": download_start,
+                        "end_date": download_end,
+                    }
+                    try:
+                        dl_params = inspect.signature(connector.download_month_raw).parameters
+                        if "stop_event" in dl_params:
+                            dl_month_kwargs["stop_event"] = self._stop_event
+                    except (TypeError, ValueError):
+                        pass
+
                     month_data = connector.download_month_raw(
                         ticker,
                         year,
                         month_num,
-                        engine=conn_engine,
-                        start_date=download_start,
-                        end_date=download_end,
+                        **dl_month_kwargs,
                     )
 
                     if isinstance(connector, DukascopyConnector) and self.engine not in ('polars', 'polars_lazy'):
@@ -729,6 +771,9 @@ class HistoricalManagerDB:
                             month_data = month_data.to_arrow()
 
                     if is_empty_dataframe(month_data):
+                        if self._stop_event.is_set():
+                            last_err = None
+                            break
                         raise TickerDataNotFoundError("Ticker data is empty/not found")
 
                     last_err = None
@@ -783,8 +828,32 @@ class HistoricalManagerDB:
 
                     year_tick_df = concat_data([year_tick_df, month_data])
 
+            if self._stop_event.is_set():
+                break
+
         return sort_dataframe(year_tick_df,
                               COLUMN_NAME.TIMESTAMP)
+
+    def _persist_tick_data(
+        self,
+        ticker: str,
+        tick_key: str,
+        dataframe: Union[PolarsDataFrame, PolarsLazyFrame, pandas_dataframe, Table],
+        years: List[int],
+    ) -> None:
+        """Persist tick DataFrame atomically and refresh cached years metadata."""
+        if not is_empty_dataframe(dataframe):
+            self._db_connector.write_data(tick_key, dataframe)
+            self._db_connector.add_tickers_years_info_to_file(
+                ticker,
+                TICK_TIMEFRAME,
+                years,
+            )
+            self._tickers_years_dict = self._db_connector.load_tickers_years_info()
+        else:
+            logger.bind(
+                target='histmanager').warning(
+                f'Data dataframe for {tick_key} is empty, skipping database write')
 
     def _download(self,
                   ticker,
@@ -828,6 +897,9 @@ class HistoricalManagerDB:
         if isinstance(self._db_connector, LocalDBYearConnector):
             # download and write data for each year
             for year in years:
+                if self._stop_event.is_set():
+                    break
+
                 y_start_month = start_month if year == start_year else 1
                 y_end_month = end_month if year == end_year else 12
                 y_start_date = start_date if year == start_year else None
@@ -843,33 +915,22 @@ class HistoricalManagerDB:
                     end_date=y_end_date,
                 )
 
-                # get data id key for the year
                 tick_key = self._db_connector._db_key('forex',
                                                       ticker,
                                                       TICK_TIMEFRAME,
                                                       year)
+                self._persist_tick_data(ticker, tick_key, year_tick_df, [year])
 
-                # call to upload df to database if not empty
-                if not is_empty_dataframe(year_tick_df):
-                    self._db_connector.write_data(tick_key,
-                                                  year_tick_df)
-
-                    # update years list in local info file
-                    self._db_connector.add_tickers_years_info_to_file(ticker,
-                                                                      TICK_TIMEFRAME,
-                                                                      [year])
-
-                    # update internal ticker years list info
-                    self._tickers_years_dict = self._db_connector.load_tickers_years_info()
-
-                else:
-                    logger.bind(
-                        target='histmanager').warning(
-                        f'Data dataframe for {tick_key} is empty, skipping database write')
+                if self._stop_event.is_set():
+                    break
         else:
             # download data for each year and aggregate
             years_data_df = empty_dataframe(self.engine)
+            processed_years: List[int] = []
             for year in years:
+                if self._stop_event.is_set():
+                    break
+
                 y_start_month = start_month if year == start_year else 1
                 y_end_month = end_month if year == end_year else 12
                 y_start_date = start_date if year == start_year else None
@@ -885,33 +946,38 @@ class HistoricalManagerDB:
                     end_date=y_end_date,
                 )
 
-                # if first iteration, assign instead of concat
-                if is_empty_dataframe(years_data_df):
-                    years_data_df = year_tick_df
-                else:
-                    years_data_df = concat_data([years_data_df, year_tick_df])
+                if not is_empty_dataframe(year_tick_df):
+                    processed_years.append(year)
+                    if is_empty_dataframe(years_data_df):
+                        years_data_df = year_tick_df
+                    else:
+                        years_data_df = concat_data([years_data_df, year_tick_df])
 
-            # get data id key
+                if self._stop_event.is_set():
+                    break
+
             tick_key = self._db_connector._db_key('forex',
                                                   ticker,
                                                   TICK_TIMEFRAME)
+            self._persist_tick_data(
+                ticker,
+                tick_key,
+                years_data_df,
+                processed_years or years,
+            )
 
-            # call to upload df to database if not empty
-            if not is_empty_dataframe(years_data_df):
-                self._db_connector.write_data(tick_key,
-                                              years_data_df)
-
-                self._db_connector.add_tickers_years_info_to_file(ticker,
-                                                                  TICK_TIMEFRAME,
-                                                                  years)
-
-                # update internal ticker years list info
-                self._tickers_years_dict = self._db_connector.load_tickers_years_info()
-
-            else:
-                logger.bind(
-                    target='histmanager').warning(
-                    f'Years data dataframe for {tick_key} is empty, skipping database write')
+        if self._stop_event.is_set():
+            self._last_interrupted_timestamp = self._db_connector.read_last_timestamp(
+                'forex', ticker, TICK_TIMEFRAME
+            )
+            logger.bind(target='histmanager').warning(
+                f"Download interrupted for {ticker}; flushed tick data up to "
+                f"{self._last_interrupted_timestamp}"
+            )
+            raise DownloadInterruptedError(
+                f"Download interrupted for {ticker}; saved ticks up to "
+                f"{self._last_interrupted_timestamp}"
+            )
 
         # Download ended
         if missing_downloads:

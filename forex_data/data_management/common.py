@@ -38,6 +38,8 @@ from datetime import (
 )
 
 from pathlib import Path
+import os
+from uuid import uuid4
 
 from attrs import (
     field,
@@ -1242,61 +1244,54 @@ def read_parquet(engine, filepath):
 
 
 def write_parquet(dataframe, filepath):
+    target_path = Path(filepath)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target_path.with_name(f".{target_path.name}.{uuid4().hex}.tmp")
 
-    if isinstance(dataframe, pandas_dataframe):
+    try:
+        if isinstance(dataframe, pandas_dataframe):
+            try:
+                dataframe.to_parquet(tmp_path, index=True)
+            except Exception as e:
+                logger.exception(f'pandas write parquet failed: {e}')
+                raise
 
-        try:
+        elif isinstance(dataframe, Table):
+            try:
+                write_table(dataframe, tmp_path)
+            except Exception as e:
+                logger.exception(f'pyarrow write parquet failed: {e}')
+                raise
 
-            dataframe.to_parquet(filepath, index=True)
+        elif isinstance(dataframe, PolarsDataFrame):
+            try:
+                dataframe.write_parquet(tmp_path)
+            except Exception as e:
+                logger.exception(f'polars write parquet failed: {e}')
+                raise
 
-        except Exception as e:
+        elif isinstance(dataframe, PolarsLazyFrame):
+            try:
+                dataframe.sink_parquet(tmp_path)
+            except Exception as e:
+                logger.exception(f'polars lazyframe sink '
+                                 'parquet failed: {e}')
+                raise
 
-            logger.exception(f'pandas write parquet failed: {e}')
-            raise
+        else:
+            logger.error('function write_parquet not available'
+                         ' for instance of type'
+                         f' {type(dataframe)}')
+            raise ValueError
 
-    elif isinstance(dataframe, Table):
-
-        try:
-
-            write_table(dataframe, filepath)
-
-        except Exception as e:
-
-            logger.exception(f'pyarrow write parquet failed: {e}')
-            raise
-
-    elif isinstance(dataframe, PolarsDataFrame):
-
-        try:
-
-            dataframe.write_parquet(filepath)
-
-        except Exception as e:
-
-            logger.exception(f'polars write parquet failed: {e}')
-            raise
-
-    elif isinstance(dataframe, PolarsLazyFrame):
-
-        try:
-
-            dataframe.sink_parquet(filepath)
-
-            # alternative to sink_parquet()
-            # dataframe.collect(streaming=False).write_parquet(filepath)
-
-        except Exception as e:
-
-            logger.exception(f'polars lazyframe sink '
-                             'parquet failed: {e}')
-            raise
-
-    else:
-
-        logger.error('function write_parquet not available'
-                     ' for instance of type'
-                     f' {type(dataframe)}')
-        raise ValueError
+        os.replace(tmp_path, target_path)
+    except Exception:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+        raise
 
 
 def read_csv(engine, file, **kwargs):
