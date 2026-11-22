@@ -7,6 +7,7 @@ from pathlib import Path
 import signal
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -244,3 +245,84 @@ class TestGracefulShutdownDump(unittest.TestCase):
             self.assertEqual(out.height, 2)
         finally:
             conn.clear_temporary_folder()
+
+    def test_clear_temporary_folder_preserves_locked_sibling_temp_dir(self) -> None:
+        db_dir = self.root_path / "shared_duka_temp_lock"
+        conn_a = DukascopyConnector(data_path=str(db_dir))
+        conn_b = DukascopyConnector(data_path=str(db_dir))
+        orphan_dir = conn_b._temporary_data_path.parent / "stale-unlocked-orphan"
+        try:
+            marker = conn_a._temporary_data_path / "metadata.db"
+            marker.write_text("active", encoding="utf-8")
+            old_ts = time.time() - 3600
+            os.utime(conn_a._temporary_data_path, (old_ts, old_ts))
+
+            orphan_dir.mkdir(parents=True, exist_ok=True)
+            os.utime(orphan_dir, (old_ts, old_ts))
+
+            conn_b.clear_temporary_folder()
+            self.assertTrue(conn_a._temporary_data_path.exists())
+            self.assertTrue(marker.exists())
+            self.assertFalse(orphan_dir.exists())
+        finally:
+            conn_a.clear_temporary_folder()
+            conn_b.clear_temporary_folder()
+
+    def test_mid_year_exception_flushes_completed_months(self) -> None:
+        db_dir = self.root_path / "hist_midyear_err"
+        with patch.object(
+            DukascopyConnector, "get_available_tickers", return_value=["EURUSD"]
+        ):
+            manager = HistoricalManagerDB(
+                data_path=str(db_dir),
+                volume_data=True,
+                engine="polars_lazy",
+            )
+
+        def _failing_month_3(
+            _conn,
+            ticker,
+            year,
+            month_num,
+            temp_filepath="",
+            engine="polars_lazy",
+            start_date=None,
+            end_date=None,
+            stop_event=None,
+        ):
+            if month_num == 1:
+                return self._make_tick_lf([datetime(2024, 1, 2, 10, 0)])
+            if month_num == 2:
+                return self._make_tick_lf([datetime(2024, 2, 2, 10, 0)])
+            raise RuntimeError("simulated mid-year failure")
+
+        try:
+            with patch.object(
+                DukascopyConnector,
+                "get_available_tickers",
+                return_value=["EURUSD"],
+            ):
+                with patch.object(
+                    DukascopyConnector,
+                    "download_month_raw",
+                    autospec=True,
+                    side_effect=_failing_month_3,
+                ):
+                    with self.assertRaises(RuntimeError):
+                        manager.get_data(
+                            ticker="EURUSD",
+                            timeframe="1D",
+                            start=datetime(2024, 1, 1),
+                            end=datetime(2024, 4, 30),
+                        )
+
+                    persisted = manager._db_connector.read_data(
+                        "forex",
+                        "eurusd",
+                        "tick",
+                        datetime(2024, 1, 1),
+                        datetime(2024, 4, 30),
+                    ).collect()
+                    self.assertEqual(persisted.height, 2)
+        finally:
+            manager.close()

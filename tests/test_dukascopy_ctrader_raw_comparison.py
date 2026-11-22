@@ -1,7 +1,12 @@
+# -*- coding: utf-8 -*-
+"""Raw Dukascopy vs cTrader tick comparison tests."""
+
 from datetime import datetime
 from pathlib import Path
+import unittest
+
 import polars as pl
-import pytest
+
 from forex_data.data_management.common import (
     COLUMN_NAME,
     POLARS_DTYPE_DICT,
@@ -10,103 +15,102 @@ from forex_data.data_management.common import (
 from forex_data.data_management.remoteconnector import CTraderConnector
 
 
-def test_dukascopy_and_ctrader_raw_week_comparison():
-    """
-    Compares Dukascopy valid raw tick data for 2021 Week 4
-    (2021-01-25 00:00:00 to 2021-01-29 23:59:59 UTC)
-    with synthesized raw tick data from cTrader download_range_raw.
-    Verifies schema compliance, zero nulls/nans/non-positive values,
-    and high correlation / low MAE at 1m timeframe.
-    """
-    tick_path = Path(
-        '~/.database/HistoricalData/LocalDB/forex/EURUSD/tick/'
-        'forex_eurusd_tick_2021.parquet'
-    ).expanduser()
+class TestDukascopyCtraderRawComparison(unittest.TestCase):
+    """Compare Dukascopy reference ticks with synthesized cTrader ticks."""
 
-    if not tick_path.exists():
-        pytest.skip(f"Reference raw tick file not found: {tick_path}")
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.tick_path = Path(
+            "~/.database/HistoricalData/LocalDB/forex/EURUSD/tick/"
+            "forex_eurusd_tick_2021.parquet"
+        ).expanduser()
 
-    # 1. Load Dukascopy raw tick data for 2021 week 4
-    start_dt = datetime(2021, 1, 25, 0, 0, 0)
-    end_dt = datetime(2021, 1, 29, 23, 59, 59)
+    @classmethod
+    def tearDownClass(cls) -> None:
+        pass
 
-    duka_ticks = pl.read_parquet(tick_path).filter(
-        (pl.col(COLUMN_NAME.TIMESTAMP) >= start_dt)
-        & (pl.col(COLUMN_NAME.TIMESTAMP) <= end_dt)
-    )
-    assert duka_ticks.height > 100_000, "Dukascopy should have > 100k ticks"
+    def test_dukascopy_and_ctrader_raw_week_comparison(self) -> None:
+        """
+        Compare Dukascopy raw ticks for 2021 Week 4
+        (2021-01-25 00:00:00 to 2021-01-29 23:59:59 UTC)
+        with synthesized raw ticks from cTrader download_range_raw.
+        """
+        if not self.tick_path.exists():
+            self.skipTest(f"Reference raw tick file not found: {self.tick_path}")
 
-    # 2. Fetch cTrader synthesized raw tick data via download_range_raw
-    ctrader = CTraderConnector()
-    try:
-        ctrader.connect()
-    except Exception as exc:
-        pytest.skip(f"cTrader connection failed: {exc}")
+        start_dt = datetime(2021, 1, 25, 0, 0, 0)
+        end_dt = datetime(2021, 1, 29, 23, 59, 59)
 
-    ctrader_ticks = ctrader.download_range_raw(
-        ticker='EURUSD',
-        start_date=start_dt,
-        end_date=end_dt,
-        engine='polars'
-    )
-    if hasattr(ctrader_ticks, 'collect'):
-        ctrader_ticks = ctrader_ticks.collect()
+        duka_ticks = pl.read_parquet(self.tick_path).filter(
+            (pl.col(COLUMN_NAME.TIMESTAMP) >= start_dt)
+            & (pl.col(COLUMN_NAME.TIMESTAMP) <= end_dt)
+        )
+        self.assertGreater(duka_ticks.height, 100_000)
 
-    assert not ctrader_ticks.is_empty(), "cTrader ticks should not be empty"
+        ctrader = CTraderConnector()
+        try:
+            ctrader.connect()
+        except Exception as exc:
+            self.skipTest(f"cTrader connection failed: {exc}")
 
-    # 3. Verify cTrader tick schema matches TIME_TICK_DTYPE
-    for col_name, expected_dtype in POLARS_DTYPE_DICT.TIME_TICK_DTYPE.items():
-        assert col_name in ctrader_ticks.columns, f"Missing {col_name}"
-        assert ctrader_ticks.schema[col_name] == expected_dtype
+        ctrader_ticks = ctrader.download_range_raw(
+            ticker="EURUSD",
+            start_date=start_dt,
+            end_date=end_dt,
+            engine="polars",
+        )
+        if hasattr(ctrader_ticks, "collect"):
+            ctrader_ticks = ctrader_ticks.collect()
 
-    # 4. Universal Non-Zero Rule check on cTrader raw ticks
-    feature_cols = [c for c in ctrader_ticks.columns if c != COLUMN_NAME.TIMESTAMP]
-    bad_ticks = ctrader_ticks.filter(
-        pl.any_horizontal([
-            pl.col(c).is_null() | pl.col(c).is_nan() | (pl.col(c) <= 0.0)
-            for c in feature_cols
-        ])
-    )
-    assert bad_ticks.height == 0, f"Found {bad_ticks.height} non-positive ticks"
+        self.assertFalse(ctrader_ticks.is_empty())
 
-    # 5. Reframe both to 1m
-    duka_1m = reframe_data(duka_ticks, '1m')
-    ctrader_1m = reframe_data(ctrader_ticks, '1m')
+        for col_name, expected_dtype in POLARS_DTYPE_DICT.TIME_TICK_DTYPE.items():
+            self.assertIn(col_name, ctrader_ticks.columns)
+            self.assertEqual(ctrader_ticks.schema[col_name], expected_dtype)
 
-    assert duka_1m.height > 6_500, "Dukascopy 1m should span the full week"
-    assert ctrader_1m.height > 6_500, "cTrader 1m should span the full week"
+        feature_cols = [
+            c for c in ctrader_ticks.columns if c != COLUMN_NAME.TIMESTAMP
+        ]
+        bad_ticks = ctrader_ticks.filter(
+            pl.any_horizontal([
+                pl.col(c).is_null() | pl.col(c).is_nan() | (pl.col(c) <= 0.0)
+                for c in feature_cols
+            ])
+        )
+        self.assertEqual(bad_ticks.height, 0)
 
-    # 6. Verify 4-Point OHLC reconstruction integrity
-    valid_ohlc = ctrader_1m.filter(
-        (pl.col(COLUMN_NAME.HIGH) >= pl.col(COLUMN_NAME.LOW))
-        & (pl.col(COLUMN_NAME.HIGH) >= pl.col(COLUMN_NAME.OPEN))
-        & (pl.col(COLUMN_NAME.HIGH) >= pl.col(COLUMN_NAME.CLOSE))
-        & (pl.col(COLUMN_NAME.LOW) <= pl.col(COLUMN_NAME.OPEN))
-        & (pl.col(COLUMN_NAME.LOW) <= pl.col(COLUMN_NAME.CLOSE))
-    )
-    assert valid_ohlc.height == ctrader_1m.height, "Invalid OHLC ordering in 1m"
+        duka_1m = reframe_data(duka_ticks, "1m")
+        ctrader_1m = reframe_data(ctrader_ticks, "1m")
 
-    # 7. Compare price correlation and MAE over overlapping bars
-    joined = duka_1m.join(
-        ctrader_1m,
-        on=COLUMN_NAME.TIMESTAMP,
-        suffix='_ctrader'
-    )
-    assert joined.height > 6_800, "Expected > 6,800 overlapping 1m bars"
+        self.assertGreater(duka_1m.height, 6_500)
+        self.assertGreater(ctrader_1m.height, 6_500)
 
-    stats = joined.select(
-        pl.corr(
-            COLUMN_NAME.CLOSE,
-            f"{COLUMN_NAME.CLOSE}_ctrader"
-        ).alias("close_corr"),
-        (
-            pl.col(COLUMN_NAME.CLOSE)
-            - pl.col(f"{COLUMN_NAME.CLOSE}_ctrader")
-        ).abs().mean().alias("mae_close")
-    ).to_dicts()[0]
+        valid_ohlc = ctrader_1m.filter(
+            (pl.col(COLUMN_NAME.HIGH) >= pl.col(COLUMN_NAME.LOW))
+            & (pl.col(COLUMN_NAME.HIGH) >= pl.col(COLUMN_NAME.OPEN))
+            & (pl.col(COLUMN_NAME.HIGH) >= pl.col(COLUMN_NAME.CLOSE))
+            & (pl.col(COLUMN_NAME.LOW) <= pl.col(COLUMN_NAME.OPEN))
+            & (pl.col(COLUMN_NAME.LOW) <= pl.col(COLUMN_NAME.CLOSE))
+        )
+        self.assertEqual(valid_ohlc.height, ctrader_1m.height)
 
-    corr = stats["close_corr"]
-    mae = stats["mae_close"]
+        joined = duka_1m.join(
+            ctrader_1m,
+            on=COLUMN_NAME.TIMESTAMP,
+            suffix="_ctrader",
+        )
+        self.assertGreater(joined.height, 6_800)
 
-    assert corr > 0.999, f"Correlation {corr} is below 0.999 threshold"
-    assert mae < 0.0005, f"MAE {mae} exceeded 5 pips threshold (0.0005)"
+        stats = joined.select(
+            pl.corr(
+                COLUMN_NAME.CLOSE,
+                f"{COLUMN_NAME.CLOSE}_ctrader",
+            ).alias("close_corr"),
+            (
+                pl.col(COLUMN_NAME.CLOSE)
+                - pl.col(f"{COLUMN_NAME.CLOSE}_ctrader")
+            ).abs().mean().alias("mae_close"),
+        ).to_dicts()[0]
+
+        self.assertGreater(stats["close_corr"], 0.999)
+        self.assertLess(stats["mae_close"], 0.0005)

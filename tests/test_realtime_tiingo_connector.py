@@ -32,6 +32,14 @@ class TestTiingoConnector(unittest.TestCase):
     schema adherence, and weekend filtering.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        pass
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
     def setUp(self):
         logger.remove()
         logger.add(

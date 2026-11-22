@@ -349,6 +349,14 @@ class TestCTraderLiveConnector(unittest.TestCase):
     retrieval from demo.ctraderapi.com.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        pass
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
     @unittest.skipUnless(
         os.environ.get("RUN_REALTIME_CONNECTOR_TEST") == "1",
         "Skipped by default to prevent using API keys in pipeline. "

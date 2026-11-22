@@ -69,6 +69,8 @@ __all__ = [
     'CTRADER_TIMEFRAMES',
     'DataCharts',
     'create_historical_figure',
+    'detect_system_theme',
+    'resolve_chart_theme_palette',
     'RealtimeDashApp',
     'SupportedChartType',
     'SUPPORTED_CHARTS_TYPE'
@@ -149,6 +151,8 @@ from .historicaldata import HistoricalManagerDB
 from .charts import (
     DataCharts,
     create_historical_figure,
+    detect_system_theme,
+    resolve_chart_theme_palette,
     RealtimeDashApp,
     SupportedChartType,
     SUPPORTED_CHARTS_TYPE

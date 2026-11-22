@@ -2,7 +2,7 @@
 from loguru import logger
 import inspect
 import threading
-from typing import Any, Dict, List, Optional, Set, Union, Literal
+from typing import Any, Callable, Dict, List, Optional, Set, Union, Literal
 from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
 from uuid import uuid4
@@ -646,7 +646,8 @@ class HistoricalManagerDB:
                        end_month: int = 12,
                        missing_downloads: Optional[list] = None,
                        start_date: Optional[datetime] = None,
-                       end_date: Optional[datetime] = None) -> Union[
+                       end_date: Optional[datetime] = None,
+                       on_partial_flush: Optional[Callable[[Any], None]] = None) -> Union[
                            PolarsDataFrame,
                            PolarsLazyFrame,
                            pandas_dataframe,
@@ -659,178 +660,186 @@ class HistoricalManagerDB:
         last_db_ts = self._db_connector.read_last_timestamp('forex', ticker, TICK_TIMEFRAME, year=year)
         overlap_margin = to_timedelta(self.download_overlap_margin)
 
-        for month in MONTHS:
+        try:
+            for month in MONTHS:
 
-            if self._stop_event.is_set():
-                logger.bind(target='histmanager').warning(
-                    f"Stop requested for {ticker} {year}; stopping month loop"
-                )
-                break
-
-            month_num = MONTHS.index(month) + 1
-
-            if month_num < start_month:
-                continue
-
-            if month_num > end_month:
-                break
-
-            if year == now_utc.year and month_num > now_utc.month:
-                break
-
-            month_start = datetime(year, month_num, 1)
-            if month_num == 12:
-                month_end = datetime(year + 1, 1, 1)
-            else:
-                month_end = datetime(year, month_num + 1, 1)
-
-            # Skip download if the month is already in the db and complete
-            available_months = getattr(self._tickers_years_dict.get(ticker, {}).get(TICK_TIMEFRAME, {}), "months", {}).get(year, [])
-
-            if last_db_ts is not None and last_db_ts.year == year and month_num < last_db_ts.month:
-                if month_num in available_months:
-                    logger.bind(target='histmanager').info(
-                        f"Skipping download for {ticker} {year}-{month} (already in DB)"
+                if self._stop_event.is_set():
+                    logger.bind(target='histmanager').warning(
+                        f"Stop requested for {ticker} {year}; stopping month loop"
                     )
+                    break
+
+                month_num = MONTHS.index(month) + 1
+
+                if month_num < start_month:
                     continue
-            elif last_db_ts is None:
+
+                if month_num > end_month:
+                    break
+
+                if year == now_utc.year and month_num > now_utc.month:
+                    break
+
+                month_start = datetime(year, month_num, 1)
+                if month_num == 12:
+                    month_end = datetime(year + 1, 1, 1)
+                else:
+                    month_end = datetime(year, month_num + 1, 1)
+
+                # Skip download if the month is already in the db and complete
+                available_months = getattr(self._tickers_years_dict.get(ticker, {}).get(TICK_TIMEFRAME, {}), "months", {}).get(year, [])
+
+                if last_db_ts is not None and last_db_ts.year == year and month_num < last_db_ts.month:
+                    if month_num in available_months:
+                        logger.bind(target='histmanager').info(
+                            f"Skipping download for {ticker} {year}-{month} (already in DB)"
+                        )
+                        continue
+                elif last_db_ts is None:
+                    is_current_month = (year == now_utc.year and month_num == now_utc.month)
+                    if not is_current_month and month_num in available_months:
+                        logger.bind(target='histmanager').info(
+                            f"Skipping download for {ticker} {year}-{month} (already in DB)"
+                        )
+                        continue
+
+                # Determine start and end date for this month's download
                 is_current_month = (year == now_utc.year and month_num == now_utc.month)
-                if not is_current_month and month_num in available_months:
+
+                if last_db_ts is not None and last_db_ts.year == year and month_num == last_db_ts.month:
+                    # Incremental download: start from last known timestamp minus overlap margin to prevent data holes
+                    download_start = max(month_start, last_db_ts - overlap_margin).replace(minute=0, second=0, microsecond=0)
+                else:
+                    download_start = month_start
+
+                if is_current_month:
+                    download_end = min(month_end, now_utc)
+                    if end_date is not None and end_date < download_end:
+                        download_end = min(download_end, end_date)
+                else:
+                    download_end = month_end
+
+                if download_start >= download_end:
                     logger.bind(target='histmanager').info(
-                        f"Skipping download for {ticker} {year}-{month} (already in DB)"
+                        f"Data for {ticker} {year}-{month} is already up to date in DB (last ts: {last_db_ts}), skipping download"
                     )
                     continue
 
-            # Determine start and end date for this month's download
-            is_current_month = (year == now_utc.year and month_num == now_utc.month)
+                month_data = None
+                last_err = None
+                for connector in self._histdata_connector:
+                    if self._stop_event.is_set():
+                        break
+                    if (
+                        isinstance(connector, HistDataConnector) and
+                        year == now_utc.year and
+                        month_num == now_utc.month
+                    ):
+                        continue
 
-            if last_db_ts is not None and last_db_ts.year == year and month_num == last_db_ts.month:
-                # Incremental download: start from last known timestamp minus overlap margin to prevent data holes
-                download_start = max(month_start, last_db_ts - overlap_margin).replace(minute=0, second=0, microsecond=0)
-            else:
-                download_start = month_start
+                    try:
+                        if ticker.upper() not in connector.get_available_tickers():
+                            continue
+                    except Exception:
+                        continue
 
-            if is_current_month:
-                download_end = min(month_end, now_utc)
-                if end_date is not None and end_date < download_end:
-                    download_end = min(download_end, end_date)
-            else:
-                download_end = month_end
+                    try:
+                        conn_engine = self.engine
+                        if isinstance(connector, DukascopyConnector) and conn_engine not in ('polars', 'polars_lazy'):
+                            conn_engine = 'polars'
 
-            if download_start >= download_end:
-                logger.bind(target='histmanager').info(
-                    f"Data for {ticker} {year}-{month} is already up to date in DB (last ts: {last_db_ts}), skipping download"
-                )
-                continue
+                        dl_month_kwargs: Dict[str, Any] = {
+                            "engine": conn_engine,
+                            "start_date": download_start,
+                            "end_date": download_end,
+                        }
+                        try:
+                            dl_params = inspect.signature(connector.download_month_raw).parameters
+                            if "stop_event" in dl_params:
+                                dl_month_kwargs["stop_event"] = self._stop_event
+                        except (TypeError, ValueError):
+                            pass
 
-            month_data = None
-            last_err = None
-            for connector in self._histdata_connector:
+                        month_data = connector.download_month_raw(
+                            ticker,
+                            year,
+                            month_num,
+                            **dl_month_kwargs,
+                        )
+
+                        if isinstance(connector, DukascopyConnector) and self.engine not in ('polars', 'polars_lazy'):
+                            if self.engine == 'pandas':
+                                month_data = month_data.to_pandas()
+                            elif self.engine == 'pyarrow':
+                                month_data = month_data.to_arrow()
+
+                        if is_empty_dataframe(month_data):
+                            if self._stop_event.is_set():
+                                last_err = None
+                                break
+                            raise TickerDataNotFoundError("Ticker data is empty/not found")
+
+                        last_err = None
+                        break
+                    except TickerDataBadTypeException as e:
+                        last_err = e
+                        logger.bind(target='histmanager').warning(
+                            f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
+                        )
+                        if connector == self._histdata_connector[-1]:
+                            raise e
+                    except TickerDataNotFoundError as e:
+                        last_err = e
+                        logger.bind(target='histmanager').warning(
+                            f"Ticker {ticker}-{year}-{month} not found for connector {connector.__class__.__name__}."
+                        )
+                        if connector == self._histdata_connector[-1]:
+                            if missing_downloads is not None:
+                                missing_downloads.append(f"{ticker}-{year}-{month}")
+                    except Exception as e:
+                        last_err = e
+                        logger.bind(target='histmanager').warning(
+                            f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
+                        )
+                        if connector == self._histdata_connector[-1]:
+                            raise e
+
+                if last_err is not None:
+                    if (
+                        year == now_utc.year and
+                        month_num >= now_utc.month
+                    ):
+                        logger.bind(target='histmanager').warning(
+                            f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data"
+                        )
+                        break
+                    if isinstance(last_err, TickerDataNotFoundError):
+                        continue
+                    elif isinstance(last_err, TickerDataBadTypeException):
+                        raise last_err
+                    else:
+                        raise last_err
+
+                if month_data is not None and not is_empty_dataframe(month_data):
+
+                    # if first iteration, assign instead of concat
+                    if is_empty_dataframe(year_tick_df):
+
+                        year_tick_df = month_data
+
+                    else:
+
+                        year_tick_df = concat_data([year_tick_df, month_data])
+
                 if self._stop_event.is_set():
                     break
-                if (
-                    isinstance(connector, HistDataConnector) and
-                    year == now_utc.year and
-                    month_num == now_utc.month
-                ):
-                    continue
-
-                try:
-                    if ticker.upper() not in connector.get_available_tickers():
-                        continue
-                except Exception:
-                    continue
-
-                try:
-                    conn_engine = self.engine
-                    if isinstance(connector, DukascopyConnector) and conn_engine not in ('polars', 'polars_lazy'):
-                        conn_engine = 'polars'
-
-                    dl_month_kwargs: Dict[str, Any] = {
-                        "engine": conn_engine,
-                        "start_date": download_start,
-                        "end_date": download_end,
-                    }
-                    try:
-                        dl_params = inspect.signature(connector.download_month_raw).parameters
-                        if "stop_event" in dl_params:
-                            dl_month_kwargs["stop_event"] = self._stop_event
-                    except (TypeError, ValueError):
-                        pass
-
-                    month_data = connector.download_month_raw(
-                        ticker,
-                        year,
-                        month_num,
-                        **dl_month_kwargs,
-                    )
-
-                    if isinstance(connector, DukascopyConnector) and self.engine not in ('polars', 'polars_lazy'):
-                        if self.engine == 'pandas':
-                            month_data = month_data.to_pandas()
-                        elif self.engine == 'pyarrow':
-                            month_data = month_data.to_arrow()
-
-                    if is_empty_dataframe(month_data):
-                        if self._stop_event.is_set():
-                            last_err = None
-                            break
-                        raise TickerDataNotFoundError("Ticker data is empty/not found")
-
-                    last_err = None
-                    break
-                except TickerDataBadTypeException as e:
-                    last_err = e
-                    logger.bind(target='histmanager').warning(
-                        f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
-                    )
-                    if connector == self._histdata_connector[-1]:
-                        raise e
-                except TickerDataNotFoundError as e:
-                    last_err = e
-                    logger.bind(target='histmanager').warning(
-                        f"Ticker {ticker}-{year}-{month} not found for connector {connector.__class__.__name__}."
-                    )
-                    if connector == self._histdata_connector[-1]:
-                        if missing_downloads is not None:
-                            missing_downloads.append(f"{ticker}-{year}-{month}")
-                except Exception as e:
-                    last_err = e
-                    logger.bind(target='histmanager').warning(
-                        f"Connector {connector.__class__.__name__} failed for {ticker}-{year}-{month}: {e}. Trying fallback."
-                    )
-                    if connector == self._histdata_connector[-1]:
-                        raise e
-
-            if last_err is not None:
-                if (
-                    year == now_utc.year and
-                    month_num >= now_utc.month
-                ):
-                    logger.bind(target='histmanager').warning(
-                        f"Ticker {ticker}-{year}-{MONTHS[month_num - 1]} query exceeded data availability for Historical Data"
-                    )
-                    break
-                if isinstance(last_err, TickerDataNotFoundError):
-                    continue
-                elif isinstance(last_err, TickerDataBadTypeException):
-                    raise last_err
-                else:
-                    raise last_err
-
-            if month_data is not None and not is_empty_dataframe(month_data):
-
-                # if first iteration, assign instead of concat
-                if is_empty_dataframe(year_tick_df):
-
-                    year_tick_df = month_data
-
-                else:
-
-                    year_tick_df = concat_data([year_tick_df, month_data])
-
-            if self._stop_event.is_set():
-                break
+        except Exception:
+            if on_partial_flush is not None and not is_empty_dataframe(year_tick_df):
+                logger.bind(target='histmanager').warning(
+                    f"Download failed mid-year for {ticker} {year}; flushing completed months."
+                )
+                on_partial_flush(sort_dataframe(year_tick_df, COLUMN_NAME.TIMESTAMP))
+            raise
 
         return sort_dataframe(year_tick_df,
                               COLUMN_NAME.TIMESTAMP)
@@ -906,6 +915,10 @@ class HistoricalManagerDB:
                 y_start_date = start_date if year == start_year else None
                 y_end_date = end_date if year == end_year else None
 
+                tick_key = self._db_connector._db_key('forex',
+                                                      ticker,
+                                                      TICK_TIMEFRAME,
+                                                      year)
                 year_tick_df = self._download_year(
                     ticker,
                     year,
@@ -914,12 +927,10 @@ class HistoricalManagerDB:
                     missing_downloads=missing_downloads,
                     start_date=y_start_date,
                     end_date=y_end_date,
+                    on_partial_flush=lambda df, k=tick_key, y=year: self._persist_tick_data(
+                        ticker, k, df, [y]
+                    ),
                 )
-
-                tick_key = self._db_connector._db_key('forex',
-                                                      ticker,
-                                                      TICK_TIMEFRAME,
-                                                      year)
                 self._persist_tick_data(ticker, tick_key, year_tick_df, [year])
 
                 if self._stop_event.is_set():
@@ -928,6 +939,9 @@ class HistoricalManagerDB:
             # download data for each year and aggregate
             years_data_df = empty_dataframe(self.engine)
             processed_years: List[int] = []
+            tick_key = self._db_connector._db_key('forex',
+                                                  ticker,
+                                                  TICK_TIMEFRAME)
             for year in years:
                 if self._stop_event.is_set():
                     break
@@ -937,6 +951,15 @@ class HistoricalManagerDB:
                 y_start_date = start_date if year == start_year else None
                 y_end_date = end_date if year == end_year else None
 
+                def _flush_on_error(partial_df, cur_year=year):
+                    merged = (
+                        partial_df
+                        if is_empty_dataframe(years_data_df)
+                        else concat_data([years_data_df, partial_df])
+                    )
+                    flushed_years = list(dict.fromkeys(processed_years + [cur_year]))
+                    self._persist_tick_data(ticker, tick_key, merged, flushed_years)
+
                 year_tick_df = self._download_year(
                     ticker,
                     year,
@@ -945,6 +968,7 @@ class HistoricalManagerDB:
                     missing_downloads=missing_downloads,
                     start_date=y_start_date,
                     end_date=y_end_date,
+                    on_partial_flush=_flush_on_error,
                 )
 
                 if not is_empty_dataframe(year_tick_df):
@@ -957,9 +981,6 @@ class HistoricalManagerDB:
                 if self._stop_event.is_set():
                     break
 
-            tick_key = self._db_connector._db_key('forex',
-                                                  ticker,
-                                                  TICK_TIMEFRAME)
             self._persist_tick_data(
                 ticker,
                 tick_key,

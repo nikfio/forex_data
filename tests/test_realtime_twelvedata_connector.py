@@ -35,6 +35,14 @@ class TestTwelveDataConnector(unittest.TestCase):
     get_recent_data) return valid, non-empty LazyFrames.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        pass
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
     def setUp(self):
         # We allow test_get_data_invalid_start_date, test_weekend_data_filtering,
         # and test_get_recent_data_weekend_shifting to run without API keys.

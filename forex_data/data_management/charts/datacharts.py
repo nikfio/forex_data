@@ -1,12 +1,13 @@
 from typing import Any
+import datetime
+import plotly.graph_objects as go
+import polars as pl
+from loguru import logger
 from forex_data.data_management.historicaldata import HistoricalManagerDB
 from forex_data.data_management.charts.common import SupportedChartType
 from forex_data.data_management.charts.figures import create_historical_figure
 from forex_data.data_management.charts.realtime import RealtimeDashApp
 from forex_data.data_management.common import is_empty_dataframe
-from loguru import logger
-import polars as pl
-import datetime
 
 
 class DataCharts(HistoricalManagerDB):
@@ -39,8 +40,13 @@ class DataCharts(HistoricalManagerDB):
         timeframe: str,
         start_date: str,
         end_date: str,
-        chart_type: str = SupportedChartType.OHLC
-    ) -> None:
+        chart_type: str = SupportedChartType.OHLC,
+        show_volume: bool = True,
+        theme: str = "auto",
+        show: bool = True,
+        title: str | None = None,
+        show_vwmp: bool = False,
+    ) -> go.Figure | None:
         """
         Plots historical data for the specified ticker and date range.
 
@@ -50,6 +56,14 @@ class DataCharts(HistoricalManagerDB):
             start_date: Start date string.
             end_date: End date string.
             chart_type: Type of chart to plot.
+            show_volume: Render volume bar subplot when volume data exists.
+            theme: Chart theme ('auto', 'dark', or 'light').
+            show: Open interactive figure immediately when True.
+            title: Optional custom chart title.
+            show_vwmp: Overlay VWMP trace when available.
+
+        Returns:
+            Constructed Plotly figure, or None if no data was found.
         """
         chart_data = self.get_data(
             ticker=ticker,
@@ -61,10 +75,20 @@ class DataCharts(HistoricalManagerDB):
         if chart_data is None or is_empty_dataframe(chart_data):
             logger.warning(
                 f"No data found for {ticker} from {start_date} to {end_date}")
-            return
+            return None
 
-        fig = create_historical_figure(chart_data, ticker, chart_type)
-        fig.show()
+        fig = create_historical_figure(
+            chart_data,
+            ticker,
+            chart_type,
+            show_volume=show_volume,
+            theme=theme,
+            title=title,
+            show_vwmp=show_vwmp,
+        )
+        if show:
+            fig.show()
+        return fig
 
     def start_realtime_plot(
         self,

@@ -72,6 +72,8 @@ from .data_management import (
     random_date_between,
     DataCharts,
     create_historical_figure,
+    detect_system_theme,
+    resolve_chart_theme_palette,
     RealtimeDashApp,
     SupportedChartType,
     SUPPORTED_CHARTS_TYPE
@@ -145,6 +147,8 @@ __all__ = [
     'random_date_between',
     'DataCharts',
     'create_historical_figure',
+    'detect_system_theme',
+    'resolve_chart_theme_palette',
     'RealtimeDashApp',
     'SupportedChartType',
     'SUPPORTED_CHARTS_TYPE',

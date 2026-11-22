@@ -42,6 +42,7 @@ from uuid import uuid4
 from zipfile import BadZipFile, ZipExtFile, ZipFile
 
 from bs4 import BeautifulSoup
+from filelock import FileLock, Timeout as FileLockTimeout
 import pandas as pd
 import polars as pl
 from polars import (
@@ -174,6 +175,7 @@ class RemoteConnector:
     # internal parameters
     _tickers_years_info_filepath = field(default=Path('.'))
     _temporary_data_path = field(default=Path('.'))
+    _temp_dir_lock: Any = field(default=None, init=False, repr=False)
 
     def __init__(self, **kwargs: Any) -> None:
 
@@ -206,7 +208,38 @@ class RemoteConnector:
 
         # remove any left over files in case of previous crash
         self.clear_temporary_folder()
-        self._temporary_data_path.mkdir(parents=True, exist_ok=False)
+        self._ensure_temporary_folder(exist_ok=False)
+
+    def _acquire_temp_lock(self) -> None:
+        """Hold a non-blocking OS lock for `_temporary_data_path` across active runs."""
+        if self._temp_dir_lock is not None or self._temporary_data_path == Path('.'):
+            return
+        self._temporary_data_path.parent.mkdir(parents=True, exist_ok=True)
+        lock = FileLock(f"{self._temporary_data_path}.lock")
+        lock.acquire(timeout=0)
+        self._temp_dir_lock = lock
+
+    def _release_temp_lock(self) -> None:
+        """Release and remove the OS lock file for `_temporary_data_path`."""
+        lock = self._temp_dir_lock
+        self._temp_dir_lock = None
+        if lock is not None:
+            try:
+                lock.release()
+            except Exception:
+                pass
+        if self._temporary_data_path != Path('.'):
+            lock_path = Path(f"{self._temporary_data_path}.lock")
+            if lock_path.exists():
+                try:
+                    lock_path.unlink()
+                except OSError:
+                    pass
+
+    def _ensure_temporary_folder(self, exist_ok: bool = True) -> None:
+        """Ensure `_temporary_data_path` exists and is lock-protected from orphan GC."""
+        self._acquire_temp_lock()
+        self._temporary_data_path.mkdir(parents=True, exist_ok=exist_ok)
 
     def connect(self) -> Any:
         """Connect to database - must be implemented by subclasses."""
@@ -233,20 +266,49 @@ class RemoteConnector:
                 logger.bind(target='dukascopy').warning(
                     f"Failed to delete temporary directory {self._temporary_data_path}: {e}"
                 )
+        self._release_temp_lock()
 
         # Clean up any orphaned temp directories from previous crashed sessions
-        # that are older than 15 minutes.
+        # that are no longer lock-held by another live process and older than 15m.
         temp_root = self.data_path / TEMP_FOLDER
         if temp_root.exists() and temp_root.is_dir():
             now = time.time()
             for p in temp_root.iterdir():
                 if p.is_dir() and p != self._temporary_data_path:
+                    orphan_lock_path = Path(f"{p}.lock")
+                    orphan_lock = FileLock(str(orphan_lock_path))
                     try:
-                        # If the folder is older than 15 minutes, clean it up
+                        orphan_lock.acquire(timeout=0)
+                    except FileLockTimeout:
+                        continue
+                    try:
                         if now - p.stat().st_mtime > 900:
                             shutil.rmtree(p)
                     except Exception:
                         pass
+                    finally:
+                        try:
+                            orphan_lock.release()
+                        except Exception:
+                            pass
+                        if not p.exists() and orphan_lock_path.exists():
+                            try:
+                                orphan_lock_path.unlink()
+                            except OSError:
+                                pass
+                elif p.is_file() and p.name.endswith(".lock"):
+                    target_dir = temp_root / p.name[:-5]
+                    if not target_dir.exists() and p != Path(f"{self._temporary_data_path}.lock"):
+                        stale_lock = FileLock(str(p))
+                        try:
+                            stale_lock.acquire(timeout=0)
+                        except FileLockTimeout:
+                            continue
+                        try:
+                            stale_lock.release()
+                            p.unlink()
+                        except Exception:
+                            pass
 
             try:
                 # If the root temp directory is empty, remove it
@@ -555,7 +617,7 @@ class HistDataConnector(RemoteConnector):
             If the extracted file type is unexpected.
         """
 
-        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
+        self._ensure_temporary_folder(exist_ok=True)
 
         try:
             temp_filepath = str(
@@ -1279,7 +1341,7 @@ class DukascopyConnector(RemoteConnector):
             raise RuntimeError("tick_vault is not installed.")
 
         # Ensure temporary data path exists and reconfigure tick_vault to use it
-        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
+        self._ensure_temporary_folder(exist_ok=True)
         self._setup_tick_vault_logging()
         if reload_config is not None:
             reload_config(
@@ -1445,7 +1507,7 @@ class DukascopyConnector(RemoteConnector):
             raise RuntimeError("tick_vault is not installed.")
 
         # Ensure temporary data path exists and reconfigure tick_vault to use it
-        self._temporary_data_path.mkdir(parents=True, exist_ok=True)
+        self._ensure_temporary_folder(exist_ok=True)
         self._setup_tick_vault_logging()
         if reload_config is not None:
             reload_config(
