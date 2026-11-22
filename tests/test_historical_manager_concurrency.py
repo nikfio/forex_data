@@ -104,7 +104,10 @@ class TestHistoricalManagerConcurrency(unittest.TestCase):
         if _data_path.exists():
             shutil.rmtree(_data_path)
 
-        cls.hist_manager = HistoricalManagerDB(config=test_config_yaml)
+        cls.hist_manager = HistoricalManagerDB(
+            config=test_config_yaml,
+            offline=os.environ.get("RUN_DUCKASCOPY_DOWNLOAD_TESTS") != "1",
+        )
 
     @classmethod
     def tearDownClass(cls):

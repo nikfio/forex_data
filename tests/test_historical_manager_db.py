@@ -54,6 +54,17 @@ __all__ = ['TestHistoricalManagerDB']
 
 from pathlib import Path
 
+_RUN_HIST_DOWNLOADS = os.environ.get("RUN_HISTORICAL_DOWNLOAD_TESTS") == "1"
+_RUN_ANY_DOWNLOADS = (
+    _RUN_HIST_DOWNLOADS
+    or os.environ.get("RUN_DOWNLOAD_CURRENT_MONTH_TESTS") == "1"
+    or os.environ.get("RUN_DUCKASCOPY_DOWNLOAD_TESTS") == "1"
+)
+_HIST_SKIP_REASON = (
+    "Skipped by default to prevent long HistData/Dukascopy downloads in CI. "
+    "Run with RUN_HISTORICAL_DOWNLOAD_TESTS=1"
+)
+
 _env_data_path = os.getenv("TEST_DATA_PATH")
 if _env_data_path:
     _data_path = Path(_env_data_path)
@@ -79,11 +90,18 @@ class TestHistoricalManagerDB(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures that are shared across all tests."""
-
-        # Create manager instance for tests
-        cls.hist_manager = HistoricalManagerDB(
-            config=test_config_yaml
-        )
+        if _RUN_ANY_DOWNLOADS:
+            cls.hist_manager = HistoricalManagerDB(
+                config=test_config_yaml
+            )
+        else:
+            cls.hist_manager = HistoricalManagerDB(
+                config=test_config_yaml,
+                offline=True,
+            )
+            cls.hist_manager._histdata_tickers_list = [
+                'EURUSD', 'EURJPY', 'GBPUSD'
+            ]
 
     @classmethod
     def tearDownClass(cls):
@@ -99,21 +117,37 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
     def test_01_initialization_with_config(self):
         """Test that HistoricalManagerDB initializes correctly with config."""
-        manager = HistoricalManagerDB(
-            config=test_config_yaml
-        )
+        with patch.object(
+            HistDataConnector, 'get_available_tickers', return_value=['EURUSD']
+        ), patch.object(
+            DukascopyConnector, 'get_available_tickers', return_value=['EURUSD']
+        ):
+            manager = HistoricalManagerDB(
+                config=test_config_yaml
+            )
 
-        self.assertIsNotNone(manager)
-        self.assertEqual(manager.data_type, 'parquet')
-        self.assertEqual(manager.engine, 'polars_lazy')
+        try:
+            self.assertIsNotNone(manager)
+            self.assertEqual(manager.data_type, 'parquet')
+            self.assertEqual(manager.engine, 'polars_lazy')
+        finally:
+            manager.close()
 
     def test_02_initialization_without_config(self):
         """Test that HistoricalManagerDB initializes with defaults."""
-        manager = HistoricalManagerDB()
+        with patch.object(
+            HistDataConnector, 'get_available_tickers', return_value=['EURUSD']
+        ), patch.object(
+            DukascopyConnector, 'get_available_tickers', return_value=['EURUSD']
+        ):
+            manager = HistoricalManagerDB()
 
-        self.assertIsNotNone(manager)
-        self.assertEqual(manager.data_type, 'parquet')
-        self.assertEqual(manager.engine, 'polars_lazy')
+        try:
+            self.assertIsNotNone(manager)
+            self.assertEqual(manager.data_type, 'parquet')
+            self.assertEqual(manager.engine, 'polars_lazy')
+        finally:
+            manager.close()
 
     def test_03_data_type_validation(self):
         """Test that invalid data_type raises appropriate error."""
@@ -131,6 +165,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 engine='invalid_engine'
             )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_05_get_data_with_daily_timeframe(self):
         """Test retrieving data with daily (1D) timeframe."""
         ticker = 'EURUSD'
@@ -155,6 +190,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         self.assertGreater(len(data), 0)
         self.assertIn('timestamp', data.columns)
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_06_get_data_with_3day_timeframe(self):
         """Test retrieving data with 3-day (3D) timeframe."""
         ticker = 'EURUSD'
@@ -177,6 +213,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
         self.assertGreater(len(data), 0)
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_07_get_data_date_range_validation(self):
         """Test that data is within requested date range."""
         ticker = 'EURJPY'
@@ -201,6 +238,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             self.assertGreaterEqual(min_date, start)
             self.assertLessEqual(max_date, end)
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_08_get_data_with_weekly_timeframe(self):
         """Test get_data with weekly (1W) timeframe."""
         ticker = 'EURJPY'
@@ -235,6 +273,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             f"{random_candles[0]['timestamp'][0]}"
         )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_09_data_columns_present(self):
         """Test that retrieved data has expected columns."""
         ticker = 'EURJPY'
@@ -257,6 +296,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             self.assertIn(column, data.columns,
                           msg=f"Column '{column}' missing from data")
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_10_data_sorted_by_timestamp(self):
         """Test that data is sorted by timestamp in ascending order."""
         ticker = 'EURJPY'
@@ -279,6 +319,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             self.assertEqual(timestamps, sorted(timestamps),
                              msg="Data not sorted by timestamp")
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_11_no_duplicate_timestamps(self):
         """Test that there are no duplicate timestamps in the data."""
         ticker = 'EURJPY'
@@ -313,6 +354,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         if hasattr(self.hist_manager, '_tf_list'):
             self.assertIn(new_timeframe, self.hist_manager._tf_list)
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_13_multiple_timeframes(self):
         """Test retrieving data for multiple different timeframes."""
         ticker = 'EURJPY'
@@ -331,6 +373,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             self.assertIsNotNone(data,
                                  msg=f"Failed to retrieve data for timeframe {tf}")
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_14_empty_date_range(self):
         """Test behavior with a very narrow date range that might return no data."""
         ticker = 'EURJPY'
@@ -368,6 +411,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 end=end
             )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_16_ticker_case_handling(self):
         """Test that ticker symbols are handled consistently."""
         timeframe = '1D'
@@ -417,6 +461,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 end=end
             )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_18_clear_database_and_redownload(self):
         """
         Test that clear_database wipes data for a specific ticker
@@ -490,6 +535,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         # Final check that ticker is back in the list
         self.assertIn(ticker.lower(), self.hist_manager._get_ticker_list())
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_19_get_histdata_tickers(self):
         """Test retrieving available tickers from HistData.com."""
         tickers = get_histdata_tickers(verify=False)
@@ -503,6 +549,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             self.assertTrue(ticker.isupper(), msg=f"Ticker {ticker} is not uppercase")
             self.assertGreaterEqual(len(ticker), 6, msg=f"Ticker {ticker} is too short")
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_20_get_data_with_single_condition_less_than(self):
         """Test get_data with single condition filtering (OPEN < threshold)."""
         ticker = 'EURUSD'
@@ -537,6 +584,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 msg=f"Found OPEN value {max_open} >= threshold {min_open_value}"
             )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_21_get_data_with_multiple_conditions_or(self):
         """Test get_data with multiple conditions using OR aggregation."""
         ticker = 'EURUSD'
@@ -581,6 +629,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                     f"HIGH={row['high']}, LOW={row['low']}"
                 )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_22_get_data_with_multiple_conditions_and(self):
         """Test get_data with multiple conditions using AND aggregation."""
         ticker = 'EURUSD'
@@ -628,6 +677,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                     msg=f"LOW={row['low']} not greater than {low_threshold}"
                 )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_23_get_data_with_condition_greater_than_or_equal(self):
         """Test get_data with GREATER_THAN_OR_EQUAL condition."""
         ticker = 'EURUSD'
@@ -679,6 +729,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
                 msg=f"Found CLOSE value {min_close} < threshold {close_threshold}"
             )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_24_business_days_data_filtering(self):
         """
         Test business_days_data function filters out weekends and
@@ -791,6 +842,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             msg="Filtered data should have same columns as raw data"
         )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_25_close_saves_tickers_years_info(self):
         """
         Test that close() method saves tickers years information correctly.
@@ -844,6 +896,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             msg=f"Ticker {ticker} should be in loaded tickers_years_dict"
         )
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_26_tickers_years_info_regeneration(self):
         """
         Test that deleting the tickers years info file and
@@ -983,6 +1036,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         msg = f"No data downloaded for {ticker} in {current_year}"
         self.assertGreater(len(data), 0, msg=msg)
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_30_download_histdata_computerror_fallback_correction(self):
         """
         Test download of year 2004 for EURUSD and GBPUSD.
@@ -1037,6 +1091,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
             # HistData successfully corrected the data
             mock_duka.assert_not_called()
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_31_read_data_window(self):
         """
         Test read_data with window parameter
@@ -1064,6 +1119,7 @@ class TestHistoricalManagerDB(unittest.TestCase):
         expected_rows = periods
         self.assertEqual(data.shape[0], expected_rows)
 
+    @unittest.skipUnless(_RUN_HIST_DOWNLOADS, _HIST_SKIP_REASON)
     def test_32_read_last_timestamp(self):
         """
         Test read_last_timestamp function
@@ -1120,40 +1176,58 @@ class TestHistoricalManagerDB(unittest.TestCase):
 
     def test_33_max_discrepancy_validation(self):
         """Test that max_discrepancy_with_now defaults to 2h and validates inputs."""
-        default_manager = HistoricalManagerDB()
-        self.assertEqual(
-            default_manager.max_discrepancy_with_now,
-            DISCREPANCY_ONLY_DUKASCOPY,
-        )
+        with patch.object(
+            DukascopyConnector, 'get_available_tickers', return_value=['EURUSD']
+        ):
+            default_manager = HistoricalManagerDB()
+            try:
+                self.assertEqual(
+                    default_manager.max_discrepancy_with_now,
+                    DISCREPANCY_ONLY_DUKASCOPY,
+                )
+            finally:
+                default_manager.close()
 
-        # 1. Valid string representing a timedelta should succeed
-        manager = HistoricalManagerDB(max_discrepancy_with_now='2D')
-        self.assertEqual(manager.max_discrepancy_with_now, '2D')
+            # 1. Valid string representing a timedelta should succeed
+            manager = HistoricalManagerDB(max_discrepancy_with_now='2D')
+            try:
+                self.assertEqual(manager.max_discrepancy_with_now, '2D')
+            finally:
+                manager.close()
 
-        # 1b. Macro constant name string resolves to '2h'
-        manager_macro = HistoricalManagerDB(
-            max_discrepancy_with_now='DISCREPANCY_ONLY_DUKASCOPY'
-        )
-        self.assertEqual(manager_macro.max_discrepancy_with_now, '2h')
+            # 1b. Macro constant name string resolves to '2h'
+            manager_macro = HistoricalManagerDB(
+                max_discrepancy_with_now='DISCREPANCY_ONLY_DUKASCOPY'
+            )
+            try:
+                self.assertEqual(manager_macro.max_discrepancy_with_now, '2h')
+            finally:
+                manager_macro.close()
 
-        # 2. Non-string should raise TypeError
-        with self.assertRaises(TypeError):
-            HistoricalManagerDB(max_discrepancy_with_now=123)
+            # 2. Non-string should raise TypeError
+            with self.assertRaises(TypeError):
+                HistoricalManagerDB(max_discrepancy_with_now=123)
 
-        # 3. Invalid timedelta string should raise ValueError
-        with self.assertRaises(ValueError):
-            HistoricalManagerDB(max_discrepancy_with_now='invalid_td')
+            # 3. Invalid timedelta string should raise ValueError
+            with self.assertRaises(ValueError):
+                HistoricalManagerDB(max_discrepancy_with_now='invalid_td')
 
     def test_33b_download_overlap_margin_validation(self):
         """Test that download_overlap_margin is correctly validated on init."""
-        manager = HistoricalManagerDB(download_overlap_margin='4h')
-        self.assertEqual(manager.download_overlap_margin, '4h')
+        with patch.object(
+            DukascopyConnector, 'get_available_tickers', return_value=['EURUSD']
+        ):
+            manager = HistoricalManagerDB(download_overlap_margin='4h')
+            try:
+                self.assertEqual(manager.download_overlap_margin, '4h')
+            finally:
+                manager.close()
 
-        with self.assertRaises(TypeError):
-            HistoricalManagerDB(download_overlap_margin=123)
+            with self.assertRaises(TypeError):
+                HistoricalManagerDB(download_overlap_margin=123)
 
-        with self.assertRaises(ValueError):
-            HistoricalManagerDB(download_overlap_margin='invalid_td')
+            with self.assertRaises(ValueError):
+                HistoricalManagerDB(download_overlap_margin='invalid_td')
 
     def test_33c_download_year_incremental_boundaries(self):
         """Test _download_year incremental download start with overlap margin."""
@@ -1168,19 +1242,22 @@ class TestHistoricalManagerDB(unittest.TestCase):
             captured_kwargs['end_date'] = end_date
             return PolarsDataFrame(schema=POLARS_DTYPE_DICT.TIME_TICK_DTYPE).lazy()
 
-        manager = HistoricalManagerDB(volume_data=True, download_overlap_margin='2h')
         with patch.object(
+            DukascopyConnector, 'get_available_tickers',
+            return_value=[ticker.upper()]
+        ), patch.object(
             LocalDBYearConnector, 'read_last_timestamp', return_value=mock_last_ts
+        ), patch.object(
+            DukascopyConnector, 'download_month_raw',
+            side_effect=mock_download_month
         ):
-            with patch.object(
-                DukascopyConnector, 'download_month_raw',
-                side_effect=mock_download_month
-            ):
-                with patch.object(
-                    DukascopyConnector, 'get_available_tickers',
-                    return_value=[ticker.upper()]
-                ):
-                    manager._download_year(ticker, 2026, start_month=10, end_month=10)
+            manager = HistoricalManagerDB(
+                volume_data=True, download_overlap_margin='2h'
+            )
+            try:
+                manager._download_year(ticker, 2026, start_month=10, end_month=10)
+            finally:
+                manager.close()
 
         self.assertIn('start_date', captured_kwargs)
         # 2026-10-19 21:59:35 - 2h = 19:59:35, rounded to hour = 19:00:00

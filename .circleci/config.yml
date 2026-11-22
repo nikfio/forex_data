@@ -31,6 +31,7 @@ run_tests:
   &run_tests
   name: run tests
   command: |
+    set -o pipefail
     mkdir -p test-results
     uv run pytest --flake8 -vv --junitxml=test-results/junit.xml 2>&1 | tee test-results/console_output.log
 
@@ -42,7 +43,7 @@ run_profiling:
     echo "Profiling fast test suite execution..."
     uv run pyinstrument --renderer pyisession \
       --outfile test-results/profiling/full_test_suite.pyisession \
-      -m pytest --ignore=tests/test_historical_manager_db.py -vv
+      -m pytest -vv
     uv run pyinstrument --load test-results/profiling/full_test_suite.pyisession \
       --renderer html \
       --outfile test-results/profiling/full_test_suite.html
